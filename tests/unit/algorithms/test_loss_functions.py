@@ -20,11 +20,13 @@ import torch
 from nemo_rl.algorithms.loss import (
     ClippedPGLossConfig,
     ClippedPGLossFn,
+    CrossTokenizerDistillationLossFn,
     DistillationLossFn,
     DPOLossFn,
     NLLLossFn,
     prepare_loss_input,
 )
+from nemo_rl.algorithms.x_token import TokenAligner
 from nemo_rl.algorithms.utils import calculate_kl, masked_mean
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 
@@ -1996,3 +1998,69 @@ def test_distillation_loss_fn_call():
     expected_fields = ["loss"]
     for field in expected_fields:
         assert field in metrics
+
+
+def test_cross_tokenizer_loss_requires_teacher_logits():
+    """Cross-tokenizer loss should fail fast when teacher logits are missing."""
+    # Build a TokenAligner instance without invoking heavy initialization.
+    token_aligner = TokenAligner.__new__(TokenAligner)
+    loss_fn = CrossTokenizerDistillationLossFn(
+        cfg={
+            "loss_type": "KL",
+            "temperature": 1.0,
+            "vocab_topk": 8,
+            "exact_token_match_only": False,
+            "reverse_kl": False,
+        },
+        token_aligner=token_aligner,
+    )
+
+    data = {
+        "input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long),
+        "input_lengths": torch.tensor([3], dtype=torch.long),
+        "token_mask": torch.tensor([[1, 1, 1]], dtype=torch.float32),
+        "sample_mask": torch.tensor([1], dtype=torch.float32),
+    }
+    student_logits = torch.randn(1, 3, 4)
+
+    with pytest.raises(ValueError, match="requires teacher_logits"):
+        loss_fn(
+            next_token_logits=student_logits,
+            data=data,  # type: ignore[arg-type]
+            global_valid_seqs=torch.tensor(1),
+            global_valid_toks=torch.tensor(3),
+            teacher_logits=None,
+        )
+
+
+def test_cross_tokenizer_loss_requires_cross_tokenizer_data():
+    """Cross-tokenizer loss should enforce set_cross_tokenizer_data() contract."""
+    token_aligner = TokenAligner.__new__(TokenAligner)
+    loss_fn = CrossTokenizerDistillationLossFn(
+        cfg={
+            "loss_type": "KL",
+            "temperature": 1.0,
+            "vocab_topk": 8,
+            "exact_token_match_only": False,
+            "reverse_kl": False,
+        },
+        token_aligner=token_aligner,
+    )
+
+    data = {
+        "input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long),
+        "input_lengths": torch.tensor([3], dtype=torch.long),
+        "token_mask": torch.tensor([[1, 1, 1]], dtype=torch.float32),
+        "sample_mask": torch.tensor([1], dtype=torch.float32),
+    }
+    student_logits = torch.randn(1, 3, 4)
+    teacher_logits = torch.randn(1, 3, 4)
+
+    with pytest.raises(ValueError, match="Cross-tokenizer data not set"):
+        loss_fn(
+            next_token_logits=student_logits,
+            data=data,  # type: ignore[arg-type]
+            global_valid_seqs=torch.tensor(1),
+            global_valid_toks=torch.tensor(3),
+            teacher_logits=teacher_logits,
+        )
