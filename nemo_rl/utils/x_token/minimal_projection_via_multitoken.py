@@ -14,7 +14,7 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
 import torch.nn as nn
-from nemo_rl.utils.x_token.tokenalign import TokenAligner
+from nemo_rl.algorithms.x_token.tokenalign import TokenAligner
 import gc
 from collections import defaultdict
 from datasets import load_dataset, get_dataset_config_names

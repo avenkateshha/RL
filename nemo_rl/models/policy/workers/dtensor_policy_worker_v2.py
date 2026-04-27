@@ -346,7 +346,7 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             CrossTokenizerDistillationLossFn,
             MultiTeacherLossAggregator,
         )
-        from nemo_rl.utils.x_token.tokenalign import TokenAligner
+        from nemo_rl.algorithms.x_token.tokenalign import TokenAligner
 
         if isinstance(loss_config, list) and token_aligner_config is None:
             entries = loss_config

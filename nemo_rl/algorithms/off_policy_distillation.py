@@ -477,7 +477,7 @@ def setup(
         teacher_tokenizer = None
 
         if cross_tokenizer_enabled:
-            from nemo_rl.utils.x_token.tokenalign import TokenAligner
+            from nemo_rl.algorithms.x_token.tokenalign import TokenAligner
 
             print(
                 f"\n▶ Setting up cross-tokenizer distillation for teacher {teacher_idx}...",

@@ -1115,7 +1115,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
     """
 
     def __init__(self, cfg: CrossTokenizerDistillationLossConfig, token_aligner):
-        from nemo_rl.utils.x_token.tokenalign import TokenAligner
+        from nemo_rl.algorithms.x_token.tokenalign import TokenAligner
         assert isinstance(token_aligner, TokenAligner)
         self.token_aligner = token_aligner
         self.cfg = cfg

@@ -168,7 +168,7 @@ class CrossTokenizerCollator:
 
         # Import TokenAligner lazily so module import stays cheap and so
         # workers that don't need CT never touch x_token.
-        from nemo_rl.utils.x_token.tokenalign import TokenAligner
+        from nemo_rl.algorithms.x_token.tokenalign import TokenAligner
 
         for spec in self.teacher_ct_specs:
             if spec is None:
