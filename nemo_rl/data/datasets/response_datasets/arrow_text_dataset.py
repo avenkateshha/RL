@@ -113,6 +113,7 @@ class ArrowTextDataset(RawDataset):
         text_key: str = "text",
         characters_per_sample: Optional[int] = None,
         pack_cache_dir: Optional[str] = None,
+        **kwargs,
     ):
         # Don't call super().__init__() since RawDataset raises NotImplementedError
         self.seed = seed
@@ -178,7 +179,10 @@ class ArrowTextDataset(RawDataset):
             # No packing: convert text to messages format directly
             def text_to_messages(example: dict[str, Any]) -> dict[str, Any]:
                 text = example[self.text_key]
-                return {"messages": [{"role": "assistant", "content": text}]}
+                return {
+                    "messages": [{"role": "assistant", "content": text}],
+                    "task_name": "arrow_text_dataset",
+                }
 
             formatted_dataset = dataset.map(text_to_messages, remove_columns=dataset.column_names)
 
@@ -192,10 +196,8 @@ class ArrowTextDataset(RawDataset):
 
         print(f"  ✓ Train: {len(train_dataset)}, Validation: {len(val_dataset)}")
 
-        self.formatted_ds = {
-            "train": train_dataset,
-            "validation": val_dataset,
-        }
+        self.dataset = train_dataset
+        self.val_dataset = val_dataset
 
 
 def _pack_cache_key(
