@@ -62,7 +62,6 @@ teachers:
       learnable: false
       project_teacher_to_student: false
       use_char_offset: false
-      use_align_fast: true
       use_cuda_dp: false
       dp_chunk_size: 128
 
