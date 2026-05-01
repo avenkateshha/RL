@@ -169,13 +169,26 @@ def sft_processor(
     length = sum(len(m["token_ids"]) for m in message_log)
 
     loss_multiplier = 1.0
-    if length >= max_seq_length:
-        # make smaller and mask out
-        for message in message_log:
-            message["token_ids"] = message["token_ids"][
-                : min(4, max_seq_length // len(message_log))
-            ]
-        loss_multiplier = 0.0
+    if length > max_seq_length:
+        # Truncate trailing tokens so the total fits max_seq_length, keep
+        # the sample. Required for packed-text / continued-pretraining
+        # workflows where every sample fills the context (e.g., arrow_text
+        # with characters_per_sample = max_seq_length * 8) — a full-context
+        # sample is valid signal, not overflow to discard. Walk in order,
+        # slice the message that exceeds the budget, drop messages after it.
+        remaining = max_seq_length
+        for i, message in enumerate(message_log):
+            n = len(message["token_ids"])
+            if n <= remaining:
+                remaining -= n
+                continue
+            if remaining > 0:
+                message["token_ids"] = message["token_ids"][:remaining]
+                del message_log[i + 1 :]
+            else:
+                del message_log[i:]
+            break
+        length = max_seq_length
 
     output: DatumSpec = {
         "message_log": message_log,

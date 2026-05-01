@@ -836,14 +836,28 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
             },
         )
         results = self.worker_group.get_all_worker_results(futures)
-        return {
+        # global_loss and grad_norm are already DP-all-reduced inside the
+        # worker (see aggregate_training_statistics), so rank 0 is global.
+        # all_mb_metrics, however, is per-rank (kl_loss/ce_loss are scaled by
+        # local_valid_toks/global_valid_toks; counts like num_chunks /
+        # num_valid_samples / topk_accuracy are raw per-rank). Extend across
+        # ranks like Policy.train does so wandb sees the global view; without
+        # this, kl_loss/ce_loss under-report by ~1/DP and counts show only
+        # rank 0's slice.
+        all_mb_metrics = defaultdict(list)
+        for r in results:
+            for k, v in r["all_mb_metrics"].items():
+                all_mb_metrics[k].extend(v)
+        aggregated_results: dict[str, Any] = {
             "loss": results[0]["global_loss"],
             "grad_norm": results[0]["grad_norm"],
-            **{
-                k: v for k, v in results[0].items()
-                if k not in ("global_loss", "grad_norm")
-            },
+            "all_mb_metrics": dict(all_mb_metrics),
         }
+        for k, v in results[0].items():
+            if k in ("global_loss", "grad_norm", "all_mb_metrics"):
+                continue
+            aggregated_results.setdefault(k, v)
+        return aggregated_results
 
     def compute_teacher_logits_ipc(
         self,

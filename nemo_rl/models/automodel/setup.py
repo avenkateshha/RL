@@ -300,10 +300,15 @@ def validate_and_prepare_config(
     )
 
     # Load model config
+    # Sanity-check escape hatch: env NRL_TRUST_REMOTE_CODE=false forces
+    # native transformers classes (skips the HF-cache modeling_*.py path).
+    # Used to test whether trust_remote_code modeling files are responsible
+    # for cross-pipeline numerical divergence.
+    _trc = os.environ.get("NRL_TRUST_REMOTE_CODE", "true").lower() != "false"
     model_config = AutoConfig.from_pretrained(
         model_name,
         torch_dtype=torch.float32,  # Always load in float32 for master weights
-        trust_remote_code=True,
+        trust_remote_code=_trc,
         attn_implementation="flash_attention_2" if enable_seq_packing else None,
         **hf_config_overrides,
     )
@@ -645,6 +650,9 @@ def setup_model_and_optimizer(
     # HF conversion (required for weight syncing).
     _maybe_set_force_hf(automodel_kwargs, model_config)
 
+    # Sanity-check escape hatch (mirrors the override at the top of this module).
+    _trc = os.environ.get("NRL_TRUST_REMOTE_CODE", "true").lower() != "false"
+
     # Create model via from_pretrained - handles meta device init, parallelization,
     # LoRA, and base weight loading internally
     model = model_class.from_pretrained(
@@ -657,7 +665,7 @@ def setup_model_and_optimizer(
         peft_config=peft_config,
         attn_implementation=attn_impl,
         torch_dtype=str(model_config.torch_dtype),
-        trust_remote_code=True,
+        trust_remote_code=_trc,
         sdpa_method=sdpa_method,
         **from_pretrained_kwargs,
         **automodel_kwargs,

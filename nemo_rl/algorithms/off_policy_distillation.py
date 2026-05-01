@@ -1339,6 +1339,13 @@ def off_policy_distillation_train(
             print("\n📊 Training Results:")
 
             print(f"  • Loss: {metrics['loss']:.4f}")
+            # Component losses (when emitted by CrossTokenizerDistillationLossFn /
+            # MultiTeacherLossAggregator). ce_loss is the gold/CE term — directly
+            # comparable to SFT's NLL loss; kl_loss is the xtoken/KL term.
+            if "ce_loss" in metrics:
+                print(f"  • CE / gold loss: {metrics['ce_loss']:.4f}")
+            if "kl_loss" in metrics:
+                print(f"  • KL / xtoken loss: {metrics['kl_loss']:.4f}")
             print(f"  • Grad Norm: {metrics['grad_norm']:.4f}")
             print(f"  • Mean Sequence Length: {metrics['mean_seq_length']:.1f}")
             

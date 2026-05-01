@@ -23,6 +23,16 @@ and shipped to the student via CUDA IPC.
 import argparse
 import os
 
+# Switch torch.multiprocessing to the file_system sharing strategy before any
+# torch tensor IPC paths are touched. The default file_descriptor strategy
+# leaks FDs over hours of training with persistent dataloader workers
+# (num_workers=64 in this YAML), which surfaces as
+# `RuntimeError: unable to mmap N bytes ... Cannot allocate memory` on a
+# `next(dataloader_iter)` deep into the run. file_system is slightly slower
+# per-batch but does not accumulate FDs.
+import torch.multiprocessing as _mp
+_mp.set_sharing_strategy("file_system")
+
 from omegaconf import OmegaConf
 
 from nemo_rl.algorithms.off_policy_distillation import (

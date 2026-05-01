@@ -308,7 +308,14 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             self.autocast_enabled,
         ) = model_and_optimizer_state
 
-        self._fix_phi_rope_meta_buffers()
+        # Sanity-check escape hatch: env NRL_SKIP_PHI_ROPE_FIX=1 disables the
+        # Phi RoPE meta-buffer repair. With NRL_TRUST_REMOTE_CODE=false the
+        # native Phi3ForCausalLM class loads and the buffers materialize
+        # properly, so the repair becomes a harmless no-op anyway. This env
+        # var lets you confirm that explicitly without walking modules.
+        import os as _os_for_phi_gate  # local alias to avoid name clash
+        if not _os_for_phi_gate.environ.get("NRL_SKIP_PHI_ROPE_FIX"):
+            self._fix_phi_rope_meta_buffers()
 
         # Initialize reference model if requested
         self.reference_model_state_dict = None
@@ -359,7 +366,7 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
     def _apply_phi_inference_dtype_override(
         self, runtime_config: Any, init_optimizer: bool
     ) -> None:
-        """Drop FP32 master weights for inference-only Phi loads.
+        """Drop FP32 master weights for inference-only loads.
 
         Automodel's load-before-shard path materializes the full model on
         every rank before FSDP sharding. ``validate_and_prepare_config``
@@ -367,25 +374,23 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
         mixed-precision master weights, but FP32 master weights are only
         consumed by the optimizer (AdamW state, grad-norm reductions). For
         Phi-4 14B that's an extra ~28 GB on each GPU before the BF16 state
-        dict is even staged, which OOMs an 80 GB H100.
+        dict is even staged; for Qwen3-32B it's ~64 GB extra and the load
+        OOMs an 80 GB H100 outright.
 
         Inference-only paths (``init_optimizer=False``, e.g. teacher
         policies) never touch the optimizer code paths, so we can safely
         load directly in the compute dtype and halve the load-time
-        footprint. Scoped to Phi-style models so other families keep the
-        existing behavior; no-op when an optimizer is requested.
+        footprint. Applies to any inference-only load now that the same
+        memory pressure exists for non-Phi families (Qwen3-32B etc.); the
+        FP32 master weights have no consumer when no optimizer is built.
         """
         if init_optimizer:
-            return
-        if not self._is_phi_style_model(
-            architectures=getattr(runtime_config.model_config, "architectures", [])
-        ):
             return
         runtime_config.model_config.torch_dtype = runtime_config.dtype
         if torch.distributed.is_initialized() and torch.distributed.get_rank() != 0:
             return
         print(
-            f"[Phi inference dtype] loading {self.cfg.get('model_name')} in "
+            f"[inference dtype] loading {self.cfg.get('model_name')} in "
             f"{runtime_config.dtype} (no optimizer requested) instead of FP32 "
             f"master weights to halve load-before-shard memory."
         )
