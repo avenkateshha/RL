@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and limitations.
 # limitations under the License.
 
-"""
-Off-Policy Distillation Algorithm
+"""Off-Policy Distillation Algorithm.
 
 This module implements off-policy distillation where:
 - A fixed dataset of prompt-response pairs is used (no student generation)
@@ -28,13 +27,15 @@ Key difference from on-policy distillation (in distillation.py):
 
 import importlib.util
 import os
+import sys
 import warnings
 from pathlib import Path
-import sys
+
 if sys.version_info >= (3, 11):
     from typing import Any, Callable, NotRequired, Optional, TypedDict, TypeVar, cast
 else:
     from typing import Any, Callable, Optional, TypedDict, TypeVar, cast
+
     from typing_extensions import NotRequired
 
 import numpy as np
@@ -85,31 +86,37 @@ class TokenAlignerConfig(TypedDict, total=False):
     When enabled, teacher and student may use different tokenizers/vocabularies.
     A precomputed projection matrix maps between the two vocabulary spaces.
     """
-    enabled: bool                          # Master switch for cross-tokenizer mode
-    projection_matrix_path: str            # Path to .pt projection matrix file
-    use_sparse_format: bool                # True = sparse COO format, False = dense indices/values
-    loss_type: str                         # 'KL', 'cross_entropy', or 'chunked_ce'
-    exact_token_match_only: bool           # Only use 1:1 aligned token positions for loss
-    temperature: float                     # Softmax temperature for KL computation
-    vocab_topk: int                        # Reduce teacher vocab to top-k for speed (0 = all)
-    reverse_kl: bool                       # If True, use reverse KL direction
-    projection_matrix_multiplier: float    # Scaling factor for projection matrix
-    max_comb_len: int                      # Max combination length for token alignment DP
-    learnable: bool                        # If True, projection matrix is trainable
-    project_teacher_to_student: bool       # If True, project teacher->student instead of student->teacher
-    use_char_offset: bool                  # If True, try char-offset alignment before DP fallback
-    force_dp_only: bool                    # If True, disable char-offset path and run DP for all samples
-    use_cuda_dp: bool                      # If True, patch TokenAligner chunked DP base case with CUDA kernel
-    dp_chunk_size: int                     # Chunk size used by DP chunked solver
+
+    enabled: bool  # Master switch for cross-tokenizer mode
+    projection_matrix_path: str  # Path to .pt projection matrix file
+    use_sparse_format: bool  # True = sparse COO format, False = dense indices/values
+    loss_type: str  # 'KL', 'cross_entropy', or 'chunked_ce'
+    exact_token_match_only: bool  # Only use 1:1 aligned token positions for loss
+    temperature: float  # Softmax temperature for KL computation
+    vocab_topk: int  # Reduce teacher vocab to top-k for speed (0 = all)
+    reverse_kl: bool  # If True, use reverse KL direction
+    projection_matrix_multiplier: float  # Scaling factor for projection matrix
+    max_comb_len: int  # Max combination length for token alignment DP
+    learnable: bool  # If True, projection matrix is trainable
+    project_teacher_to_student: (
+        bool  # If True, project teacher->student instead of student->teacher
+    )
+    use_char_offset: bool  # If True, try char-offset alignment before DP fallback
+    force_dp_only: bool  # If True, disable char-offset path and run DP for all samples
+    use_cuda_dp: (
+        bool  # If True, patch TokenAligner chunked DP base case with CUDA kernel
+    )
+    dp_chunk_size: int  # Chunk size used by DP chunked solver
 
 
 class OffPolicyDistillationConfig(TypedDict):
     """Configuration for off-policy distillation training.
-    
+
     Simplified compared to on-policy:
     - No num_generations_per_prompt (we use fixed responses)
     - No max_rollout_turns (no generation)
     """
+
     num_prompts_per_step: int  # Batch size
     max_num_steps: int  # Maximum number of steps to train for
     max_num_epochs: int  # Maximum number of epochs to train for
@@ -125,6 +132,7 @@ class OffPolicyDistillationConfig(TypedDict):
 
 class OffPolicyDistillationSaveState(TypedDict):
     """State to save for checkpointing."""
+
     total_steps: int  # Track total number of steps across all epochs
     current_epoch: int  # Track current epoch
     current_step: int  # Track step within current epoch
@@ -144,10 +152,11 @@ def _default_distillation_save_state() -> OffPolicyDistillationSaveState:
 
 class OffPolicyMasterConfig(TypedDict):
     """Main configuration structure for off-policy distillation.
-    
+
     Key difference from on-policy MasterConfig:
     - No 'env' config (no environment needed)
     """
+
     policy: PolicyConfig  # Student model configuration
     teacher: PolicyConfig  # Teacher model configuration (single-teacher compatibility)
     loss_fn: DistillationLossConfig  # Loss function configuration
@@ -156,7 +165,9 @@ class OffPolicyMasterConfig(TypedDict):
     logger: LoggerConfig  # Logger configuration
     cluster: ClusterConfig  # Cluster configuration
     checkpointing: CheckpointingConfig  # Checkpointing configuration
-    token_aligner: NotRequired[TokenAlignerConfig]  # Cross-tokenizer config (single-teacher compatibility)
+    token_aligner: NotRequired[
+        TokenAlignerConfig
+    ]  # Cross-tokenizer config (single-teacher compatibility)
     teachers: NotRequired[list["TeacherSpec"]]  # Multi-teacher configuration
 
 
@@ -245,7 +256,9 @@ def _normalize_teacher_specs(master_config: OffPolicyMasterConfig) -> list[Teach
     return [single_spec]
 
 
-def _group_teacher_logits_by_rank(all_teacher_logits: list[Any]) -> dict[int, list[Any]]:
+def _group_teacher_logits_by_rank(
+    all_teacher_logits: list[Any],
+) -> dict[int, list[Any]]:
     """Repack ``[teacher][rank]`` payloads into ``{rank: [teacher_payloads...]}``."""
     teacher_logits_by_rank: dict[int, list[Any]] = {}
     for teacher_result in all_teacher_logits:
@@ -273,7 +286,7 @@ def setup(
     list[Optional[PreTrainedTokenizerBase]],  # teacher_tokenizers
 ]:
     """Setup for off-policy distillation algorithm.
-    
+
     Key differences from on-policy setup():
     - No student_generation interface (we don't generate responses)
     - Simpler cluster setup (training only, no inference cluster needed)
@@ -446,7 +459,7 @@ def setup(
     # For off-policy distillation, we only need a training cluster
     # No inference cluster needed since we don't generate responses
     print("\n▶ Setting up compute cluster...", flush=True)
-    
+
     # Need one colocated worker-group slot per policy (all teachers + student).
     # Keep historical minimum of 3 for existing two-teacher setups.
     required_worker_groups = max(3, len(teacher_specs) + 1)
@@ -767,7 +780,9 @@ def validate(
                 val_data["teacher_topk_logits"] = teacher_topk_logprobs
                 val_data["teacher_topk_indices"] = teacher_topk["topk_indices"]
                 del teacher_topk
-            if not bool(master_config["distillation"].get("keep_models_resident", False)):
+            if not bool(
+                master_config["distillation"].get("keep_models_resident", False)
+            ):
                 teacher_policy.offload_after_refit()
 
             # Compute student validation loss (eval mode, no gradient updates).
@@ -779,9 +794,7 @@ def validate(
             # the driver-side instance (which was never given CT data).
             student_policy.prepare_for_training()
             val_loss_fn = (
-                None
-                if isinstance(loss_fn, MultiTeacherLossAggregator)
-                else loss_fn
+                None if isinstance(loss_fn, MultiTeacherLossAggregator) else loss_fn
             )
             if use_ipc:
                 val_results = student_policy.train_off_policy_distillation(
@@ -864,12 +877,12 @@ def off_policy_distillation_train(
     teacher_tokenizers: Optional[list[Optional[PreTrainedTokenizerBase]]] = None,
 ) -> None:
     """Run off-policy distillation training algorithm.
-    
+
     Key differences from on-policy distillation train():
     - No student_generation parameter (we don't generate responses)
     - No task_to_env / val_task_to_env (no environment scoring)
     - No rollout generation step - uses fixed responses from dataset directly
-    
+
     Training loop:
     1. Load batch with prompt-response pairs (responses already in dataset)
     2. Add loss masks (train on assistant tokens only)
@@ -883,6 +896,26 @@ def off_policy_distillation_train(
         eval_hook_period: How often (in steps) to call *eval_hook*. 0 = disabled.
         eval_hook_at_start: If True, call eval_hook before the first training step.
     """
+    # Phase 1 of cross-topology IPC supports different (TP, CP) between
+    # teacher and student but still requires equal data-parallel size:
+    # teacher's IPC handles are matched to student ranks by ``dp_rank``, and
+    # mismatched dp_size means data shards have different sizes (no clean
+    # 1:1 mapping). Cross-DP routing is Phase 2 work; until it lands, fail
+    # loudly and early at the training entry point rather than mid-step.
+    student_dp_size = student_policy.sharding_annotations.get_axis_size("data_parallel")
+    for t_idx, teacher_policy in enumerate(teacher_policies):
+        teacher_dp_size = teacher_policy.sharding_annotations.get_axis_size(
+            "data_parallel"
+        )
+        assert student_dp_size == teacher_dp_size, (
+            f"off-policy distillation currently requires student and teacher "
+            f"to have the same data_parallel size, but got student dp_size="
+            f"{student_dp_size} and teacher[{t_idx}] dp_size={teacher_dp_size}. "
+            f"(TP and CP can differ — Phase 1 cross-topology IPC handles that. "
+            f"Different dp_size needs cross-DP batch routing, which is Phase 2 "
+            f"work and not yet implemented.)"
+        )
+
     timer = Timer()
     timeout = TimeoutChecker(
         timeout=master_config["checkpointing"].get("checkpoint_must_save_by", None),
@@ -989,7 +1022,10 @@ def off_policy_distillation_train(
                 # (teacher tokenize + DP alignment). The batch carries
                 # input_ids / input_lengths / token_mask / sample_mask /
                 # flat_messages / per_teacher_ct_data.
-                print("▶ Processing batch data (off-policy - using fixed responses)...", flush=True)
+                print(
+                    "▶ Processing batch data (off-policy - using fixed responses)...",
+                    flush=True,
+                )
                 with timer.time("data_processing"):
                     flat_messages = batch["flat_messages"]
                     input_lengths = batch["input_lengths"]
@@ -1014,7 +1050,9 @@ def off_policy_distillation_train(
                         "Multi-teacher distillation currently requires use_ipc=True."
                     )
                 all_teacher_logits: list[Any] = []
-                per_teacher_ct_data: list[tuple[torch.Tensor, list[Any], Optional[dict[str, list]]]] = []
+                per_teacher_ct_data: list[
+                    tuple[torch.Tensor, list[Any], Optional[dict[str, list]]]
+                ] = []
 
                 print(
                     f"▶ Preparing for teacher logprob inference ({num_teachers} teacher(s))...",
@@ -1036,13 +1074,19 @@ def off_policy_distillation_train(
                                 "num_chunks": ct["num_chunks"],
                             }
                         per_teacher_ct_data.append(
-                            (ct["teacher_input_ids"], ct["aligned_pairs"], chunk_indices)
+                            (
+                                ct["teacher_input_ids"],
+                                ct["aligned_pairs"],
+                                chunk_indices,
+                            )
                         )
                     else:
                         teacher_data = None
                         per_teacher_ct_data.append((torch.empty(0), [], None))
 
-                    teacher_fwd_data = teacher_data if teacher_data is not None else train_data
+                    teacher_fwd_data = (
+                        teacher_data if teacher_data is not None else train_data
+                    )
                     # Always send full logits: cross-tokenizer teachers need them
                     # for projection, and same-tokenizer teachers need them for
                     # exact full-vocab KL (topk approximation inflates KL by ~30%).
@@ -1065,13 +1109,23 @@ def off_policy_distillation_train(
                                 "Set distillation.use_ipc: true in the config."
                             )
                         with timer.time(f"teacher_{teacher_idx}_logprob_inference"):
-                            teacher_topk = teacher_policy.get_topk_logits(train_data, k=topk_k)
-                            teacher_topk_logprobs, converted_to_logprobs = _ensure_topk_logprobs_for_non_ipc(
-                                teacher_topk["topk_logits"]
+                            teacher_topk = teacher_policy.get_topk_logits(
+                                train_data, k=topk_k
+                            )
+                            teacher_topk_logprobs, converted_to_logprobs = (
+                                _ensure_topk_logprobs_for_non_ipc(
+                                    teacher_topk["topk_logits"]
+                                )
                             )
                             train_data["teacher_topk_logits"] = teacher_topk_logprobs
-                            train_data["teacher_topk_indices"] = teacher_topk["topk_indices"]
-                            if converted_to_logprobs and total_steps == 0 and current_step == 0:
+                            train_data["teacher_topk_indices"] = teacher_topk[
+                                "topk_indices"
+                            ]
+                            if (
+                                converted_to_logprobs
+                                and total_steps == 0
+                                and current_step == 0
+                            ):
                                 print(
                                     "⚠️ teacher.get_topk_logits returned raw logits in non-IPC mode; "
                                     "normalizing with log_softmax before distillation loss.",
@@ -1102,23 +1156,47 @@ def off_policy_distillation_train(
                         # MultiTeacherLossAggregator (with N=1 for single
                         # teacher). This eliminates the diverging code path
                         # that previously left single-teacher metrics on GPU.
-                        teacher_worker_specs: list[tuple[DistillationLossConfig, Optional[dict[str, Any]], float]] = []
+                        teacher_worker_specs: list[
+                            tuple[
+                                DistillationLossConfig, Optional[dict[str, Any]], float
+                            ]
+                        ] = []
                         for teacher_idx, spec_cfg in enumerate(teacher_specs):
                             aligner_cfg = spec_cfg.get("token_aligner", {})
-                            teacher_loss_cfg = spec_cfg.get("loss_fn", master_config["loss_fn"])
+                            teacher_loss_cfg = spec_cfg.get(
+                                "loss_fn", master_config["loss_fn"]
+                            )
                             if token_aligners[teacher_idx] is None:
-                                teacher_worker_specs.append((teacher_loss_cfg, None, spec_cfg.get("weight", 1.0)))
+                                teacher_worker_specs.append(
+                                    (
+                                        teacher_loss_cfg,
+                                        None,
+                                        spec_cfg.get("weight", 1.0),
+                                    )
+                                )
                             else:
                                 teacher_worker_specs.append(
                                     (
                                         teacher_loss_cfg,
                                         {
-                                            "teacher_model": spec_cfg["teacher"]["model_name"],
-                                            "student_model": master_config["policy"]["model_name"],
-                                            "projection_matrix_path": aligner_cfg["projection_matrix_path"],
-                                            "use_sparse_format": aligner_cfg.get("use_sparse_format", True),
-                                            "learnable": aligner_cfg.get("learnable", False),
-                                            "max_comb_len": aligner_cfg.get("max_comb_len", 4),
+                                            "teacher_model": spec_cfg["teacher"][
+                                                "model_name"
+                                            ],
+                                            "student_model": master_config["policy"][
+                                                "model_name"
+                                            ],
+                                            "projection_matrix_path": aligner_cfg[
+                                                "projection_matrix_path"
+                                            ],
+                                            "use_sparse_format": aligner_cfg.get(
+                                                "use_sparse_format", True
+                                            ),
+                                            "learnable": aligner_cfg.get(
+                                                "learnable", False
+                                            ),
+                                            "max_comb_len": aligner_cfg.get(
+                                                "max_comb_len", 4
+                                            ),
                                             "projection_matrix_multiplier": aligner_cfg.get(
                                                 "projection_matrix_multiplier", 1.0
                                             ),
@@ -1133,7 +1211,11 @@ def off_policy_distillation_train(
                             loss_config=teacher_worker_specs,
                             token_aligner_config=None,
                         )
-                    for teacher_idx, (teacher_input_ids, aligned_pairs, chunk_indices) in enumerate(per_teacher_ct_data):
+                    for teacher_idx, (
+                        teacher_input_ids,
+                        aligned_pairs,
+                        chunk_indices,
+                    ) in enumerate(per_teacher_ct_data):
                         if teacher_input_ids.numel() == 0:
                             continue
                         # Always pass the teacher index now that every cached
@@ -1191,8 +1273,15 @@ def off_policy_distillation_train(
                     )
 
                 # ==== Eval Hook (e.g., generation-based MATH/MMLU eval) ====
-                if eval_hook and eval_hook_period > 0 and (total_steps + 1) % eval_hook_period == 0:
-                    print(f"\n🔍 Running eval hook at step {total_steps + 1}...", flush=True)
+                if (
+                    eval_hook
+                    and eval_hook_period > 0
+                    and (total_steps + 1) % eval_hook_period == 0
+                ):
+                    print(
+                        f"\n🔍 Running eval hook at step {total_steps + 1}...",
+                        flush=True,
+                    )
                     with timer.time("eval_hook"):
                         eval_hook_metrics = eval_hook(
                             step=total_steps + 1,
@@ -1201,7 +1290,9 @@ def off_policy_distillation_train(
                             logger=logger,
                         )
                     if isinstance(eval_hook_metrics, dict):
-                        logger.log_metrics(eval_hook_metrics, total_steps + 1, prefix="eval_hook")
+                        logger.log_metrics(
+                            eval_hook_metrics, total_steps + 1, prefix="eval_hook"
+                        )
                     student_policy.prepare_for_training()
 
                 # ==== Metrics ====
@@ -1319,22 +1410,36 @@ def off_policy_distillation_train(
                 ct_key = f"teacher_{teacher_idx}_ct_processing"
                 lp_key = f"teacher_{teacher_idx}_logprob_inference"
                 if ct_key in timing_metrics:
-                    timing_metrics[f"teacher_{teacher_idx}/ct_processing"] = timing_metrics[ct_key]
+                    timing_metrics[f"teacher_{teacher_idx}/ct_processing"] = (
+                        timing_metrics[ct_key]
+                    )
                 if lp_key in timing_metrics:
-                    timing_metrics[f"teacher_{teacher_idx}/logprob_inference"] = timing_metrics[lp_key]
+                    timing_metrics[f"teacher_{teacher_idx}/logprob_inference"] = (
+                        timing_metrics[lp_key]
+                    )
                 loss_compute_key = f"teacher_{teacher_idx}/loss_compute"
                 if loss_compute_key in metrics:
                     timing_metrics[loss_compute_key] = float(metrics[loss_compute_key])
 
             teacher_total = 0.0
             for teacher_idx in range(num_teachers):
-                teacher_total += timing_metrics.get(f"teacher_{teacher_idx}/ct_processing", 0.0)
-                teacher_total += timing_metrics.get(f"teacher_{teacher_idx}/logprob_inference", 0.0)
-                teacher_total += timing_metrics.get(f"teacher_{teacher_idx}/loss_compute", 0.0)
+                teacher_total += timing_metrics.get(
+                    f"teacher_{teacher_idx}/ct_processing", 0.0
+                )
+                teacher_total += timing_metrics.get(
+                    f"teacher_{teacher_idx}/logprob_inference", 0.0
+                )
+                teacher_total += timing_metrics.get(
+                    f"teacher_{teacher_idx}/loss_compute", 0.0
+                )
             timing_metrics["multi_teacher_total"] = teacher_total
             # policy_training is the only worker-side timing exposed at this layer.
-            timing_metrics["student_forward"] = timing_metrics.get("policy_training", 0.0)
-            timing_metrics["student_backward"] = timing_metrics.get("policy_training", 0.0)
+            timing_metrics["student_forward"] = timing_metrics.get(
+                "policy_training", 0.0
+            )
+            timing_metrics["student_backward"] = timing_metrics.get(
+                "policy_training", 0.0
+            )
 
             print("\n📊 Training Results:")
 
@@ -1348,7 +1453,7 @@ def off_policy_distillation_train(
                 print(f"  • KL / xtoken loss: {metrics['kl_loss']:.4f}")
             print(f"  • Grad Norm: {metrics['grad_norm']:.4f}")
             print(f"  • Mean Sequence Length: {metrics['mean_seq_length']:.1f}")
-            
+
             if "total_flops" in train_results:
                 total_time = timing_metrics.get("total_step_time", 0)
                 total_tflops = (
