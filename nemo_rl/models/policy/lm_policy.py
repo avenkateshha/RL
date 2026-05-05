@@ -611,9 +611,12 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
         """Push per-step cross-tokenizer data to all workers' cached loss functions.
 
         Shards ``teacher_input_ids``, ``aligned_pairs``, and the optional
-        ``chunk_indices`` along the DP axis so each worker only receives
-        its own slice. ``chunk_indices`` carries the per-sample COO chunk
-        masks precomputed by ``CrossTokenizerCollator``.
+        ``chunk_indices`` along the DP axis, and replicates along
+        ``tensor_parallel`` / ``context_parallel`` / ``pipeline_parallel`` so
+        every worker in the same DP group receives the same slice. Mirrors
+        the axis layout used by :meth:`train_off_policy_distillation`.
+        ``chunk_indices`` carries the per-sample COO chunk masks precomputed
+        by ``CrossTokenizerCollator``.
         """
         dp_size = self.sharding_annotations.get_axis_size("data_parallel")
         batch_size = teacher_input_ids.shape[0]
@@ -630,20 +633,28 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
         else:
             chunk_indices_shards = [None for _ in range(dp_size)]
 
-        futures = self.worker_group.run_all_workers_multiple_data(
+        teacher_input_ids_shards = [
+            teacher_input_ids[i * shard_size : (i + 1) * shard_size]
+            for i in range(dp_size)
+        ]
+        aligned_pairs_shards = [
+            aligned_pairs[i * shard_size : (i + 1) * shard_size] for i in range(dp_size)
+        ]
+
+        multi_future = self.worker_group.run_all_workers_sharded_data(
             "update_cross_tokenizer_data",
-            teacher_input_ids=[
-                teacher_input_ids[i * shard_size : (i + 1) * shard_size]
-                for i in range(dp_size)
-            ],
-            aligned_pairs=[
-                aligned_pairs[i * shard_size : (i + 1) * shard_size]
-                for i in range(dp_size)
-            ],
+            teacher_input_ids=teacher_input_ids_shards,
+            aligned_pairs=aligned_pairs_shards,
             teacher_idx=[teacher_idx for _ in range(dp_size)],
             chunk_indices=chunk_indices_shards,
+            in_sharded_axes=["data_parallel"],
+            replicate_on_axes=[
+                "tensor_parallel",
+                "context_parallel",
+                "pipeline_parallel",
+            ],
         )
-        ray.get(futures)
+        self.worker_group.get_all_worker_results(multi_future)
 
     def train(
         self,
@@ -876,6 +887,14 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
         dp_size = self.sharding_annotations.get_axis_size("data_parallel")
         sharded_data = data.shard_by_batch_size(dp_size, batch_size=batch_size)
 
+        # Keep CP and TP in the returned list. Teacher compute is replicated
+        # across CP ranks (same inputs/model/outputs), but each CP rank writes
+        # its IPC buffer to its *own* GPU memory; similarly each TP rank holds
+        # only its local vocab shard of the payload. The student must
+        # reconstruct the full tensor by reading per-rank IPC buffers from its
+        # TP siblings (vocab concat) and per-CP-rank buffers (sequence
+        # all-gather). Deduplicating here would drop those handles and leave
+        # CP>0 / TP>0 students without a match.
         futures = self.worker_group.run_all_workers_sharded_data(
             "compute_teacher_logits_ipc",
             data=sharded_data,
@@ -886,8 +905,6 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                 "pipeline_parallel",
             ],
             output_is_replicated=[
-                "context_parallel",
-                "tensor_parallel",
                 "pipeline_parallel",
             ],
             common_kwargs={

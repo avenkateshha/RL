@@ -1041,15 +1041,22 @@ class DistillationLossFn(LossFunction):
 
 class CrossTokenizerDistillationLossConfig(TypedDict):
     """Configuration for cross-tokenizer distillation loss."""
-    loss_type: str                        # 'KL', 'cross_entropy', or 'chunked_ce'
-    temperature: float                    # Softmax temperature
-    vocab_topk: int                       # Reduce teacher vocab to top-k (0 = all)
-    exact_token_match_only: bool          # Only use 1:1 aligned positions
-    reverse_kl: bool                      # Reverse KL direction
+
+    loss_type: str  # 'KL', 'cross_entropy', or 'chunked_ce'
+    temperature: float  # Softmax temperature
+    vocab_topk: int  # Reduce teacher vocab to top-k (0 = all)
+    exact_token_match_only: bool  # Only use 1:1 aligned positions
+    reverse_kl: bool  # Reverse KL direction
     project_teacher_to_student: NotRequired[bool]
-    gold_loss: NotRequired[bool]          # Use gold loss (common KL + uncommon L1, no projection)
-    xtoken_loss: NotRequired[bool]        # Relaxed exact-map threshold (>=0.6 instead of ==1.0)
-    ce_loss_scale: NotRequired[float]     # Scale for additional CE (next-token) loss (0.0 = disabled)
+    gold_loss: NotRequired[
+        bool
+    ]  # Use gold loss (common KL + uncommon L1, no projection)
+    xtoken_loss: NotRequired[
+        bool
+    ]  # Relaxed exact-map threshold (>=0.6 instead of ==1.0)
+    ce_loss_scale: NotRequired[
+        float
+    ]  # Scale for additional CE (next-token) loss (0.0 = disabled)
     dynamic_loss_scaling: NotRequired[bool]  # Scale KL loss to match CE magnitude
 
 
@@ -1061,10 +1068,11 @@ class CrossTokenizerDistillationLossDataDict(TypedDict):
     loss function instance via set_cross_tokenizer_data() to avoid
     sequence-length mismatches in the worker's shape validation.
     """
-    input_ids: torch.Tensor               # Student token IDs (B, S_student)
+
+    input_ids: torch.Tensor  # Student token IDs (B, S_student)
     input_lengths: torch.Tensor
-    token_mask: torch.Tensor              # (B, S_student)
-    sample_mask: torch.Tensor             # (B,)
+    token_mask: torch.Tensor  # (B, S_student)
+    sample_mask: torch.Tensor  # (B,)
 
 
 def _scatter_chunk_mask_from_coo(
@@ -1092,7 +1100,11 @@ def _scatter_chunk_mask_from_coo(
         bcol = torch.full((coo.shape[0], 1), b, dtype=torch.int64)
         parts.append(torch.cat([bcol, coo], dim=1))
     mask = torch.zeros(
-        batch_size, seq_len, total_chunks, dtype=torch.bool, device=device,
+        batch_size,
+        seq_len,
+        total_chunks,
+        dtype=torch.bool,
+        device=device,
     )
     if parts:
         idx = torch.cat(parts, dim=0).to(device)
@@ -1118,6 +1130,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
     def __init__(self, cfg: CrossTokenizerDistillationLossConfig, token_aligner):
         from nemo_rl.algorithms.x_token.tokenalign import TokenAligner
+
         assert isinstance(token_aligner, TokenAligner)
         self.token_aligner = token_aligner
         self.cfg = cfg
@@ -1170,25 +1183,34 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             student_probs = torch.softmax(student_logits / temperature, dim=-1)
 
         has_sparse = (
-            hasattr(self.token_aligner, 'sparse_transformation_matrix')
+            hasattr(self.token_aligner, "sparse_transformation_matrix")
             and self.token_aligner.sparse_transformation_matrix is not None
         )
         if has_sparse:
             sparse_mat = self.token_aligner.sparse_transformation_matrix
             reduced_sparse = sparse_mat.index_select(1, global_top_indices).coalesce()
             projected = self.token_aligner.project_token_likelihoods_instance(
-                student_probs, None, None, None, device,
+                student_probs,
+                None,
+                None,
+                None,
+                device,
                 use_sparse_format=True,
                 sparse_matrix=reduced_sparse,
             )
             return projected
 
         proj_values = self.token_aligner.likelihood_projection_matrix
-        if getattr(self.token_aligner, 'learnable', False):
-            proj_values = self.token_aligner.transform_learned_matrix_instance(proj_values)
+        if getattr(self.token_aligner, "learnable", False):
+            proj_values = self.token_aligner.transform_learned_matrix_instance(
+                proj_values
+            )
         projected_full = self.token_aligner.project_token_likelihoods_instance(
-            student_probs, self.token_aligner.likelihood_projection_indices,
-            proj_values, teacher_vocab_size, device,
+            student_probs,
+            self.token_aligner.likelihood_projection_indices,
+            proj_values,
+            teacher_vocab_size,
+            device,
             use_sparse_format=False,
         )
         return projected_full[:, :, global_top_indices]
@@ -1242,20 +1264,28 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
         # Chunk-average log-probs over full vocabularies
         student_chunk_lp = torch.bmm(
-            student_chunk_mask.transpose(1, 2).to(student_log_probs.dtype), student_log_probs,
+            student_chunk_mask.transpose(1, 2).to(student_log_probs.dtype),
+            student_log_probs,
         )
         teacher_chunk_lp = torch.bmm(
-            teacher_chunk_mask.transpose(1, 2).to(teacher_log_probs.dtype), teacher_log_probs,
+            teacher_chunk_mask.transpose(1, 2).to(teacher_log_probs.dtype),
+            teacher_log_probs,
         )
         del student_log_probs, teacher_log_probs
 
-        student_chunk_sizes = student_chunk_mask.sum(dim=1, keepdim=True).float().transpose(1, 2)
-        teacher_chunk_sizes = teacher_chunk_mask.sum(dim=1, keepdim=True).float().transpose(1, 2)
+        student_chunk_sizes = (
+            student_chunk_mask.sum(dim=1, keepdim=True).float().transpose(1, 2)
+        )
+        teacher_chunk_sizes = (
+            teacher_chunk_mask.sum(dim=1, keepdim=True).float().transpose(1, 2)
+        )
 
         student_chunk_lp = student_chunk_lp / (student_chunk_sizes + 1e-10)
         teacher_chunk_lp = teacher_chunk_lp / (teacher_chunk_sizes + 1e-10)
 
-        chunk_valid = (student_chunk_sizes.squeeze(-1) > 0) & (teacher_chunk_sizes.squeeze(-1) > 0)
+        chunk_valid = (student_chunk_sizes.squeeze(-1) > 0) & (
+            teacher_chunk_sizes.squeeze(-1) > 0
+        )
 
         if not chunk_valid.any():
             return torch.tensor(0.0, device=device, requires_grad=True), 0.0
@@ -1268,11 +1298,17 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
             if not reverse_kl:
                 kl_elem = torch.nn.functional.kl_div(
-                    s_common, t_common, reduction="none", log_target=True,
+                    s_common,
+                    t_common,
+                    reduction="none",
+                    log_target=True,
                 )
             else:
                 kl_elem = torch.nn.functional.kl_div(
-                    t_common, s_common, reduction="none", log_target=True,
+                    t_common,
+                    s_common,
+                    reduction="none",
+                    log_target=True,
                 )
             kl_per_chunk = kl_elem.sum(dim=-1) * chunk_valid
             if chunk_valid.sum() > 0:
@@ -1304,12 +1340,16 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     t_probs = torch.exp(t_valid)
 
                     if s_probs.shape[-1] > max_uncommon_vocab:
-                        s_sorted, _ = torch.topk(s_probs, k=max_uncommon_vocab, dim=-1, largest=True)
+                        s_sorted, _ = torch.topk(
+                            s_probs, k=max_uncommon_vocab, dim=-1, largest=True
+                        )
                     else:
                         s_sorted = torch.sort(s_probs, dim=-1, descending=True)[0]
 
                     if t_probs.shape[-1] > max_uncommon_vocab:
-                        t_sorted, _ = torch.topk(t_probs, k=max_uncommon_vocab, dim=-1, largest=True)
+                        t_sorted, _ = torch.topk(
+                            t_probs, k=max_uncommon_vocab, dim=-1, largest=True
+                        )
                     else:
                         t_sorted = torch.sort(t_probs, dim=-1, descending=True)[0]
 
@@ -1317,13 +1357,15 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     min_len = min(s_sorted.shape[-1], t_sorted.shape[-1])
                     if min_len > 0:
                         loss_l1_per_chunk = torch.nn.functional.l1_loss(
-                            s_sorted[:, :min_len], t_sorted[:, :min_len], reduction='none',
+                            s_sorted[:, :min_len],
+                            t_sorted[:, :min_len],
+                            reduction="none",
                         ).sum(dim=-1)
                         loss_l1_uncommon = loss_l1_per_chunk.mean()
                         del loss_l1_per_chunk
                     del s_sorted, t_sorted
 
-        loss_total = (loss_kl_common + loss_l1_uncommon) * (temperature ** 2)
+        loss_total = (loss_kl_common + loss_l1_uncommon) * (temperature**2)
 
         # Top-1 accuracy on common vocab. Computed as a 0-d GPU tensor so the
         # caller can include it in the batched .cpu().tolist() sync at the end
@@ -1334,9 +1376,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             if common_student_indices.numel() > 0 and chunk_valid.any():
                 s_valid_lp = student_chunk_lp[chunk_valid][:, common_student_indices]
                 t_valid_lp = teacher_chunk_lp[chunk_valid][:, common_teacher_indices]
-                matches = (
-                    s_valid_lp.argmax(dim=-1) == t_valid_lp.argmax(dim=-1)
-                ).sum()
+                matches = (s_valid_lp.argmax(dim=-1) == t_valid_lp.argmax(dim=-1)).sum()
                 denom = chunk_valid.sum().clamp(min=1)
                 top1_accuracy = matches.to(torch.float32) / denom.to(torch.float32)
 
@@ -1374,6 +1414,27 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         softmax, log_softmax) out of the per-teacher loop and share it
         across multiple teachers with the same temperature.
         """
+
+        # Under CP>1 the student post-processor runs ``prepare_data_for_cp``,
+        # which may return ``input_ids`` / ``token_mask`` / ``sample_mask`` as
+        # DTensors. Downstream ops combine these with already-unwrapped
+        # ``student_logits`` (see ``.full_tensor()`` below) and with scalar
+        # losses, so we unwrap everything once here to avoid "mixed
+        # torch.Tensor and DTensor" errors in the per-chunk projection,
+        # auxiliary CE, and DP rescale.
+        def _unwrap_dtensor(
+            t: Optional[torch.Tensor],
+        ) -> Optional[torch.Tensor]:
+            if isinstance(t, torch.distributed.tensor.DTensor):
+                return t.full_tensor()
+            return t
+
+        data = {
+            **data,
+            "input_ids": _unwrap_dtensor(data["input_ids"]),
+            "token_mask": _unwrap_dtensor(data.get("token_mask")),
+            "sample_mask": _unwrap_dtensor(data.get("sample_mask")),
+        }
         input_ids_student = data["input_ids"]
         batch_size = input_ids_student.shape[0]
 
@@ -1454,10 +1515,18 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             return loss, {"loss": 0.0, "topk_accuracy": 0.0, "num_chunks": 0}
 
         proj_mask = _scatter_chunk_mask_from_coo(
-            student_coo_list, batch_size, student_seq_len, total_chunks, device,
+            student_coo_list,
+            batch_size,
+            student_seq_len,
+            total_chunks,
+            device,
         )
         tgt_mask = _scatter_chunk_mask_from_coo(
-            teacher_coo_list, batch_size, teacher_seq_len, total_chunks, device,
+            teacher_coo_list,
+            batch_size,
+            teacher_seq_len,
+            total_chunks,
+            device,
         )
         num_valid_chunks_total = int(sum(num_chunks_list))
 
@@ -1468,10 +1537,18 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # ================================================================
         if use_gold_loss:
             loss, top1_accuracy = self._compute_gold_loss(
-                student_logits, teacher_logits_f32, proj_mask, tgt_mask,
-                batch_size, student_seq_len, teacher_seq_len,
+                student_logits,
+                teacher_logits_f32,
+                proj_mask,
+                tgt_mask,
+                batch_size,
+                student_seq_len,
+                teacher_seq_len,
                 teacher_vocab_size,
-                temperature, reverse_kl, use_xtoken_loss, device,
+                temperature,
+                reverse_kl,
+                use_xtoken_loss,
+                device,
                 precomputed_student_log_probs=precomputed_student_log_probs,
             )
         else:
@@ -1487,27 +1564,37 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     teacher_flat = teacher_logits_f32.view(-1, teacher_vocab_size)
                     importance = teacher_flat.max(dim=0)[0]
                     _, global_top_indices = torch.topk(
-                        importance, k=min(vocab_topk, teacher_vocab_size), dim=-1,
+                        importance,
+                        k=min(vocab_topk, teacher_vocab_size),
+                        dim=-1,
                     )
                     global_top_indices = global_top_indices.sort()[0]
 
             # -- 4. Project student probs to teacher vocab --
             projected_student = self._project_student_to_teacher(
-                student_logits, teacher_vocab_size, temperature, global_top_indices, device,
+                student_logits,
+                teacher_vocab_size,
+                temperature,
+                global_top_indices,
+                device,
                 precomputed_student_probs=precomputed_student_probs,
             )
 
             # -- 5. Teacher log-probs in reduced vocab --
             teacher_logits_reduced = teacher_logits_f32[:, :, global_top_indices]
-            teacher_log_probs = torch.log_softmax(teacher_logits_reduced / temperature, dim=-1)
+            teacher_log_probs = torch.log_softmax(
+                teacher_logits_reduced / temperature, dim=-1
+            )
             del teacher_logits_reduced
 
             # -- 6. Chunk-averaged distributions --
             proj_chunks = torch.bmm(
-                proj_mask.transpose(1, 2).to(projected_student.dtype), projected_student,
+                proj_mask.transpose(1, 2).to(projected_student.dtype),
+                projected_student,
             )
             tgt_log_chunks = torch.bmm(
-                tgt_mask.transpose(1, 2).to(teacher_log_probs.dtype), teacher_log_probs,
+                tgt_mask.transpose(1, 2).to(teacher_log_probs.dtype),
+                teacher_log_probs,
             )
             del projected_student, teacher_log_probs
 
@@ -1525,13 +1612,19 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             # -- 7. KL divergence per chunk --
             if reverse_kl:
                 kl_per_elem = torch.nn.functional.kl_div(
-                    tgt_log_chunks, proj_log_chunks, reduction="none", log_target=True,
+                    tgt_log_chunks,
+                    proj_log_chunks,
+                    reduction="none",
+                    log_target=True,
                 )
             else:
                 kl_per_elem = torch.nn.functional.kl_div(
-                    proj_log_chunks, tgt_log_chunks, reduction="none", log_target=True,
+                    proj_log_chunks,
+                    tgt_log_chunks,
+                    reduction="none",
+                    log_target=True,
                 )
-            kl_per_chunk = kl_per_elem.sum(dim=-1) * (temperature ** 2)
+            kl_per_chunk = kl_per_elem.sum(dim=-1) * (temperature**2)
             kl_per_chunk = kl_per_chunk * chunk_valid
             del proj_chunks, tgt_log_chunks, proj_log_chunks, kl_per_elem
 
@@ -1572,11 +1665,13 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             # Mask padding positions so CE loss only covers real tokens.
             # token_mask[:, 1:] marks valid next-token targets (shifted by 1).
             token_mask = data["token_mask"]
-            ce_mask = token_mask[:, 1 : student_seq_len].to(torch.bool)
+            ce_mask = token_mask[:, 1:student_seq_len].to(torch.bool)
             ce_targets = input_ids_student[:, 1:student_seq_len].clone()
             ce_targets[~ce_mask] = -100
             ce_loss = torch.nn.functional.cross_entropy(
-                student_logits[:, :student_seq_len - 1].reshape(-1, student_logits.shape[-1]),
+                student_logits[:, : student_seq_len - 1].reshape(
+                    -1, student_logits.shape[-1]
+                ),
                 ce_targets.reshape(-1),
                 ignore_index=-100,
             )
@@ -1633,7 +1728,9 @@ class MultiTeacherLossAggregator(LossFunction):
         self.weights = weights
         self.normalize_by_vocab = normalize_by_vocab
         self.cfg = cfg or {}
-        self.teacher_aggregation_mode = self.cfg.get("teacher_aggregation_mode", "weighted")
+        self.teacher_aggregation_mode = self.cfg.get(
+            "teacher_aggregation_mode", "weighted"
+        )
         if self.teacher_aggregation_mode not in {"weighted", "routing", "average"}:
             raise ValueError(
                 "teacher_aggregation_mode must be one of {'weighted', 'routing', 'average'}, "
@@ -1665,7 +1762,9 @@ class MultiTeacherLossAggregator(LossFunction):
         fn = self.loss_fns[teacher_idx]
         if fn is not None:
             fn.set_cross_tokenizer_data(
-                teacher_input_ids, aligned_pairs, chunk_indices=chunk_indices,
+                teacher_input_ids,
+                aligned_pairs,
+                chunk_indices=chunk_indices,
             )
 
     def _compute_same_tokenizer_kl(
@@ -1682,7 +1781,9 @@ class MultiTeacherLossAggregator(LossFunction):
         student_shifted = student_logits[:, :-1]
 
         if teacher_topk_indices_ipc is None:
-            teacher_logprobs = torch.nn.functional.log_softmax(t_logits[:, :seq_len], dim=-1)
+            teacher_logprobs = torch.nn.functional.log_softmax(
+                t_logits[:, :seq_len], dim=-1
+            )
             student_logprobs = torch.nn.functional.log_softmax(student_shifted, dim=-1)
             per_token_kl = (
                 teacher_logprobs.exp() * (teacher_logprobs - student_logprobs)
@@ -1693,12 +1794,20 @@ class MultiTeacherLossAggregator(LossFunction):
             student_logprobs = torch.nn.functional.log_softmax(student_shifted, dim=-1)
             student_topk = torch.gather(student_logprobs, dim=-1, index=topk_idx)
             teacher_topk_probs = teacher_topk.exp()
-            teacher_rest = (1.0 - teacher_topk_probs.sum(dim=-1, keepdim=True)).clamp(min=1e-10)
+            teacher_rest = (1.0 - teacher_topk_probs.sum(dim=-1, keepdim=True)).clamp(
+                min=1e-10
+            )
             teacher_probs_full = torch.cat([teacher_topk_probs, teacher_rest], dim=-1)
-            teacher_logprobs_full = torch.cat([teacher_topk, teacher_rest.log()], dim=-1)
+            teacher_logprobs_full = torch.cat(
+                [teacher_topk, teacher_rest.log()], dim=-1
+            )
             student_topk_probs = student_topk.exp()
-            student_rest = (1.0 - student_topk_probs.sum(dim=-1, keepdim=True)).clamp(min=1e-10)
-            student_logprobs_full = torch.cat([student_topk, student_rest.log()], dim=-1)
+            student_rest = (1.0 - student_topk_probs.sum(dim=-1, keepdim=True)).clamp(
+                min=1e-10
+            )
+            student_logprobs_full = torch.cat(
+                [student_topk, student_rest.log()], dim=-1
+            )
             per_token_kl = (
                 teacher_probs_full * (teacher_logprobs_full - student_logprobs_full)
             ).sum(dim=-1)
@@ -1741,10 +1850,14 @@ class MultiTeacherLossAggregator(LossFunction):
         if teacher_logits_list is None:
             teacher_logits_list = [teacher_logits] if teacher_logits is not None else []
         if teacher_topk_indices_list is None:
-            teacher_topk_indices_list = [teacher_topk_indices_ipc] * len(teacher_logits_list)
+            teacher_topk_indices_list = [teacher_topk_indices_ipc] * len(
+                teacher_logits_list
+            )
 
         if len(teacher_logits_list) == 0:
-            zero = torch.tensor(0.0, device=next_token_logits.device, requires_grad=True)
+            zero = torch.tensor(
+                0.0, device=next_token_logits.device, requires_grad=True
+            )
             return zero, {"loss": 0.0, "num_valid_samples": 0}
 
         if len(teacher_logits_list) != len(self.loss_fns):
@@ -1759,9 +1872,13 @@ class MultiTeacherLossAggregator(LossFunction):
             )
 
         vocab_sizes = [int(t.shape[-1]) for t in teacher_logits_list]
-        min_log_vocab = math.log(max(2, min(vocab_sizes))) if self.normalize_by_vocab else 1.0
+        min_log_vocab = (
+            math.log(max(2, min(vocab_sizes))) if self.normalize_by_vocab else 1.0
+        )
 
-        total_kl = torch.tensor(0.0, device=next_token_logits.device, requires_grad=True)
+        total_kl = torch.tensor(
+            0.0, device=next_token_logits.device, requires_grad=True
+        )
         metrics: dict[str, Any] = {}
         # GPU-side scalar tensors accumulated during the loop, synced once
         # (as a single batched D2H copy) at the end of the call. This keeps the
@@ -1788,7 +1905,9 @@ class MultiTeacherLossAggregator(LossFunction):
                 )
 
         original_sample_mask = data["sample_mask"]
-        active_teachers = sum(1 for t_logits in teacher_logits_list if t_logits is not None)
+        active_teachers = sum(
+            1 for t_logits in teacher_logits_list if t_logits is not None
+        )
         average_weight = 1.0 / max(1, active_teachers)
 
         # ===== Hoist student-only work out of the per-teacher loop =====
@@ -1843,7 +1962,12 @@ class MultiTeacherLossAggregator(LossFunction):
         # ===============================================================
 
         for teacher_idx, (loss_fn, weight, t_logits, t_topk_idx) in enumerate(
-            zip(self.loss_fns, self.weights, teacher_logits_list, teacher_topk_indices_list)
+            zip(
+                self.loss_fns,
+                self.weights,
+                teacher_logits_list,
+                teacher_topk_indices_list,
+            )
         ):
             if t_logits is None:
                 continue
@@ -1915,7 +2039,9 @@ class MultiTeacherLossAggregator(LossFunction):
             gpu_scalar_metrics[f"teacher_{teacher_idx}/weighted_kl"] = (
                 weighted_teacher_kl.detach()
             )
-            metrics[f"teacher_{teacher_idx}/loss_compute"] = float(teacher_compute_elapsed)
+            metrics[f"teacher_{teacher_idx}/loss_compute"] = float(
+                teacher_compute_elapsed
+            )
             for key, value in teacher_metrics.items():
                 metric_key = f"teacher_{teacher_idx}/{key}"
                 if isinstance(value, torch.Tensor) and value.ndim == 0:
@@ -1943,7 +2069,7 @@ class MultiTeacherLossAggregator(LossFunction):
             ce_targets = data["input_ids"][:, 1:student_seq_len].clone()
             ce_targets[~token_mask_ce] = -100
             ce_loss = torch.nn.functional.cross_entropy(
-                ce_logits[:, :student_seq_len - 1].reshape(-1, ce_logits.shape[-1]),
+                ce_logits[:, : student_seq_len - 1].reshape(-1, ce_logits.shape[-1]),
                 ce_targets.reshape(-1),
                 ignore_index=-100,
             )
@@ -1955,9 +2081,7 @@ class MultiTeacherLossAggregator(LossFunction):
                 # Python scalar treated as a constant). The clamp guards
                 # against the degenerate total_kl==0 case; in practice KL is
                 # strictly positive, so this matches the original branch.
-                dls_scale = (
-                    ce_loss.detach() / total_kl.detach().clamp(min=1e-10)
-                )
+                dls_scale = ce_loss.detach() / total_kl.detach().clamp(min=1e-10)
                 loss = total_kl * dls_scale + ce_loss
             else:
                 loss = total_kl + ce_loss * ce_loss_scale
@@ -1999,9 +2123,7 @@ class MultiTeacherLossAggregator(LossFunction):
         # and prevented the GPU from pipelining their kernels.
         if gpu_scalar_metrics:
             keys = list(gpu_scalar_metrics.keys())
-            stacked = torch.stack(
-                [t.reshape(()) for t in gpu_scalar_metrics.values()]
-            )
+            stacked = torch.stack([t.reshape(()) for t in gpu_scalar_metrics.values()])
             values = stacked.cpu().tolist()
             for k, v in zip(keys, values):
                 metrics[k] = float(v)

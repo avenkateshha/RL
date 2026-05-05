@@ -314,6 +314,7 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
         # properly, so the repair becomes a harmless no-op anyway. This env
         # var lets you confirm that explicitly without walking modules.
         import os as _os_for_phi_gate  # local alias to avoid name clash
+
         if not _os_for_phi_gate.environ.get("NRL_SKIP_PHI_ROPE_FIX"):
             self._fix_phi_rope_meta_buffers()
 
@@ -339,9 +340,7 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             _runtime_is_reward_model,  # Duplicate, already set as _is_reward_model
         ) = runtime_config
 
-    def _is_phi_style_model(
-        self, architectures: Optional[list[Any]] = None
-    ) -> bool:
+    def _is_phi_style_model(self, architectures: Optional[list[Any]] = None) -> bool:
         """Return True for Phi-4 / Phi-3 model families.
 
         Shared gate for the Phi-specific patches in this worker. Accepts an
@@ -354,14 +353,8 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             architectures = getattr(
                 getattr(self, "model_config", None), "architectures", []
             )
-        arch_blob = " ".join(
-            a.lower() for a in architectures if isinstance(a, str)
-        )
-        return (
-            "phi-4" in model_name
-            or "phi4" in model_name
-            or "phi3" in arch_blob
-        )
+        arch_blob = " ".join(a.lower() for a in architectures if isinstance(a, str))
+        return "phi-4" in model_name or "phi4" in model_name or "phi3" in arch_blob
 
     def _apply_phi_inference_dtype_override(
         self, runtime_config: Any, init_optimizer: bool
@@ -728,6 +721,94 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
 
             return metrics
 
+    def _select_teacher_result_by_world_rank(
+        self, teacher_logits: list[Any]
+    ) -> dict[str, Any]:
+        """Select this worker's teacher result by matching global ``world_rank``.
+
+        ``teacher_logits`` is the ordered list returned by the teacher worker
+        group. Older code indexed it with ``torch.distributed.get_rank()``,
+        which assumes teacher and student worker-group layouts are identical.
+        This helper switches to explicit matching on the schema-v1 top-level
+        ``world_rank`` field and validates required per-handle fields.
+        """
+        current_world_rank = torch.distributed.get_rank()
+        available_ranks: list[Any] = []
+        for entry in teacher_logits:
+            if not isinstance(entry, dict):
+                continue
+            entry_world_rank = entry.get("world_rank")
+            available_ranks.append(entry_world_rank)
+            if entry_world_rank == current_world_rank:
+                handles = entry.get("microbatch_handles")
+                assert handles, (
+                    "teacher entry for world_rank="
+                    f"{current_world_rank} has no microbatch_handles"
+                )
+                first_handle = handles[0]
+                missing = [
+                    f
+                    for f in (
+                        "schema_version",
+                        "world_rank",
+                        "tp_rank",
+                        "cp_rank",
+                        "payload_ipc",
+                    )
+                    if f not in first_handle
+                ]
+                assert not missing, (
+                    f"teacher microbatch handle missing required fields "
+                    f"{missing} (world_rank={current_world_rank})"
+                )
+                return entry
+
+        raise RuntimeError(
+            "No teacher worker result matched current world_rank="
+            f"{current_world_rank}; available teacher world_ranks="
+            f"{available_ranks}. This typically indicates mismatched teacher "
+            "and student worker-group topologies."
+        )
+
+    def _select_teacher_results_for_tp_group(
+        self, teacher_logits: list[Any]
+    ) -> list[dict[str, Any]]:
+        """Return one teacher entry per TP rank sharing this worker's coords.
+
+        TP siblings share ``(dp, cp, pp)`` and are ordered by ``tp_rank``.
+        Assumes teacher and student share the same mesh topology (enforced
+        by the strict shard-to-shard matching of the minimal-change IPC plan).
+        """
+        tp_group = self.tp_mesh.get_group()
+        tp_group_ranks = set(torch.distributed.get_process_group_ranks(tp_group))
+
+        matched: dict[int, dict[str, Any]] = {}
+        for entry in teacher_logits:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("world_rank") not in tp_group_ranks:
+                continue
+            handles = entry.get("microbatch_handles")
+            if not handles:
+                continue
+            tp_r = handles[0].get("tp_rank")
+            assert tp_r is not None and 0 <= tp_r < self.tp_size, (
+                f"teacher handle has invalid tp_rank={tp_r} (tp_size={self.tp_size})"
+            )
+            assert tp_r not in matched, (
+                f"duplicate teacher entries for tp_rank={tp_r} in my TP group "
+                f"(world_ranks={sorted(tp_group_ranks)})"
+            )
+            matched[tp_r] = entry
+
+        missing = [r for r in range(self.tp_size) if r not in matched]
+        assert not missing, (
+            f"teacher TP-group incomplete: missing tp_ranks={missing}; "
+            f"tp_group world_ranks={sorted(tp_group_ranks)}; got "
+            f"tp_ranks={sorted(matched.keys())}"
+        )
+        return [matched[r] for r in range(self.tp_size)]
+
     @wrap_with_nvtx_name("dtensor_policy_worker_v2/train_off_policy_distillation")
     def train_off_policy_distillation(
         self,
@@ -779,14 +860,31 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             self.model.train()
 
         teacher_worker_result = None
+        teacher_worker_tp_group_results: Optional[list[dict[str, Any]]] = None
         if teacher_logits is not None:
-            # Both shapes pre-shard the per-rank payload before reaching here:
-            #   - single teacher: ``list[rank]`` of per-rank dicts
+            # Both shapes carry per-rank payloads:
+            #   - single teacher: list of dicts, each tagged with world_rank
+            #     by ``compute_teacher_logits_ipc`` (schema_version=1).
             #   - multi-teacher:  ``dict[rank, list[T_payloads]]`` (built by
-            #     ``_group_teacher_logits_by_rank``)
-            # Indexing by rank yields the right per-rank entry in both cases.
-            rank = torch.distributed.get_rank()
-            teacher_worker_result = teacher_logits[rank]
+            #     ``_group_teacher_logits_by_rank``); TP/CP not currently
+            #     supported on this path.
+            if isinstance(teacher_logits, dict):
+                # multi-teacher: rank-keyed dict. Index by world_rank.
+                rank = torch.distributed.get_rank()
+                teacher_worker_result = teacher_logits[rank]
+            else:
+                teacher_worker_result = self._select_teacher_result_by_world_rank(
+                    teacher_logits
+                )
+                # Full-vocab cross-tokenizer: collect TP-sibling teacher
+                # entries so the student can concatenate per-rank vocab
+                # shards into the global vocab. Top-k payloads already span
+                # the global vocab via ``distributed_vocab_topk`` and need
+                # no TP-group reconstruction.
+                if self.tp_size > 1 and not teacher_worker_result.get("is_topk", False):
+                    teacher_worker_tp_group_results = (
+                        self._select_teacher_results_for_tp_group(teacher_logits)
+                    )
 
         def train_context_fn(processed_inputs):
             return get_train_context(
@@ -817,6 +915,7 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             enable_seq_packing=self.enable_seq_packing,
             sampling_params=None,
             teacher_result=teacher_worker_result,
+            teacher_tp_group_results=teacher_worker_tp_group_results,
         )
 
         def on_microbatch_start(mb_idx):
@@ -919,6 +1018,42 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
                 dtype=self.dtype,
             )
 
+    def _get_or_create_teacher_ipc_post_processor(
+        self, topk_logits: Optional[int]
+    ) -> XTokenTeacherIPCExportPostProcessor:
+        """Return a worker-persistent teacher IPC export post-processor.
+
+        Rationale for persistence: its IPC buffers (and therefore the CUDA
+        IPC exports) are allocated once and reused every step. A fresh
+        post-processor per step would re-export fresh IPC handles each step;
+        under TP>1 the cross-device IPC mappings opened by student TP-siblings
+        keep those teacher buffers pinned after the post-processor goes out
+        of scope, so the old buffers never return to the caching allocator
+        and accumulate ~2.5 GB per step. Reusing the same post-processor
+        keeps the in-use teacher IPC memory bounded to a single step's worth.
+        """
+        cached = getattr(self, "_xtoken_teacher_ipc_post_processor", None)
+        if cached is None or cached.topk_logits != topk_logits:
+            teacher_post_processor = XTokenTeacherIPCExportPostProcessor(
+                loss_fn=getattr(self, "_cached_loss_fn", None),
+                cfg=self.cfg,
+                device_mesh=self.device_mesh,
+                cp_mesh=self.cp_mesh,
+                tp_mesh=self.tp_mesh,
+                cp_size=self.cp_size,
+                dp_size=self.dp_size,
+                enable_seq_packing=self.enable_seq_packing,
+                sampling_params=None,
+                topk_logits=topk_logits,
+                is_mdlm=self.cfg.get("is_mdlm", False),
+            )
+            self._xtoken_teacher_ipc_post_processor = teacher_post_processor
+        else:
+            cached.microbatch_handles = []
+            cached.set_microbatch_index(0)
+            teacher_post_processor = cached
+        return teacher_post_processor
+
     @wrap_with_nvtx_name("dtensor_policy_worker_v2/compute_teacher_logits_ipc")
     def compute_teacher_logits_ipc(
         self,
@@ -969,18 +1104,8 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
                 f"Emptying cache every {empty_cache_steps} microbatches; doing so unnecessarily would incur a large performance overhead.",
             )
 
-        teacher_post_processor = XTokenTeacherIPCExportPostProcessor(
-            loss_fn=getattr(self, "_cached_loss_fn", None),
-            cfg=self.cfg,
-            device_mesh=self.device_mesh,
-            cp_mesh=self.cp_mesh,
-            tp_mesh=self.tp_mesh,
-            cp_size=self.cp_size,
-            dp_size=self.dp_size,
-            enable_seq_packing=self.enable_seq_packing,
-            sampling_params=None,
-            topk_logits=topk_logits,
-            is_mdlm=self.cfg.get("is_mdlm", False),
+        teacher_post_processor = self._get_or_create_teacher_ipc_post_processor(
+            topk_logits
         )
 
         def on_microbatch_start(mb_idx):
@@ -1036,6 +1161,13 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
         return {
             "microbatch_handles": teacher_post_processor.microbatch_handles,
             "is_topk": topk_logits is not None,
+            # Top-level metadata mirrors per-microbatch schema-v1 fields so
+            # consumers (student worker, multi-teacher grouping) can validate
+            # and route entries without scanning per-microbatch handles.
+            "schema_version": 1,
+            "world_rank": torch.distributed.get_rank(),
+            "tp_size": self.tp_size,
+            "cp_size": self.cp_size,
         }
 
     @wrap_with_nvtx_name("dtensor_policy_worker_v2/get_logprobs")
