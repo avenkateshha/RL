@@ -15,6 +15,7 @@
 from typing import Any, Optional
 
 import torch
+import torch.distributed.nn.functional as dist_nn_func
 from megatron.core.models.gpt import GPTModel
 from megatron.core.parallel_state import (
     get_tensor_model_parallel_group,
@@ -104,6 +105,34 @@ def _compute_distributed_softmax(
     exp_logits.div_(sum_exp_logits)
 
     return exp_logits
+
+
+def _compute_distributed_softmax_with_grad(
+    vocab_parallel_logits: torch.Tensor, group: torch.distributed.ProcessGroup
+) -> torch.Tensor:
+    """Compute distributed softmax across TP workers with autograd support.
+
+    This is the differentiable counterpart of ``_compute_distributed_softmax``.
+    The max reduction is used only as a numerical-stability shift, so it is
+    detached. The denominator reduction must be autograd-aware because its
+    backward pass needs the global ``sum(grad * probs)`` term of softmax.
+    """
+    logits = vocab_parallel_logits.to(dtype=torch.float32)
+    logits_max = torch.amax(logits, dim=-1, keepdim=True).detach()
+    torch.distributed.all_reduce(
+        logits_max,
+        op=torch.distributed.ReduceOp.MAX,
+        group=group,
+    )
+
+    exp_logits = torch.exp(logits - logits_max)
+    sum_exp_logits = exp_logits.sum(dim=-1, keepdim=True)
+    sum_exp_logits = dist_nn_func.all_reduce(
+        sum_exp_logits,
+        op=torch.distributed.ReduceOp.SUM,
+        group=group,
+    )
+    return exp_logits / sum_exp_logits
 
 
 class DistributedLogprob(torch.autograd.Function):
