@@ -1396,6 +1396,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         mb_idx: Optional[int] = None,
         mbs: Optional[int] = None,
         teacher_topk_indices_ipc: Optional[torch.Tensor] = None,
+        seq_index: Optional[torch.Tensor] = None,
         _return_raw_kl: bool = False,
         precomputed_student_logits_f32: Optional[torch.Tensor] = None,
         precomputed_student_probs: Optional[torch.Tensor] = None,
@@ -1831,6 +1832,7 @@ class MultiTeacherLossAggregator(LossFunction):
         mb_idx: Optional[int] = None,
         mbs: Optional[int] = None,
         teacher_topk_indices_ipc: Optional[torch.Tensor] = None,
+        seq_index: Optional[torch.Tensor] = None,
         teacher_logits_list: Optional[list[torch.Tensor]] = None,
         teacher_topk_indices_list: Optional[list[Optional[torch.Tensor]]] = None,
         teacher_routing_indices: Optional[torch.Tensor] = None,
@@ -2006,6 +2008,7 @@ class MultiTeacherLossAggregator(LossFunction):
                     mb_idx=mb_idx,
                     mbs=mbs,
                     teacher_topk_indices_ipc=t_topk_idx,
+                    seq_index=seq_index,
                     _return_raw_kl=True,
                     **shared_kwargs,
                 )
