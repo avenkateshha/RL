@@ -764,32 +764,29 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
         teacher_cp_size: int,
         seq_dim: int = 1,
     ) -> torch.Tensor:
-        """Reverse NeMo-RL's load-balanced CP layout into a contiguous sequence.
+        """Concatenate CP shards in rank order to match DTensor.full_tensor().
 
         Each input shard is one teacher CP rank's local view, of shape
-        ``(B, S_full / cp_size, ...)``. Internally that view holds two
-        chunks back-to-back along the seq dim: chunk ``c`` and chunk
-        ``2*cp_size-1-c``. We split each shard into 2, label all
-        ``2*cp_size`` chunks by their global index, sort, and concat.
+        ``(B, S_full / cp_size, ...)``. Internally that view holds the
+        load-balanced layout (chunk ``c`` followed by chunk
+        ``2*cp_size-1-c`` back-to-back along seq_dim).
 
-        No-op (returns the only input) when ``teacher_cp_size == 1``.
+        We deliberately do NOT un-permute back to global sequence order:
+        the student-side ``next_token_logits.full_tensor()`` and
+        ``data["input_ids"].full_tensor()`` both gather contiguously by CP
+        rank (PyTorch DTensor doesn't know nemo_automodel's load-balanced
+        layout), so the cross-tokenizer chunk masks (built from
+        un-permuted alignment positions but applied positionally) are
+        internally consistent only when student/teacher/input_ids share the
+        same CP-rank-gathered order. Sorting teacher back into global
+        order here would mismatch student's positions and inflate KL/CE.
         """
         assert len(cp_shards) == teacher_cp_size, (
             f"expected {teacher_cp_size} CP shards, got {len(cp_shards)}"
         )
         if teacher_cp_size == 1:
             return cp_shards[0]
-        labeled_chunks: list[tuple[int, torch.Tensor]] = []
-        for cp_r, shard in enumerate(cp_shards):
-            sub_chunks = torch.chunk(shard, chunks=2, dim=seq_dim)
-            assert len(sub_chunks) == 2, (
-                f"CP shard at cp_rank={cp_r} did not split into 2 along "
-                f"seq_dim={seq_dim}; shape={tuple(shard.shape)}"
-            )
-            labeled_chunks.append((cp_r, sub_chunks[0]))
-            labeled_chunks.append((2 * teacher_cp_size - cp_r - 1, sub_chunks[1]))
-        labeled_chunks.sort(key=lambda t: t[0])
-        return torch.cat([c for _, c in labeled_chunks], dim=seq_dim)
+        return torch.cat(cp_shards, dim=seq_dim)
 
     def _reconstruct_full_teacher_logits(
         self,

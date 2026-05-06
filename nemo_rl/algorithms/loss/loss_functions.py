@@ -2103,6 +2103,17 @@ class MultiTeacherLossAggregator(LossFunction):
 
         token_mask = data["token_mask"]
         sample_mask = data["sample_mask"]
+        # Under CP>1 prepare_data_for_cp may emit token_mask / sample_mask as
+        # DTensors. Mixing DTensor reductions with the python-float coercion
+        # below ``tok_scale = float(local_valid_toks / global_valid_toks)``
+        # silently turns "local sum" into "global sum" because DTensor.sum()
+        # auto-all-reduces across the sharded dim, breaking the per-DP-rank
+        # rescale invariant. Unwrap to plain tensors so local_valid_toks is
+        # the real per-rank local count.
+        if isinstance(token_mask, torch.distributed.tensor.DTensor):
+            token_mask = token_mask.full_tensor()
+        if isinstance(sample_mask, torch.distributed.tensor.DTensor):
+            sample_mask = sample_mask.full_tensor()
         student_seq_len = next_token_logits.shape[1]
         max_len = min(token_mask.shape[1] - 1, student_seq_len)
         local_mask = token_mask[:, 1 : max_len + 1] * sample_mask.unsqueeze(-1)
