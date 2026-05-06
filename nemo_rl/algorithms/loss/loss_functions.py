@@ -2066,10 +2066,22 @@ class MultiTeacherLossAggregator(LossFunction):
             # promotes to fp32 for the log_softmax/NLL reduction. Avoids
             # materializing a second full-vocab fp32 tensor here.
             ce_logits = next_token_logits
+            if isinstance(ce_logits, torch.distributed.tensor.DTensor):
+                ce_logits = ce_logits.full_tensor()
             student_seq_len = ce_logits.shape[1]
             # Mask padding positions so CE loss only covers real tokens.
-            token_mask_ce = data["token_mask"][:, 1:student_seq_len].to(torch.bool)
-            ce_targets = data["input_ids"][:, 1:student_seq_len].clone()
+            # Under CP>1 the post-processor's prepare_data_for_cp may emit
+            # input_ids / token_mask as DTensors; unwrap before the
+            # ``ce_targets[~token_mask_ce] = -100`` index_put_ which would
+            # otherwise hit DTensor's FakeTensor sharding propagation.
+            ce_input_ids = data["input_ids"]
+            ce_token_mask = data["token_mask"]
+            if isinstance(ce_input_ids, torch.distributed.tensor.DTensor):
+                ce_input_ids = ce_input_ids.full_tensor()
+            if isinstance(ce_token_mask, torch.distributed.tensor.DTensor):
+                ce_token_mask = ce_token_mask.full_tensor()
+            token_mask_ce = ce_token_mask[:, 1:student_seq_len].to(torch.bool)
+            ce_targets = ce_input_ids[:, 1:student_seq_len].clone()
             ce_targets[~token_mask_ce] = -100
             ce_loss = torch.nn.functional.cross_entropy(
                 ce_logits[:, : student_seq_len - 1].reshape(-1, ce_logits.shape[-1]),
