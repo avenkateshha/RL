@@ -753,16 +753,25 @@ def validate(
                 )
                 val_data = maybe_pad_last_batch(val_data, dp_size, val_mbs)
 
-            # Get teacher top-k logits
+            # Teacher IPC for cross-tokenizer loss must export full teacher
+            # vocab logits; top-k is only valid for same-tokenizer KL.
             use_ipc = master_config["distillation"].get("use_ipc", True)
             topk_k = master_config["distillation"]["topk_logits_k"]
+            teacher_topk_k = (
+                None
+                if isinstance(
+                    loss_fn,
+                    (CrossTokenizerDistillationLossFn, MultiTeacherLossAggregator),
+                )
+                else topk_k
+            )
 
             teacher_policy = teacher_policies[0]
             teacher_policy.prepare_for_lp_inference()
             if use_ipc:
                 teacher_logits = teacher_policy.compute_teacher_logits_ipc(
                     val_data,
-                    topk_logits=topk_k,
+                    topk_logits=teacher_topk_k,
                     gbs=val_data.size,
                     mbs=master_config["distillation"].get(
                         "val_micro_batch_size",

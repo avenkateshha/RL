@@ -59,7 +59,7 @@ class _LazyPackedDataset:
 
 
 class ArrowTextDataset(RawDataset):
-    """Dataset class for loading arrow files containing raw text.
+    r"""Dataset class for loading arrow files containing raw text.
 
     This class loads arrow files with a 'text' column and converts them to
     the messages format expected by SFT training.
@@ -82,7 +82,7 @@ class ArrowTextDataset(RawDataset):
 
     Args:
         arrow_files: Path pattern (glob) or list of arrow file paths
-        val_split: Fraction of data to use for validation (default: 0.05)
+        split_validation_size: Fraction of data to use for validation (default: 0)
         seed: Random seed for train/val split
         text_key: Key for text column in arrow files (default: "text")
         characters_per_sample: If set, concatenate multiple texts (separated
@@ -100,7 +100,7 @@ class ArrowTextDataset(RawDataset):
         data:
           dataset_name: "arrow_text"
           arrow_files: "/path/to/data/*.arrow"
-          val_split: 0.05
+          split_validation_size: 0.05
           max_input_seq_length: 4096
           characters_per_sample: 32768  # 4096 tokens * 8 chars/token (guarantees full context)
     """
@@ -108,7 +108,8 @@ class ArrowTextDataset(RawDataset):
     def __init__(
         self,
         arrow_files: str | list[str],
-        val_split: float = 0.05,
+        split_validation_size: float = 0,
+        val_split: Optional[float] = None,
         seed: int = 42,
         text_key: str = "text",
         characters_per_sample: Optional[int] = None,
@@ -119,12 +120,16 @@ class ArrowTextDataset(RawDataset):
         self.seed = seed
         self.text_key = text_key
         self.task_name = "arrow_text_dataset"
+        if val_split is not None:
+            split_validation_size = val_split
 
         # Resolve glob pattern if string
         if isinstance(arrow_files, str):
             file_list = glob.glob(arrow_files)
             if not file_list:
-                raise ValueError(f"No arrow files found matching pattern: {arrow_files}")
+                raise ValueError(
+                    f"No arrow files found matching pattern: {arrow_files}"
+                )
         else:
             file_list = arrow_files
 
@@ -159,19 +164,20 @@ class ArrowTextDataset(RawDataset):
             )
 
             # Split pack_ranges into train/val
-            if val_split > 0:
+            if split_validation_size > 0:
                 import random
+
                 rng = random.Random(seed)
                 indices = list(range(len(pack_ranges)))
                 rng.shuffle(indices)
-                val_count = max(1, int(len(pack_ranges) * val_split))
+                val_count = max(1, int(len(pack_ranges) * split_validation_size))
                 val_indices = sorted(indices[:val_count])
                 train_indices = sorted(indices[val_count:])
                 train_ranges = [pack_ranges[i] for i in train_indices]
                 val_ranges = [pack_ranges[i] for i in val_indices]
             else:
                 train_ranges = pack_ranges
-                val_ranges = pack_ranges[:min(100, len(pack_ranges))]
+                val_ranges = pack_ranges[: min(100, len(pack_ranges))]
 
             train_dataset = _LazyPackedDataset(dataset, train_ranges, text_key)
             val_dataset = _LazyPackedDataset(dataset, val_ranges, text_key)
@@ -184,15 +190,21 @@ class ArrowTextDataset(RawDataset):
                     "task_name": "arrow_text_dataset",
                 }
 
-            formatted_dataset = dataset.map(text_to_messages, remove_columns=dataset.column_names)
+            formatted_dataset = dataset.map(
+                text_to_messages, remove_columns=dataset.column_names
+            )
 
-            if val_split > 0:
-                split = formatted_dataset.train_test_split(test_size=val_split, seed=seed)
+            if split_validation_size > 0:
+                split = formatted_dataset.train_test_split(
+                    test_size=split_validation_size, seed=seed
+                )
                 train_dataset = split["train"]
                 val_dataset = split["test"]
             else:
                 train_dataset = formatted_dataset
-                val_dataset = formatted_dataset.select(range(min(100, len(formatted_dataset))))
+                val_dataset = formatted_dataset.select(
+                    range(min(100, len(formatted_dataset)))
+                )
 
         print(f"  ✓ Train: {len(train_dataset)}, Validation: {len(val_dataset)}")
 

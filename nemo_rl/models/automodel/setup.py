@@ -650,6 +650,16 @@ def setup_model_and_optimizer(
     # HF conversion (required for weight syncing).
     _maybe_set_force_hf(automodel_kwargs, model_config)
 
+    restore_pad_token_id = None
+    if tp_size > 1 and automodel_kwargs.get("force_hf") is True:
+        restore_pad_token_id = getattr(model_config, "pad_token_id", None)
+        if restore_pad_token_id is not None:
+            # HF initialize_weights() zeros embedding[padding_idx]. Under TP that
+            # row index hits a sharded DTensor and can fail during materialization.
+            # Temporarily clear it for from_pretrained(); restore it after the
+            # base checkpoint has been loaded.
+            from_pretrained_kwargs["pad_token_id"] = None
+
     # Sanity-check escape hatch (mirrors the override at the top of this module).
     _trc = os.environ.get("NRL_TRUST_REMOTE_CODE", "true").lower() != "false"
 
@@ -682,9 +692,14 @@ def setup_model_and_optimizer(
     # Autocast is disabled for custom MoE models (non-HF) to avoid numerical issues
     autocast_enabled = not (is_moe_model and not is_hf_model)
 
-    # Set pad token ID if needed. Some model configs (e.g. Gemma3 in transformers v5)
-    # don't have pad_token_id as a direct attribute.
-    if getattr(model.config, "pad_token_id", None) is None:
+    if restore_pad_token_id is not None:
+        model.config.pad_token_id = restore_pad_token_id
+        input_embeddings = model.get_input_embeddings()
+        if input_embeddings is not None and hasattr(input_embeddings, "padding_idx"):
+            input_embeddings.padding_idx = restore_pad_token_id
+    elif getattr(model.config, "pad_token_id", None) is None:
+        # Set pad token ID if needed. Some model configs (e.g. Gemma3 in
+        # transformers v5) don't have pad_token_id as a direct attribute.
         model.config.pad_token_id = tokenizer.pad_token_id
 
     # Handle tied word embeddings (safety net after from_pretrained)

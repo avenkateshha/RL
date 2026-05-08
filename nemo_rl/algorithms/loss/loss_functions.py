@@ -21,7 +21,12 @@ import torch
 from nemo_rl.algorithms.loss.interfaces import LossFunction, LossInputType, LossType
 from nemo_rl.algorithms.utils import calculate_kl, masked_mean
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
-from nemo_rl.distributed.model_utils import DistributedCrossEntropy
+from nemo_rl.distributed.model_utils import (
+    DistributedCrossEntropy,
+    _compute_distributed_softmax_with_grad,
+    allgather_cp_sharded_tensor,
+    get_logprobs_from_vocab_parallel_logits,
+)
 
 Tensor = TypeVar("Tensor", bound=torch.Tensor)
 
@@ -1112,6 +1117,139 @@ def _scatter_chunk_mask_from_coo(
     return mask
 
 
+def _restore_global_sequence_order_from_seq_index(
+    tensor: Optional[torch.Tensor],
+    seq_index: Optional[torch.Tensor],
+    seq_dim: int = 1,
+) -> Optional[torch.Tensor]:
+    """Undo CP-rank-gathered sequence order using the CP seq_index tensor."""
+    if tensor is None or seq_index is None:
+        return tensor
+    if tensor.ndim <= seq_dim:
+        return tensor
+
+    flat_seq_index = seq_index.reshape(-1)
+    if tensor.shape[seq_dim] != flat_seq_index.shape[0]:
+        return tensor
+
+    restore_indices = torch.argsort(flat_seq_index.to(device=tensor.device))
+    return tensor.index_select(seq_dim, restore_indices)
+
+
+def _plain_sequence_tensor(
+    tensor: Optional[torch.Tensor],
+    seq_index: Optional[torch.Tensor],
+) -> Optional[torch.Tensor]:
+    """Unwrap a CP DTensor and restore original sequence order when needed."""
+    if isinstance(tensor, torch.distributed.tensor.DTensor):
+        return _restore_global_sequence_order_from_seq_index(
+            tensor.full_tensor(), seq_index
+        )
+    return tensor
+
+
+def _get_next_token_logprobs_from_dtensor_logits(
+    student_logits: torch.Tensor,
+    input_ids: torch.Tensor,
+    seq_index: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Compute next-token logprobs from DTensor logits for auxiliary CE."""
+    device_mesh = student_logits.device_mesh
+    mesh_dim_names = device_mesh.mesh_dim_names
+    if mesh_dim_names is not None and "tp" in mesh_dim_names:
+        return get_logprobs_from_vocab_parallel_logits(
+            student_logits,
+            input_ids,
+            seq_index=seq_index,
+        )
+
+    if mesh_dim_names is None or "cp" not in mesh_dim_names:
+        logits = student_logits.full_tensor()
+        targets = _plain_sequence_tensor(input_ids, seq_index)
+        assert targets is not None
+        log_probs = torch.log_softmax(logits.to(torch.float32), dim=-1)
+        return (
+            log_probs[:, :-1]
+            .gather(
+                dim=-1,
+                index=targets[:, 1 : logits.shape[1]].unsqueeze(-1),
+            )
+            .squeeze(-1)
+        )
+
+    if seq_index is None or not isinstance(input_ids, torch.distributed.tensor.DTensor):
+        raise ValueError(
+            "CP-sharded CE without TP requires DTensor input_ids and seq_index."
+        )
+
+    from torch.distributed.tensor import DTensor, distribute_tensor
+
+    target_shape = torch.Size(input_ids.shape)
+    _, sorted_indices = torch.sort(seq_index)
+    targets = input_ids.full_tensor()[:, sorted_indices]
+    targets = targets.roll(shifts=-1, dims=-1)[:, seq_index]
+    targets = distribute_tensor(
+        targets,
+        input_ids.device_mesh,
+        input_ids.placements,
+    ).to_local()
+
+    local_logits = student_logits.to_local().to(torch.float32)
+    local_log_probs = torch.log_softmax(local_logits, dim=-1)
+    local_logprobs = local_log_probs.gather(
+        dim=-1,
+        index=targets.unsqueeze(-1),
+    ).squeeze(-1)
+    logprobs = DTensor.from_local(
+        local_logprobs,
+        input_ids.device_mesh,
+        input_ids.placements,
+    ).full_tensor()[:, sorted_indices]
+    assert logprobs.shape == target_shape
+    return logprobs[:, :-1]
+
+
+def _masked_next_token_ce_loss(
+    student_logits: torch.Tensor,
+    input_ids: torch.Tensor,
+    token_mask: torch.Tensor,
+    seq_index: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Compute next-token CE while preserving DTensor TP/CP sharding."""
+    if isinstance(student_logits, torch.distributed.tensor.DTensor):
+        if seq_index is not None and not isinstance(
+            input_ids, torch.distributed.tensor.DTensor
+        ):
+            raise ValueError(
+                "CP-sharded CE requires DTensor input_ids so targets can be "
+                "resharded consistently with logits."
+            )
+        next_token_logprobs = _get_next_token_logprobs_from_dtensor_logits(
+            student_logits,
+            input_ids,
+            seq_index=seq_index,
+        )
+        token_mask_plain = _plain_sequence_tensor(token_mask, seq_index)
+        assert token_mask_plain is not None
+        max_len = min(next_token_logprobs.shape[1], token_mask_plain.shape[1] - 1)
+        mask = token_mask_plain[:, 1 : max_len + 1].to(next_token_logprobs.dtype)
+        valid_count = mask.sum().clamp(min=1.0)
+        return -(next_token_logprobs[:, :max_len] * mask).sum() / valid_count
+
+    input_ids_plain = _plain_sequence_tensor(input_ids, seq_index)
+    token_mask_plain = _plain_sequence_tensor(token_mask, seq_index)
+    assert input_ids_plain is not None and token_mask_plain is not None
+    student_seq_len = student_logits.shape[1]
+    ce_mask = token_mask_plain[:, 1:student_seq_len].to(torch.bool)
+    ce_targets = input_ids_plain[:, 1:student_seq_len].clone()
+    ce_targets[~ce_mask] = -100
+    return torch.nn.functional.cross_entropy(
+        student_logits[:, : student_seq_len - 1].reshape(-1, student_logits.shape[-1]),
+        ce_targets.reshape(-1),
+        ignore_index=-100,
+    )
+
+
 class CrossTokenizerDistillationLossFn(LossFunction):
     """Cross-tokenizer distillation loss using TokenAligner's projection matrix.
 
@@ -1214,6 +1352,196 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             use_sparse_format=False,
         )
         return projected_full[:, :, global_top_indices]
+
+    def _should_use_sharded_path(
+        self,
+        next_token_logits: torch.Tensor,
+        vocab_parallel_group: Optional[torch.distributed.ProcessGroup],
+        context_parallel_group: Optional[torch.distributed.ProcessGroup],
+    ) -> bool:
+        """Return whether the TP/CP-aware projection path can run."""
+        if not isinstance(next_token_logits, torch.distributed.tensor.DTensor):
+            return False
+        tp_world = (
+            torch.distributed.get_world_size(vocab_parallel_group)
+            if vocab_parallel_group is not None
+            else 1
+        )
+        cp_world = (
+            torch.distributed.get_world_size(context_parallel_group)
+            if context_parallel_group is not None
+            else 1
+        )
+        has_sparse_proj = (
+            getattr(self.token_aligner, "sparse_transformation_matrix", None)
+            is not None
+        )
+        has_dense_proj = (
+            getattr(self.token_aligner, "likelihood_projection_indices", None)
+            is not None
+            and getattr(self.token_aligner, "likelihood_projection_matrix", None)
+            is not None
+        )
+        return (
+            (tp_world > 1 or cp_world > 1)
+            and not self.cfg.get("gold_loss", False)
+            and (has_sparse_proj or has_dense_proj)
+            and not getattr(self.token_aligner, "learnable", False)
+        )
+
+    def _project_student_to_teacher_sharded(
+        self,
+        student_logits_local: torch.Tensor,
+        teacher_vocab_size: int,
+        temperature: float,
+        global_top_indices: torch.Tensor,
+        device: torch.device,
+        tp_group: Optional[torch.distributed.ProcessGroup],
+        cp_group: Optional[torch.distributed.ProcessGroup],
+        vocab_parallel_rank: int,
+        vocab_start_index: Optional[int] = None,
+        tp_mesh: Any = None,
+        cp_mesh: Any = None,
+        seq_index: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Project TP/CP-sharded student logits without materializing full vocab."""
+        if getattr(self.token_aligner, "learnable", False):
+            raise NotImplementedError(
+                "TP/CP-aware projection does not support learnable projection "
+                "matrices because row slicing breaks gradient flow to the "
+                "original parameter."
+            )
+
+        tp_world = (
+            torch.distributed.get_world_size(tp_group) if tp_group is not None else 1
+        )
+        cp_world = (
+            torch.distributed.get_world_size(cp_group) if cp_group is not None else 1
+        )
+
+        local_vocab_size = student_logits_local.shape[-1]
+        vocab_start = (
+            int(vocab_start_index)
+            if vocab_start_index is not None
+            else int(vocab_parallel_rank * local_vocab_size)
+        )
+        vocab_end = int(vocab_start + local_vocab_size)
+
+        scaled_logits = student_logits_local.to(torch.float32) / temperature
+        if tp_world > 1:
+            student_probs = _compute_distributed_softmax_with_grad(
+                scaled_logits, group=tp_group
+            )
+        else:
+            student_probs = torch.softmax(scaled_logits, dim=-1)
+
+        sparse_mat = getattr(self.token_aligner, "sparse_transformation_matrix", None)
+        if sparse_mat is not None:
+            partial = self._project_local_sparse(
+                student_probs,
+                sparse_mat,
+                global_top_indices,
+                vocab_start,
+                vocab_end,
+                device,
+            )
+        else:
+            projection_indices = getattr(
+                self.token_aligner, "likelihood_projection_indices", None
+            )
+            projection_values = getattr(
+                self.token_aligner, "likelihood_projection_matrix", None
+            )
+            if projection_indices is None or projection_values is None:
+                raise NotImplementedError(
+                    "TP/CP-aware projection requires either a sparse projection "
+                    "matrix or dense projection indices and values."
+                )
+            partial = self._project_local_dense(
+                student_probs,
+                projection_indices,
+                projection_values,
+                global_top_indices,
+                vocab_start,
+                vocab_end,
+                teacher_vocab_size,
+                device,
+            )
+
+        if tp_world > 1:
+            if tp_mesh is not None:
+                from torch.distributed.tensor import DTensor, Partial
+
+                partial = DTensor.from_local(
+                    partial, tp_mesh, [Partial()]
+                ).full_tensor()
+            else:
+                torch.distributed.all_reduce(
+                    partial, op=torch.distributed.ReduceOp.SUM, group=tp_group
+                )
+
+        if cp_world > 1 and cp_mesh is not None:
+            from torch.distributed.tensor import DTensor, Shard
+
+            partial = DTensor.from_local(partial, cp_mesh, [Shard(1)]).full_tensor()
+            partial = _restore_global_sequence_order_from_seq_index(partial, seq_index)
+        elif cp_world > 1 and cp_group is not None:
+            partial = allgather_cp_sharded_tensor(partial, cp_group, seq_dim=1)
+
+        return partial.to(student_logits_local.dtype)
+
+    def _project_local_sparse(
+        self,
+        student_probs: torch.Tensor,
+        sparse_mat: torch.Tensor,
+        global_top_indices: torch.Tensor,
+        vocab_start: int,
+        vocab_end: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Project this TP rank's local student vocab rows with a sparse matrix."""
+        row_indices = torch.arange(vocab_start, vocab_end, device=device)
+        proj_local_coo = (
+            sparse_mat.index_select(0, row_indices)
+            .coalesce()
+            .index_select(1, global_top_indices)
+            .coalesce()
+        )
+        proj_local_coo = (
+            proj_local_coo * self.token_aligner.projection_matrix_multiplier
+        )
+
+        batch_size, seq_len, local_vocab_size = student_probs.shape
+        probs_2d = student_probs.reshape(batch_size * seq_len, local_vocab_size).to(
+            torch.float32
+        )
+        proj_local_csr = proj_local_coo.to_sparse_csr().to(torch.float32)
+        partial_2d = torch.sparse.mm(proj_local_csr.t(), probs_2d.t()).t()
+        return partial_2d.reshape(batch_size, seq_len, -1).contiguous()
+
+    def _project_local_dense(
+        self,
+        student_probs: torch.Tensor,
+        projection_indices: torch.Tensor,
+        projection_values: torch.Tensor,
+        global_top_indices: torch.Tensor,
+        vocab_start: int,
+        vocab_end: int,
+        teacher_vocab_size: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Project this TP rank's dense projection rows via the CSR path."""
+        indices_local = projection_indices[vocab_start:vocab_end, :]
+        values_local = projection_values[vocab_start:vocab_end, :]
+        projected_full = self.token_aligner.project_token_likelihoods_instance(
+            student_probs,
+            indices_local,
+            values_local,
+            int(teacher_vocab_size),
+            device,
+            use_sparse_format=False,
+        )
+        return projected_full[:, :, global_top_indices].contiguous()
 
     def _compute_gold_loss(
         self,
@@ -1395,6 +1723,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         teacher_logits: Optional[torch.Tensor] = None,
         mb_idx: Optional[int] = None,
         mbs: Optional[int] = None,
+        mb_start: Optional[int] = None,
         teacher_topk_indices_ipc: Optional[torch.Tensor] = None,
         seq_index: Optional[torch.Tensor] = None,
         _return_raw_kl: bool = False,
@@ -1415,14 +1744,19 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         softmax, log_softmax) out of the per-teacher loop and share it
         across multiple teachers with the same temperature.
         """
+        input_ids_for_ce = data["input_ids"]
+        token_mask_for_ce = data["token_mask"]
+        use_sharded_path = self._should_use_sharded_path(
+            next_token_logits,
+            vocab_parallel_group,
+            context_parallel_group,
+        )
 
         # Under CP>1 the student post-processor runs ``prepare_data_for_cp``,
         # which may return ``input_ids`` / ``token_mask`` / ``sample_mask`` as
-        # DTensors. Downstream ops combine these with already-unwrapped
-        # ``student_logits`` (see ``.full_tensor()`` below) and with scalar
-        # losses, so we unwrap everything once here to avoid "mixed
-        # torch.Tensor and DTensor" errors in the per-chunk projection,
-        # auxiliary CE, and DP rescale.
+        # DTensors. The chunk-mask KL path operates in student-global sequence
+        # order, so unwrap and de-zigzag the masks/targets used for indexing.
+        # Keep the original DTensor targets above for sharded auxiliary CE.
         def _unwrap_dtensor(
             t: Optional[torch.Tensor],
         ) -> Optional[torch.Tensor]:
@@ -1430,25 +1764,55 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 return t.full_tensor()
             return t
 
+        input_ids_was_dtensor = isinstance(
+            data["input_ids"], torch.distributed.tensor.DTensor
+        )
+        token_mask_was_dtensor = isinstance(
+            data.get("token_mask"), torch.distributed.tensor.DTensor
+        )
         data = {
             **data,
             "input_ids": _unwrap_dtensor(data["input_ids"]),
             "token_mask": _unwrap_dtensor(data.get("token_mask")),
             "sample_mask": _unwrap_dtensor(data.get("sample_mask")),
         }
-        input_ids_student = data["input_ids"]
-        batch_size = input_ids_student.shape[0]
+        if seq_index is not None and input_ids_was_dtensor:
+            data["input_ids"] = _restore_global_sequence_order_from_seq_index(
+                data["input_ids"], seq_index
+            )
+        if seq_index is not None and token_mask_was_dtensor:
+            data["token_mask"] = _restore_global_sequence_order_from_seq_index(
+                data.get("token_mask"), seq_index
+            )
 
-        # Keep logits in their native dtype (typically bf16). The downstream
-        # log_softmax / softmax / bmm ops on CUDA upcast to fp32 internally for
-        # numerics while storing activations in bf16, which roughly halves the
-        # working-set memory of the gold-loss / projection paths.
-        if precomputed_student_logits_f32 is not None:
+        # Keep the student logits sharded for the TP/CP-aware projection path.
+        # Full materialization is still required for gold loss, learnable
+        # projections, and non-DTensor inputs.
+        if use_sharded_path:
+            student_logits = next_token_logits.to_local()
+            precomputed_student_probs = None
+            precomputed_student_log_probs = None
+        elif precomputed_student_logits_f32 is not None:
             student_logits = precomputed_student_logits_f32
         elif isinstance(next_token_logits, torch.distributed.tensor.DTensor):
             student_logits = next_token_logits.full_tensor()
         else:
             student_logits = next_token_logits
+        if not use_sharded_path:
+            student_logits = _restore_global_sequence_order_from_seq_index(
+                student_logits, seq_index
+            )
+            precomputed_student_probs = _restore_global_sequence_order_from_seq_index(
+                precomputed_student_probs, seq_index
+            )
+            precomputed_student_log_probs = (
+                _restore_global_sequence_order_from_seq_index(
+                    precomputed_student_log_probs, seq_index
+                )
+            )
+
+        input_ids_student = data["input_ids"]
+        batch_size = input_ids_student.shape[0]
 
         if teacher_logits is None:
             raise ValueError(
@@ -1478,7 +1842,10 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 "requires full teacher logits (topk_logits=None)."
             )
 
-        if mb_idx is not None and mbs is not None:
+        if mb_start is not None:
+            mb_start = int(mb_start)
+            mb_end = mb_start + batch_size
+        elif mb_idx is not None and mbs is not None:
             mb_start = mb_idx * mbs
             mb_end = mb_start + batch_size
         else:
@@ -1493,7 +1860,9 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         reverse_kl = self.cfg.get("reverse_kl", False)
         use_gold_loss = self.cfg.get("gold_loss", False)
         use_xtoken_loss = self.cfg.get("xtoken_loss", False)
-        student_seq_len = student_logits.shape[1]
+        student_seq_len = (
+            next_token_logits.shape[1] if use_sharded_path else student_logits.shape[1]
+        )
         teacher_seq_len = teacher_logits_f32.shape[1]
         teacher_vocab_size = teacher_logits_f32.shape[-1]
 
@@ -1572,14 +1941,39 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     global_top_indices = global_top_indices.sort()[0]
 
             # -- 4. Project student probs to teacher vocab --
-            projected_student = self._project_student_to_teacher(
-                student_logits,
-                teacher_vocab_size,
-                temperature,
-                global_top_indices,
-                device,
-                precomputed_student_probs=precomputed_student_probs,
-            )
+            if use_sharded_path:
+                tp_mesh = None
+                cp_mesh = None
+                if isinstance(next_token_logits, torch.distributed.tensor.DTensor):
+                    mesh_dim_names = next_token_logits.device_mesh.mesh_dim_names
+                    if mesh_dim_names is not None:
+                        if "tp" in mesh_dim_names:
+                            tp_mesh = next_token_logits.device_mesh["tp"]
+                        if "cp" in mesh_dim_names:
+                            cp_mesh = next_token_logits.device_mesh["cp"]
+
+                projected_student = self._project_student_to_teacher_sharded(
+                    student_logits,
+                    teacher_vocab_size,
+                    temperature,
+                    global_top_indices,
+                    device,
+                    vocab_parallel_group,
+                    context_parallel_group,
+                    int(vocab_parallel_rank or 0),
+                    tp_mesh=tp_mesh,
+                    cp_mesh=cp_mesh,
+                    seq_index=seq_index,
+                )
+            else:
+                projected_student = self._project_student_to_teacher(
+                    student_logits,
+                    teacher_vocab_size,
+                    temperature,
+                    global_top_indices,
+                    device,
+                    precomputed_student_probs=precomputed_student_probs,
+                )
 
             # -- 5. Teacher log-probs in reduced vocab --
             teacher_logits_reduced = teacher_logits_f32[:, :, global_top_indices]
@@ -1663,18 +2057,11 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         ce_loss_value = 0.0
 
         if ce_loss_scale > 0.0 or dynamic_loss_scaling:
-            # Mask padding positions so CE loss only covers real tokens.
-            # token_mask[:, 1:] marks valid next-token targets (shifted by 1).
-            token_mask = data["token_mask"]
-            ce_mask = token_mask[:, 1:student_seq_len].to(torch.bool)
-            ce_targets = input_ids_student[:, 1:student_seq_len].clone()
-            ce_targets[~ce_mask] = -100
-            ce_loss = torch.nn.functional.cross_entropy(
-                student_logits[:, : student_seq_len - 1].reshape(
-                    -1, student_logits.shape[-1]
-                ),
-                ce_targets.reshape(-1),
-                ignore_index=-100,
+            ce_loss = _masked_next_token_ce_loss(
+                next_token_logits if use_sharded_path else student_logits,
+                input_ids_for_ce if use_sharded_path else input_ids_student,
+                token_mask_for_ce if use_sharded_path else data["token_mask"],
+                seq_index=seq_index,
             )
             ce_loss_value = float(ce_loss.item())
 
@@ -1831,6 +2218,7 @@ class MultiTeacherLossAggregator(LossFunction):
         teacher_logits: Optional[torch.Tensor] = None,
         mb_idx: Optional[int] = None,
         mbs: Optional[int] = None,
+        mb_start: Optional[int] = None,
         teacher_topk_indices_ipc: Optional[torch.Tensor] = None,
         seq_index: Optional[torch.Tensor] = None,
         teacher_logits_list: Optional[list[torch.Tensor]] = None,
@@ -1918,12 +2306,22 @@ class MultiTeacherLossAggregator(LossFunction):
         # When two or more teachers share the same temperature and code path
         # (gold_loss vs. projection), we can compute the corresponding
         # student tensor exactly once and reuse it across those teachers.
+        uses_sharded_student_path = any(
+            loss_fn is not None
+            and t_logits is not None
+            and loss_fn._should_use_sharded_path(
+                next_token_logits,
+                vocab_parallel_group,
+                context_parallel_group,
+            )
+            for loss_fn, t_logits in zip(self.loss_fns, teacher_logits_list)
+        )
         per_teacher_share_keys: list[Optional[tuple[float, str]]] = []
         share_key_counts: dict[tuple[float, str], int] = {}
         for teacher_idx, (loss_fn, t_logits) in enumerate(
             zip(self.loss_fns, teacher_logits_list)
         ):
-            if t_logits is None or loss_fn is None:
+            if t_logits is None or loss_fn is None or uses_sharded_student_path:
                 per_teacher_share_keys.append(None)
                 continue
             cfg = getattr(loss_fn, "cfg", {}) or {}
@@ -2007,6 +2405,7 @@ class MultiTeacherLossAggregator(LossFunction):
                     teacher_logits=t_logits,
                     mb_idx=mb_idx,
                     mbs=mbs,
+                    mb_start=mb_start,
                     teacher_topk_indices_ipc=t_topk_idx,
                     seq_index=seq_index,
                     _return_raw_kl=True,
@@ -2062,31 +2461,11 @@ class MultiTeacherLossAggregator(LossFunction):
         loss = total_kl
         ce_loss_tensor: Optional[torch.Tensor] = None
         if ce_loss_scale > 0.0 or dynamic_loss_scaling:
-            # Pass logits in their native dtype; cross_entropy internally
-            # promotes to fp32 for the log_softmax/NLL reduction. Avoids
-            # materializing a second full-vocab fp32 tensor here.
-            ce_logits = next_token_logits
-            if isinstance(ce_logits, torch.distributed.tensor.DTensor):
-                ce_logits = ce_logits.full_tensor()
-            student_seq_len = ce_logits.shape[1]
-            # Mask padding positions so CE loss only covers real tokens.
-            # Under CP>1 the post-processor's prepare_data_for_cp may emit
-            # input_ids / token_mask as DTensors; unwrap before the
-            # ``ce_targets[~token_mask_ce] = -100`` index_put_ which would
-            # otherwise hit DTensor's FakeTensor sharding propagation.
-            ce_input_ids = data["input_ids"]
-            ce_token_mask = data["token_mask"]
-            if isinstance(ce_input_ids, torch.distributed.tensor.DTensor):
-                ce_input_ids = ce_input_ids.full_tensor()
-            if isinstance(ce_token_mask, torch.distributed.tensor.DTensor):
-                ce_token_mask = ce_token_mask.full_tensor()
-            token_mask_ce = ce_token_mask[:, 1:student_seq_len].to(torch.bool)
-            ce_targets = ce_input_ids[:, 1:student_seq_len].clone()
-            ce_targets[~token_mask_ce] = -100
-            ce_loss = torch.nn.functional.cross_entropy(
-                ce_logits[:, : student_seq_len - 1].reshape(-1, ce_logits.shape[-1]),
-                ce_targets.reshape(-1),
-                ignore_index=-100,
+            ce_loss = _masked_next_token_ce_loss(
+                next_token_logits,
+                data["input_ids"],
+                data["token_mask"],
+                seq_index=seq_index,
             )
             ce_loss_tensor = ce_loss
             if dynamic_loss_scaling:

@@ -643,6 +643,7 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
         # before passing this in.
         self._teacher_dp_group_entries = teacher_dp_group_entries
         self._microbatch_idx = 0
+        self._microbatch_start = 0
         # Cache parallel coordinates for diagnostics.
         self.world_rank = torch.distributed.get_rank()
         self.tp_group = self.tp_mesh.get_group()
@@ -662,6 +663,8 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
         )
 
     def set_microbatch_index(self, mb_idx: int) -> None:
+        if mb_idx == 0 or mb_idx <= self._microbatch_idx:
+            self._microbatch_start = 0
         self._microbatch_idx = mb_idx
 
     @staticmethod
@@ -759,34 +762,30 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
         return handles_by_t_coord, t_tp_size, t_cp_size, bool(is_topk)
 
     @staticmethod
-    def _de_zigzag_cp_shards(
+    def _cp_shards_to_global_order(
         cp_shards: list[torch.Tensor],
         teacher_cp_size: int,
         seq_dim: int = 1,
     ) -> torch.Tensor:
-        """Concatenate CP shards in rank order to match DTensor.full_tensor().
-
-        Each input shard is one teacher CP rank's local view, of shape
-        ``(B, S_full / cp_size, ...)``. Internally that view holds the
-        load-balanced layout (chunk ``c`` followed by chunk
-        ``2*cp_size-1-c`` back-to-back along seq_dim).
-
-        We deliberately do NOT un-permute back to global sequence order:
-        the student-side ``next_token_logits.full_tensor()`` and
-        ``data["input_ids"].full_tensor()`` both gather contiguously by CP
-        rank (PyTorch DTensor doesn't know nemo_automodel's load-balanced
-        layout), so the cross-tokenizer chunk masks (built from
-        un-permuted alignment positions but applied positionally) are
-        internally consistent only when student/teacher/input_ids share the
-        same CP-rank-gathered order. Sorting teacher back into global
-        order here would mismatch student's positions and inflate KL/CE.
-        """
+        """Rebuild dense global sequence order from teacher CP-rank shards."""
         assert len(cp_shards) == teacher_cp_size, (
             f"expected {teacher_cp_size} CP shards, got {len(cp_shards)}"
         )
         if teacher_cp_size == 1:
             return cp_shards[0]
-        return torch.cat(cp_shards, dim=seq_dim)
+
+        global_chunks: list[Optional[torch.Tensor]] = [None] * (2 * teacher_cp_size)
+        for cp_rank, shard in enumerate(cp_shards):
+            assert shard.shape[seq_dim] % 2 == 0, (
+                "teacher CP shard sequence length must be divisible by 2 "
+                f"for load-balanced reconstruction, got shape={tuple(shard.shape)}"
+            )
+            left_chunk, right_chunk = torch.chunk(shard, chunks=2, dim=seq_dim)
+            global_chunks[cp_rank] = left_chunk
+            global_chunks[2 * teacher_cp_size - cp_rank - 1] = right_chunk
+
+        assert all(chunk is not None for chunk in global_chunks)
+        return torch.cat(global_chunks, dim=seq_dim)  # type: ignore[arg-type]
 
     def _reconstruct_full_teacher_logits(
         self,
@@ -820,7 +819,7 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
                     self._rebuild_payload_from_handle(handle, current_device_id)
                 )
             cp_shards.append(torch.cat(tp_chunks, dim=-1))
-        return self._de_zigzag_cp_shards(cp_shards, t_cp_size, seq_dim=1)
+        return self._cp_shards_to_global_order(cp_shards, t_cp_size, seq_dim=1)
 
     def _reconstruct_full_teacher_topk(
         self,
@@ -847,8 +846,12 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
             )
             cp_value_shards.append(values)
             cp_index_shards.append(indices)
-        full_values = self._de_zigzag_cp_shards(cp_value_shards, t_cp_size, seq_dim=1)
-        full_indices = self._de_zigzag_cp_shards(cp_index_shards, t_cp_size, seq_dim=1)
+        full_values = self._cp_shards_to_global_order(
+            cp_value_shards, t_cp_size, seq_dim=1
+        )
+        full_indices = self._cp_shards_to_global_order(
+            cp_index_shards, t_cp_size, seq_dim=1
+        )
         return full_values, full_indices
 
     def _inject_teacher_ipc_tensors(self, loss_kwargs: dict[str, Any]) -> None:
@@ -969,6 +972,8 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
         loss_kwargs.setdefault("vocab_parallel_group", self.tp_group)
         if self.cp_group is not None:
             loss_kwargs.setdefault("context_parallel_group", self.cp_group)
+        microbatch_size = int(data_dict["input_ids"].shape[0])
+        loss_kwargs.setdefault("mb_start", self._microbatch_start)
 
         # Build ``seq_index_tensor`` for the CE-auxiliary sharded path.
         # ``processed_inputs.seq_index`` is mutated in place by the
@@ -998,10 +1003,9 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
             data_dict,
             global_valid_seqs,
             global_valid_toks,
-            mb_idx=self._microbatch_idx,
-            mbs=data_dict["input_ids"].shape[0],
             **loss_kwargs,
         )
+        self._microbatch_start += microbatch_size
         return loss, loss_metrics
 
 
