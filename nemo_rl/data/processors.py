@@ -241,6 +241,7 @@ def kd_data_processor(
         add_special_tokens=True,
         max_length=max_seq_length,
         truncation=True,
+        padding="max_length",
     )["input_ids"][0]
 
     length = len(token_ids)

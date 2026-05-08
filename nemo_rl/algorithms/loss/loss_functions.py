@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import os
 import time
 from typing import Any, NotRequired, Optional, TypedDict, TypeVar, Union
 
@@ -1109,11 +1110,11 @@ class CrossTokenizerDistillationLossFn(LossFunction):
     masked_mean normalization so loss magnitude is comparable to same-tokenizer
     distillation.
 
-    Teacher-specific data (teacher_input_ids, aligned_pairs) is stored on
-    this object via set_cross_tokenizer_data() before each training step,
-    rather than in the data dict, because teacher and student sequences
-    have different lengths and the worker validates that all tensors in
-    the data dict share the same sequence dimension.
+    Per-step alignment state is stored on this object via
+    set_cross_tokenizer_data() before each training step rather than in the
+    data dict, because the worker validates that all tensors in the data
+    dict share the same sequence dimension and the alignment payload is a
+    list of variable-length per-sample COO tensors.
     """
 
     def __init__(self, cfg: CrossTokenizerDistillationLossConfig, token_aligner):
@@ -1122,28 +1123,18 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         self.token_aligner = token_aligner
         self.cfg = cfg
         self.loss_type = LossType.TOKEN_LEVEL
-        self._teacher_input_ids = None
-        self._aligned_pairs = None
         self._chunk_indices: Optional[dict[str, list]] = None
 
     def set_cross_tokenizer_data(
         self,
-        teacher_input_ids: torch.Tensor,
-        aligned_pairs: list,
-        chunk_indices: Optional[dict[str, list]] = None,
+        chunk_indices: dict[str, list],
     ):
-        """Store teacher-side data before each training step.
+        """Store the per-sample COO chunk-mask indices for the next step.
 
-        Called from the training loop before student_policy.train().
-        The worker never sees these tensors in shape validation.
-
-        ``chunk_indices`` carries the per-sample COO chunk-mask indices that
-        used to be rebuilt inside ``__call__`` every microbatch. When set, it
-        is a dict with keys ``student_chunk_coo``, ``teacher_chunk_coo``,
-        ``num_chunks``, each a DP-sharded list of length ``batch_size``.
+        ``chunk_indices`` is a dict with keys ``student_chunk_coo``,
+        ``teacher_chunk_coo``, ``num_chunks``, each a DP-sharded list of
+        length ``batch_size`` precomputed by ``CrossTokenizerCollator``.
         """
-        self._teacher_input_ids = teacher_input_ids
-        self._aligned_pairs = aligned_pairs
         self._chunk_indices = chunk_indices
 
     def _project_student_to_teacher(
@@ -1208,7 +1199,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         xtoken_loss: bool,
         device: torch.device,
         precomputed_student_log_probs: Optional[torch.Tensor] = None,
-    ) -> tuple[torch.Tensor, float]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Gold loss: common-vocab KL + uncommon-vocab sorted L1.
 
         Splits the vocabulary into tokens with exact 1:1 projection mappings
@@ -1392,11 +1383,6 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             raise ValueError(
                 "CrossTokenizerDistillationLossFn requires teacher_logits via IPC. "
                 "Set use_ipc=True in the distillation config."
-            )
-        if self._aligned_pairs is None or self._teacher_input_ids is None:
-            raise ValueError(
-                "Cross-tokenizer data not set. "
-                "Call loss_fn.set_cross_tokenizer_data() before training."
             )
 
         # IPC contract (XTokenTeacherIPCExportPostProcessor, full-vocab branch):
@@ -1647,10 +1633,8 @@ class MultiTeacherLossAggregator(LossFunction):
 
     def set_cross_tokenizer_data(
         self,
-        teacher_input_ids: torch.Tensor,
-        aligned_pairs: list,
+        chunk_indices: dict[str, list],
         teacher_idx: Optional[int] = None,
-        chunk_indices: Optional[dict[str, list]] = None,
     ) -> None:
         # When called from the single-teacher dispatch (no explicit teacher_idx),
         # default to the only teacher slot so the unified worker path keeps
@@ -1664,9 +1648,7 @@ class MultiTeacherLossAggregator(LossFunction):
             teacher_idx = 0
         fn = self.loss_fns[teacher_idx]
         if fn is not None:
-            fn.set_cross_tokenizer_data(
-                teacher_input_ids, aligned_pairs, chunk_indices=chunk_indices,
-            )
+            fn.set_cross_tokenizer_data(chunk_indices)
 
     def _compute_same_tokenizer_kl(
         self,

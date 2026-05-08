@@ -603,45 +603,44 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
 
     def update_cross_tokenizer_data(
         self,
-        teacher_input_ids: torch.Tensor,
-        aligned_pairs: Any,
+        chunk_indices: dict[str, list],
+        gbs: int,
         teacher_idx: Optional[int] = None,
-        chunk_indices: Optional[dict[str, Any]] = None,
     ) -> None:
-        """Push per-step cross-tokenizer data to all workers' cached loss functions.
+        """Push per-step cross-tokenizer COO chunk indices to workers.
 
-        Shards ``teacher_input_ids``, ``aligned_pairs``, and the optional
-        ``chunk_indices`` along the DP axis so each worker only receives
-        its own slice. ``chunk_indices`` carries the per-sample COO chunk
-        masks precomputed by ``CrossTokenizerCollator``.
+        Shards along the DP axis using the same chunk-then-stripe layout
+        as ``BatchedDataDict.shard_by_batch_size(shards=dp_size, batch_size=gbs)``
+        so each worker's chunk_indices slice corresponds to the same samples
+        as its student/teacher ``input_ids`` slices coming from
+        ``train_off_policy_distillation`` / ``compute_teacher_logits_ipc``.
         """
         dp_size = self.sharding_annotations.get_axis_size("data_parallel")
-        batch_size = teacher_input_ids.shape[0]
-        shard_size = batch_size // dp_size
+        keys = list(chunk_indices.keys())
+        total_size = len(chunk_indices[keys[0]])
+        assert total_size % gbs == 0, (
+            f"chunk_indices length ({total_size}) is not a multiple of gbs ({gbs})"
+        )
+        assert gbs % dp_size == 0, (
+            f"gbs ({gbs}) is not a multiple of dp_size ({dp_size})"
+        )
+        num_chunks = total_size // gbs
+        shard = gbs // dp_size
 
-        if chunk_indices is not None:
-            chunk_indices_shards: list[Optional[dict[str, Any]]] = [
-                {
-                    k: chunk_indices[k][i * shard_size : (i + 1) * shard_size]
-                    for k in chunk_indices
-                }
-                for i in range(dp_size)
-            ]
-        else:
-            chunk_indices_shards = [None for _ in range(dp_size)]
+        chunk_indices_shards: list[dict[str, list]] = []
+        for r in range(dp_size):
+            rank_shard: dict[str, list] = {k: [] for k in keys}
+            for c in range(num_chunks):
+                start = c * gbs + r * shard
+                end = start + shard
+                for k in keys:
+                    rank_shard[k].extend(chunk_indices[k][start:end])
+            chunk_indices_shards.append(rank_shard)
 
         futures = self.worker_group.run_all_workers_multiple_data(
             "update_cross_tokenizer_data",
-            teacher_input_ids=[
-                teacher_input_ids[i * shard_size : (i + 1) * shard_size]
-                for i in range(dp_size)
-            ],
-            aligned_pairs=[
-                aligned_pairs[i * shard_size : (i + 1) * shard_size]
-                for i in range(dp_size)
-            ],
-            teacher_idx=[teacher_idx for _ in range(dp_size)],
             chunk_indices=chunk_indices_shards,
+            teacher_idx=[teacher_idx for _ in range(dp_size)],
         )
         ray.get(futures)
 

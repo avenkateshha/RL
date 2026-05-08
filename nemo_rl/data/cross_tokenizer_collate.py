@@ -80,10 +80,18 @@ def _build_chunk_coo(
     Returns ``(student_chunk_coo, teacher_chunk_coo, num_chunks)``. COO tensors
     are empty ``(0, 2)`` when a sample has no surviving chunks.
     """
+    # Match PyTorch tokenalign reference (compute_KL_loss_optimized chunk
+    # branch): chunk_id is the position in aligned_pairs (capped at
+    # max_n_chunks = min(student_seq_len, teacher_seq_len)). Sentinel pairs
+    # (start == -1) and pairs whose span extends past the truncation
+    # boundary just skip COO writes — they keep their chunk_id slot, which
+    # ends up as an all-False "ghost" column in proj_mask / tgt_mask. The
+    # downstream chunk_valid mask zeros their loss contribution.
     student_rows: list[tuple[int, int]] = []
     teacher_rows: list[tuple[int, int]] = []
-    chunk_id = 0
-    for pair in aligned_pairs:
+    max_n_chunks = min(student_seq_len, teacher_seq_len)
+    truncated = aligned_pairs[:max_n_chunks]
+    for chunk_id, pair in enumerate(truncated):
         s1_start, s1_end, s2_start, s2_end = pair[2], pair[3], pair[4], pair[5]
         if exact_match_only and (
             s1_end - s1_start != 1 or s2_end - s2_start != 1
@@ -91,13 +99,13 @@ def _build_chunk_coo(
             continue
         if s1_start == -1 or s2_start == -1:
             continue
-        if s1_end > student_seq_len or s2_end > teacher_seq_len:
-            continue
-        for pos in range(s1_start, s1_end):
+        # Clamp out-of-bounds spans (PT silently no-ops via tensor slicing).
+        s1_end_clamped = min(s1_end, student_seq_len)
+        s2_end_clamped = min(s2_end, teacher_seq_len)
+        for pos in range(s1_start, s1_end_clamped):
             student_rows.append((pos, chunk_id))
-        for pos in range(s2_start, s2_end):
+        for pos in range(s2_start, s2_end_clamped):
             teacher_rows.append((pos, chunk_id))
-        chunk_id += 1
 
     student_coo = (
         torch.tensor(student_rows, dtype=torch.int64)
@@ -109,7 +117,7 @@ def _build_chunk_coo(
         if teacher_rows
         else torch.empty((0, 2), dtype=torch.int64)
     )
-    return student_coo, teacher_coo, chunk_id
+    return student_coo, teacher_coo, max_n_chunks
 
 
 class CrossTokenizerCollator:
@@ -257,24 +265,27 @@ class CrossTokenizerCollator:
         extra_env = base.get("extra_env_info")
         batch_size = student_ids.shape[0]
 
-        has_raw_text = (
-            extra_env is not None
-            and len(extra_env) == batch_size
-            and all(
-                isinstance(e, dict) and "raw_text" in e for e in extra_env
-            )
-        )
         texts_cache: Optional[list[str]] = None
 
         per_teacher_ct_data: list[Optional[dict[str, Any]]] = []
         any_ct = any(spec is not None for spec in self.teacher_ct_specs)
         if any_ct:
-            if has_raw_text:
-                texts_cache = [e["raw_text"] for e in extra_env]
-            else:
-                texts_cache = self._get_student_tokenizer().batch_decode(
-                    student_ids.tolist(), skip_special_tokens=True
-                )
+            # Cross-tokenizer requires the upstream processor (e.g.
+            # kd_data_processor) to stash the original string in
+            # extra_env_info["raw_text"]. Decoding student_ids back to text is
+            # lossy on whitespace/control chars, so the only way to guarantee
+            # student and teacher tokenize the *same* string is to refuse a
+            # batch that doesn't carry raw_text.
+            assert (
+                extra_env is not None
+                and len(extra_env) == batch_size
+                and all(isinstance(e, dict) and "raw_text" in e for e in extra_env)
+            ), (
+                "CrossTokenizerCollator requires every sample to carry "
+                "extra_env_info['raw_text']; configure data.train.processor "
+                "to one that emits it (e.g. kd_data_processor)."
+            )
+            texts_cache = [e["raw_text"] for e in extra_env]
 
         for t_idx, spec in enumerate(self.teacher_ct_specs):
             if spec is None:
@@ -301,19 +312,43 @@ class CrossTokenizerCollator:
             student_seq_len = int(student_ids.shape[1])
             teacher_seq_len = int(teacher_input_ids.shape[1])
 
+            # PT (`tokenalign/src/pytorch_data_loader.py`) tokenizes student
+            # with `padding="max_length"`, so its alignment input is fixed at
+            # ctx_length and `max_n_chunks = min(student, teacher) = ctx_length`.
+            # NRL pads student to the batch-local longest (rounded up by
+            # `make_seq_div_by`), which is < `max_total_sequence_length`
+            # whenever the longest sample in the batch hasn't hit the cap.
+            # That tighter student bound used to leak into `_build_chunk_coo`
+            # and silently truncate aligned_pairs at chunk_id >= student_seq_len.
+            # Pad student up to teacher_seq_len for alignment so the chunk-id
+            # space matches PT.
+            if student_seq_len < teacher_seq_len:
+                pad_block = torch.full(
+                    (batch_size, teacher_seq_len - student_seq_len),
+                    self.pad_token_id,
+                    dtype=student_ids.dtype,
+                )
+                student_ids_for_align = torch.cat(
+                    [student_ids, pad_block], dim=1,
+                )
+                align_student_seq_len = teacher_seq_len
+            else:
+                student_ids_for_align = student_ids
+                align_student_seq_len = student_seq_len
+
             aligned_pairs: list[Any] = []
             student_chunk_coo: list[torch.Tensor] = []
             teacher_chunk_coo: list[torch.Tensor] = []
             num_chunks_per_sample: list[int] = []
             for b in range(batch_size):
-                s_t = student_ids[b : b + 1]
+                s_t = student_ids_for_align[b : b + 1]
                 t_t = teacher_input_ids[b : b + 1]
                 result = aligner.align(s_t, t_t, chunk_size=dp_chunk_size)
                 pairs = result[0]
                 aligned_pairs.append(pairs)
 
                 s_coo, t_coo, n_chunks = _build_chunk_coo(
-                    pairs, student_seq_len, teacher_seq_len, exact_match_only,
+                    pairs, align_student_seq_len, teacher_seq_len, exact_match_only,
                 )
                 student_chunk_coo.append(s_coo)
                 teacher_chunk_coo.append(t_coo)

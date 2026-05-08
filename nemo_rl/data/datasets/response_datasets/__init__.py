@@ -15,7 +15,14 @@
 from nemo_rl.data import ResponseDatasetConfig
 from nemo_rl.data.datasets.response_datasets.aime24 import AIME2024Dataset
 from nemo_rl.data.datasets.response_datasets.arrow_text_dataset import ArrowTextDataset
-from nemo_rl.data.datasets.response_datasets.avqa import AVQADataset
+
+# AVQADataset depends on `soundfile` (libsndfile bindings) which isn't always
+# installed in inference-only containers. Skip if unavailable so non-audio
+# datasets still load.
+try:
+    from nemo_rl.data.datasets.response_datasets.avqa import AVQADataset
+except ModuleNotFoundError:
+    AVQADataset = None  # type: ignore[assignment,misc]
 from nemo_rl.data.datasets.response_datasets.clevr import CLEVRCoGenTDataset
 from nemo_rl.data.datasets.response_datasets.daily_omni import DailyOmniDataset
 from nemo_rl.data.datasets.response_datasets.dapo_math import (
@@ -47,7 +54,6 @@ from nemo_rl.data.datasets.response_datasets.tulu3 import Tulu3SftMixtureDataset
 
 DATASET_REGISTRY = {
     # built-in datasets
-    "avqa": AVQADataset,
     "AIME2024": AIME2024Dataset,
     "arrow_text": ArrowTextDataset,
     "clevr-cogent": CLEVRCoGenTDataset,
@@ -70,6 +76,8 @@ DATASET_REGISTRY = {
     "NemoGymDataset": NemoGymDataset,
     "ResponseDataset": ResponseDataset,
 }
+if AVQADataset is not None:
+    DATASET_REGISTRY["avqa"] = AVQADataset
 
 
 def load_response_dataset(data_config: ResponseDatasetConfig):

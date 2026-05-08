@@ -18,7 +18,6 @@ from nemo_rl.data.datasets.eval_datasets.humaneval_plus import HumanEvalPlusData
 from nemo_rl.data.datasets.eval_datasets.local_math_dataset import LocalMathDataset
 from nemo_rl.data.datasets.eval_datasets.math import MathDataset
 from nemo_rl.data.datasets.eval_datasets.mbpp_plus import MBPPPlusDataset
-from nemo_rl.data.datasets.eval_datasets.mmau import MMAUDataset
 from nemo_rl.data.datasets.eval_datasets.mmlu import MMLUDataset
 from nemo_rl.data.datasets.eval_datasets.mmlu_pro import MMLUProDataset
 
@@ -98,6 +97,8 @@ def load_eval_dataset(data_config):
         )
     # mmau
     elif dataset_name in ("mmau", "TwinkStart/MMAU"):
+        from nemo_rl.data.datasets.eval_datasets.mmau import MMAUDataset
+
         split = data_config.get("split", "v05.15.25")
         base_dataset = MMAUDataset(
             dataset_name="TwinkStart/MMAU",
@@ -141,7 +142,6 @@ __all__ = [
     "LocalMathDataset",
     "MathDataset",
     "MBPPPlusDataset",
-    "MMAUDataset",
     "MMLUDataset",
     "MMLUProDataset",
     "MULTIMODAL_DATASETS",

@@ -14,8 +14,10 @@
 
 import contextlib
 import gc
+import os
 import warnings
 from contextlib import AbstractContextManager, contextmanager, nullcontext
+from pathlib import Path as _Path
 from typing import Any, Generator, Optional
 
 import ray
@@ -530,19 +532,15 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
 
     def update_cross_tokenizer_data(
         self,
-        teacher_input_ids: Any,
-        aligned_pairs: Any,
+        chunk_indices: dict,
         teacher_idx: Optional[int] = None,
-        chunk_indices: Optional[dict] = None,
     ) -> None:
         """Update per-step cross-tokenizer data on the cached loss function."""
         cached = getattr(self, "_cached_loss_fn", None)
         if cached is not None:
             cached.set_cross_tokenizer_data(
-                teacher_input_ids=teacher_input_ids,
-                aligned_pairs=aligned_pairs,
+                chunk_indices,
                 teacher_idx=teacher_idx,
-                chunk_indices=chunk_indices,
             )
 
     @wrap_with_nvtx_name("dtensor_policy_worker_v2/train")

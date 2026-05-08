@@ -1014,7 +1014,7 @@ def off_policy_distillation_train(
                         "Multi-teacher distillation currently requires use_ipc=True."
                     )
                 all_teacher_logits: list[Any] = []
-                per_teacher_ct_data: list[tuple[torch.Tensor, list[Any], Optional[dict[str, list]]]] = []
+                per_teacher_ct_data: list[Optional[dict[str, list]]] = []
 
                 print(
                     f"▶ Preparing for teacher logprob inference ({num_teachers} teacher(s))...",
@@ -1040,7 +1040,7 @@ def off_policy_distillation_train(
                         )
                     else:
                         teacher_data = None
-                        per_teacher_ct_data.append((torch.empty(0), [], None))
+                        per_teacher_ct_data.append(None)
 
                     teacher_fwd_data = teacher_data if teacher_data is not None else train_data
                     # Always send full logits: cross-tokenizer teachers need them
@@ -1133,16 +1133,18 @@ def off_policy_distillation_train(
                             loss_config=teacher_worker_specs,
                             token_aligner_config=None,
                         )
-                    for teacher_idx, (teacher_input_ids, aligned_pairs, chunk_indices) in enumerate(per_teacher_ct_data):
-                        if teacher_input_ids.numel() == 0:
+                    for teacher_idx, ct_tuple in enumerate(per_teacher_ct_data):
+                        if ct_tuple is None:
+                            continue
+                        _, _, chunk_indices = ct_tuple
+                        if chunk_indices is None:
                             continue
                         # Always pass the teacher index now that every cached
                         # loss fn is a MultiTeacherLossAggregator (N>=1).
                         student_policy.update_cross_tokenizer_data(
-                            teacher_input_ids=teacher_input_ids,
-                            aligned_pairs=aligned_pairs,
-                            teacher_idx=teacher_idx,
                             chunk_indices=chunk_indices,
+                            gbs=master_config["policy"]["train_global_batch_size"],
+                            teacher_idx=teacher_idx,
                         )
 
                 student_loss_fn = None if cross_tokenizer_enabled else loss_fn

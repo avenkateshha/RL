@@ -694,7 +694,7 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
             global_valid_seqs,
             global_valid_toks,
             mb_idx=self._microbatch_idx,
-            mbs=data_dict["input_ids"].shape[0],
+            mbs=self.cfg["train_micro_batch_size"],
             **loss_kwargs,
         )
         return loss, loss_metrics
