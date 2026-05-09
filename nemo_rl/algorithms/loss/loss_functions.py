@@ -17,6 +17,7 @@ import time
 from typing import Any, NotRequired, Optional, TypedDict, TypeVar, Union
 
 import torch
+import torch.distributed.nn.functional as dist_nn_func
 
 from nemo_rl.algorithms.loss.interfaces import LossFunction, LossInputType, LossType
 from nemo_rl.algorithms.utils import calculate_kl, masked_mean
@@ -1359,7 +1360,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         vocab_parallel_group: Optional[torch.distributed.ProcessGroup],
         context_parallel_group: Optional[torch.distributed.ProcessGroup],
     ) -> bool:
-        """Return whether the TP/CP-aware projection path can run."""
+        """Return whether the TP/CP-aware projection or gold-loss path can run."""
         if not isinstance(next_token_logits, torch.distributed.tensor.DTensor):
             return False
         tp_world = (
@@ -1382,10 +1383,17 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             and getattr(self.token_aligner, "likelihood_projection_matrix", None)
             is not None
         )
+        # Gold loss only needs the dense projection partition (sparse proj
+        # rows aren't used in the gold-loss math). Non-gold paths can run on
+        # either projection format. Learnable projections are excluded
+        # because row slicing breaks autograd back to the original parameter.
+        use_gold_loss = self.cfg.get("gold_loss", False)
+        has_required_proj = (
+            has_dense_proj if use_gold_loss else (has_sparse_proj or has_dense_proj)
+        )
         return (
             (tp_world > 1 or cp_world > 1)
-            and not self.cfg.get("gold_loss", False)
-            and (has_sparse_proj or has_dense_proj)
+            and has_required_proj
             and not getattr(self.token_aligner, "learnable", False)
         )
 
@@ -1578,11 +1586,6 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         uncommon_student_indices = partition.uncommon_student_indices.to(device)
         uncommon_teacher_indices = partition.uncommon_teacher_indices.to(device)
 
-        # student_chunk_mask / teacher_chunk_mask are precomputed by the
-        # caller (from collator-emitted per-sample COO) and shared with the
-        # non-gold path — shape (B, seq_len, total_chunks), dtype bool.
-        total_chunks = student_chunk_mask.shape[-1]
-
         # log_softmax on full original logits BEFORE chunk averaging
         if precomputed_student_log_probs is not None:
             student_log_probs = precomputed_student_log_probs
@@ -1614,6 +1617,43 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         chunk_valid = (student_chunk_sizes.squeeze(-1) > 0) & (
             teacher_chunk_sizes.squeeze(-1) > 0
         )
+
+        return self._compute_gold_loss_from_chunk_log_probs(
+            student_chunk_lp,
+            teacher_chunk_lp,
+            chunk_valid,
+            common_student_indices,
+            common_teacher_indices,
+            uncommon_student_indices,
+            uncommon_teacher_indices,
+            batch_size,
+            temperature,
+            reverse_kl,
+            device,
+        )
+
+    def _compute_gold_loss_from_chunk_log_probs(
+        self,
+        student_chunk_lp: torch.Tensor,
+        teacher_chunk_lp: torch.Tensor,
+        chunk_valid: torch.Tensor,
+        common_student_indices: torch.Tensor,
+        common_teacher_indices: torch.Tensor,
+        uncommon_student_indices: torch.Tensor,
+        uncommon_teacher_indices: torch.Tensor,
+        batch_size: int,
+        temperature: float,
+        reverse_kl: bool,
+        device: torch.device,
+    ) -> tuple[torch.Tensor, float]:
+        """Gold loss from already-chunk-averaged log-probabilities.
+
+        Common-vocab KL on exact-map tokens + uncommon-vocab sorted-L1 (ULD),
+        scaled by ``temperature**2``. Used both by the legacy materialized
+        ``_compute_gold_loss`` and by the TP/CP-aware variant after both have
+        produced full-vocab chunk log-probs of shape ``(B, total_chunks, V_*)``.
+        """
+        total_chunks = student_chunk_lp.shape[1]
 
         if not chunk_valid.any():
             return torch.tensor(0.0, device=device, requires_grad=True), 0.0
@@ -1710,6 +1750,142 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
         del student_chunk_lp, teacher_chunk_lp
         return loss_total, top1_accuracy
+
+    def _compute_gold_loss_tp_cp_aware(
+        self,
+        student_logits_local: torch.Tensor,
+        teacher_logits: torch.Tensor,
+        student_chunk_mask: torch.Tensor,
+        teacher_chunk_mask: torch.Tensor,
+        batch_size: int,
+        teacher_vocab_size: int,
+        temperature: float,
+        reverse_kl: bool,
+        xtoken_loss: bool,
+        device: torch.device,
+        tp_group: Optional[torch.distributed.ProcessGroup],
+        cp_group: Optional[torch.distributed.ProcessGroup],
+        vocab_parallel_rank: int,
+        tp_mesh: Any = None,
+        cp_mesh: Any = None,
+        seq_index: Optional[torch.Tensor] = None,
+    ) -> tuple[torch.Tensor, float]:
+        """TP/CP-aware gold loss without materializing full student logits.
+
+        Student logits remain vocab/sequence sharded through the distributed
+        log-softmax and chunk averaging. TP ranks then gather only the
+        chunk-averaged student log-probs, which are O(B * total_chunks * V)
+        and so cheap relative to gathering full ``(B, S, V)`` logits.
+        Mirrors :meth:`_compute_gold_loss` numerically, just sharded.
+        """
+        del vocab_parallel_rank  # used only by projection paths; not needed here
+
+        partition = self.token_aligner.build_vocab_partition(
+            xtoken_loss=xtoken_loss,
+            teacher_vocab_size=teacher_vocab_size,
+        )
+        common_student_indices = partition.common_student_indices.to(device)
+        common_teacher_indices = partition.common_teacher_indices.to(device)
+        uncommon_student_indices = partition.uncommon_student_indices.to(device)
+        uncommon_teacher_indices = partition.uncommon_teacher_indices.to(device)
+
+        tp_world = (
+            torch.distributed.get_world_size(tp_group) if tp_group is not None else 1
+        )
+        cp_world = (
+            torch.distributed.get_world_size(cp_group) if cp_group is not None else 1
+        )
+
+        # --- TP-aware distributed log-softmax of the student ---
+        s_logits_t = student_logits_local.to(torch.float32) / temperature
+        if tp_world > 1:
+            logits_max = torch.amax(s_logits_t, dim=-1, keepdim=True).detach()
+            torch.distributed.all_reduce(
+                logits_max,
+                op=torch.distributed.ReduceOp.MAX,
+                group=tp_group,
+            )
+            shifted_logits = s_logits_t - logits_max
+            sum_exp_logits = torch.exp(shifted_logits).sum(dim=-1, keepdim=True)
+            sum_exp_logits = dist_nn_func.all_reduce(
+                sum_exp_logits,
+                op=torch.distributed.ReduceOp.SUM,
+                group=tp_group,
+            )
+            student_log_probs = shifted_logits - torch.log(sum_exp_logits)
+        else:
+            student_log_probs = torch.log_softmax(s_logits_t, dim=-1)
+
+        # --- CP all-gather of student log-probs along the seq dim ---
+        # student_log_probs is still TP-sharded along vocab; we only need to
+        # restore the full sequence so the chunk-mask bmm sees S_full.
+        if cp_world > 1 and cp_mesh is not None:
+            from torch.distributed.tensor import DTensor, Shard
+
+            student_dtensor = DTensor.from_local(
+                student_log_probs.contiguous(), cp_mesh, [Shard(1)]
+            )
+            student_log_probs = student_dtensor.full_tensor()
+            if seq_index is not None:
+                _, sorted_indices = torch.sort(seq_index)
+                student_log_probs = student_log_probs[:, sorted_indices]
+        elif cp_world > 1 and cp_group is not None:
+            student_log_probs = allgather_cp_sharded_tensor(
+                student_log_probs.contiguous(), cp_group, seq_dim=1
+            )
+
+        teacher_log_probs = torch.log_softmax(teacher_logits / temperature, dim=-1)
+
+        student_chunk_lp = torch.bmm(
+            student_chunk_mask.transpose(1, 2).to(student_log_probs.dtype),
+            student_log_probs,
+        )
+        teacher_chunk_lp = torch.bmm(
+            teacher_chunk_mask.transpose(1, 2).to(teacher_log_probs.dtype),
+            teacher_log_probs,
+        )
+        del student_log_probs, teacher_log_probs
+
+        student_chunk_sizes = (
+            student_chunk_mask.sum(dim=1, keepdim=True).float().transpose(1, 2)
+        )
+        teacher_chunk_sizes = (
+            teacher_chunk_mask.sum(dim=1, keepdim=True).float().transpose(1, 2)
+        )
+        student_chunk_lp = student_chunk_lp / (student_chunk_sizes + 1e-10)
+        teacher_chunk_lp = teacher_chunk_lp / (teacher_chunk_sizes + 1e-10)
+
+        # --- TP all-gather of student chunk log-probs along vocab ---
+        if tp_world > 1:
+            if tp_mesh is not None:
+                from torch.distributed.tensor import DTensor, Shard
+
+                student_dtensor = DTensor.from_local(
+                    student_chunk_lp.contiguous(), tp_mesh, [Shard(-1)]
+                )
+                student_chunk_lp = student_dtensor.full_tensor()
+            else:
+                gathered = dist_nn_func.all_gather(
+                    student_chunk_lp.contiguous(), group=tp_group
+                )
+                student_chunk_lp = torch.cat(gathered, dim=-1)
+
+        chunk_valid = (student_chunk_sizes.squeeze(-1) > 0) & (
+            teacher_chunk_sizes.squeeze(-1) > 0
+        )
+        return self._compute_gold_loss_from_chunk_log_probs(
+            student_chunk_lp,
+            teacher_chunk_lp,
+            chunk_valid,
+            common_student_indices,
+            common_teacher_indices,
+            uncommon_student_indices,
+            uncommon_teacher_indices,
+            batch_size,
+            temperature,
+            reverse_kl,
+            device,
+        )
 
     def __call__(
         self,
@@ -1906,21 +2082,50 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # Matches tokenalign.py compute_KL_loss_optimized gold_loss branch.
         # ================================================================
         if use_gold_loss:
-            loss, top1_accuracy = self._compute_gold_loss(
-                student_logits,
-                teacher_logits_f32,
-                proj_mask,
-                tgt_mask,
-                batch_size,
-                student_seq_len,
-                teacher_seq_len,
-                teacher_vocab_size,
-                temperature,
-                reverse_kl,
-                use_xtoken_loss,
-                device,
-                precomputed_student_log_probs=precomputed_student_log_probs,
-            )
+            if use_sharded_path:
+                tp_mesh = None
+                cp_mesh = None
+                if isinstance(next_token_logits, torch.distributed.tensor.DTensor):
+                    mesh_dim_names = next_token_logits.device_mesh.mesh_dim_names
+                    if mesh_dim_names is not None:
+                        if "tp" in mesh_dim_names:
+                            tp_mesh = next_token_logits.device_mesh["tp"]
+                        if "cp" in mesh_dim_names:
+                            cp_mesh = next_token_logits.device_mesh["cp"]
+                loss, top1_accuracy = self._compute_gold_loss_tp_cp_aware(
+                    student_logits,
+                    teacher_logits_f32,
+                    proj_mask,
+                    tgt_mask,
+                    batch_size,
+                    teacher_vocab_size,
+                    temperature,
+                    reverse_kl,
+                    use_xtoken_loss,
+                    device,
+                    tp_group=vocab_parallel_group,
+                    cp_group=context_parallel_group,
+                    vocab_parallel_rank=int(vocab_parallel_rank or 0),
+                    tp_mesh=tp_mesh,
+                    cp_mesh=cp_mesh,
+                    seq_index=seq_index,
+                )
+            else:
+                loss, top1_accuracy = self._compute_gold_loss(
+                    student_logits,
+                    teacher_logits_f32,
+                    proj_mask,
+                    tgt_mask,
+                    batch_size,
+                    student_seq_len,
+                    teacher_seq_len,
+                    teacher_vocab_size,
+                    temperature,
+                    reverse_kl,
+                    use_xtoken_loss,
+                    device,
+                    precomputed_student_log_probs=precomputed_student_log_probs,
+                )
         else:
             # ================================================================
             # Standard projection-based path
