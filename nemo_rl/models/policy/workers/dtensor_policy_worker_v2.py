@@ -721,29 +721,59 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
 
             return metrics
 
-    def _select_teacher_results_for_dp_group(
-        self, teacher_logits: list[Any]
-    ) -> dict[tuple[int, int], dict[str, Any]]:
-        """Return all teacher entries that share this student's ``dp_rank``.
+    def _plan_teacher_handles_for_student_microbatches(
+        self,
+        teacher_logits: list[Any],
+        *,
+        student_gbs: int,
+        student_mbs: int,
+    ) -> dict[str, Any]:
+        """Plan cross-DP routing of teacher IPC handles to student microbatches.
 
-        Phase 1 of cross-topology IPC: teacher and student may have different
-        (TP, CP) but must share ``dp_size`` so each student dp_rank corresponds
-        to exactly one teacher dp_rank's data slice. Within that slice, the
-        teacher produces ``teacher_tp_size * teacher_cp_size`` IPC records;
-        this helper collects all of them keyed by ``(t_tp_rank, t_cp_rank)``
-        so the student post-processor can reconstruct the full teacher
-        ``(B, S_full, V_full)`` tensor locally via IPC reads — without
-        participating in the teacher's process group.
+        Teacher and student may have different ``(dp_size, mbs)`` (and may
+        also have different ``(tp_size, cp_size)``) as long as they share the
+        same global batch size. Each teacher microbatch handle carries a
+        ``[global_start, global_start + actual_shape[0])`` half-open range
+        in the canonical global-sample order. This method enumerates the
+        student's local microbatches, computes their global ranges, and emits
+        one segment per overlapping teacher microbatch — slicing both source
+        (teacher reconstruction) and destination (student microbatch) along
+        the batch axis so the student post-processor can place the data
+        without any further range arithmetic.
 
-        Raises a clear error on dp_size mismatch (cross-DP routing is Phase 2)
-        or if the expected ``t_tp_size * t_cp_size`` entry count is incomplete.
+        Returns:
+            ``{"t_tp_size", "t_cp_size", "is_topk",
+               "segments_per_student_mb": list[list[Segment]]}``.
+            Each segment is a dict with keys
+            ``handles_by_t_coord, src_slice, dst_slice, t_dp_rank, t_mb_idx``.
+            ``segments_per_student_mb[m]`` covers student microbatch ``m``
+            exactly: the union of its ``dst_slice``s tiles ``[0, B_student_m)``.
         """
         student_dp_group = self.dp_mesh.get_group()
         student_dp_rank = torch.distributed.get_rank(student_dp_group)
+        student_dp_size = self.dp_size
 
-        teacher_dp_size: Optional[int] = None
+        # Divisibility on the student side: required for clean microbatch
+        # boundaries. The teacher side is enforced by the teacher worker.
+        assert student_gbs % student_dp_size == 0, (
+            f"student_gbs={student_gbs} must be divisible by student "
+            f"dp_size={student_dp_size}"
+        )
+        student_local_gbs = student_gbs // student_dp_size
+        assert student_local_gbs % student_mbs == 0, (
+            f"student local batch ({student_local_gbs}) must be divisible by "
+            f"student mbs={student_mbs}"
+        )
+        num_student_mbs = student_local_gbs // student_mbs
+        student_local_start = student_dp_rank * student_local_gbs
+
+        # Discover teacher's parallel sizes from the first valid entry; all
+        # entries come from the same teacher worker group so these are
+        # uniform across the list.
         teacher_tp_size: Optional[int] = None
         teacher_cp_size: Optional[int] = None
+        teacher_gbs: Optional[int] = None
+        is_topk: Optional[bool] = None
         for entry in teacher_logits:
             if not isinstance(entry, dict):
                 continue
@@ -751,79 +781,123 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             if not handles:
                 continue
             h0 = handles[0]
-            teacher_dp_size = h0.get("dp_size", entry.get("dp_size"))
-            teacher_tp_size = h0.get("tp_size", entry.get("tp_size"))
-            teacher_cp_size = h0.get("cp_size", entry.get("cp_size"))
+            teacher_tp_size = h0["tp_size"]
+            teacher_cp_size = h0["cp_size"]
+            teacher_gbs = entry.get("gbs")
+            is_topk = bool(entry.get("is_topk", h0.get("is_topk", False)))
             break
         assert (
-            teacher_dp_size is not None
-            and teacher_tp_size is not None
+            teacher_tp_size is not None
             and teacher_cp_size is not None
+            and teacher_gbs is not None
+            and is_topk is not None
         ), "teacher_logits has no valid entries with parallel-size metadata"
-
-        assert teacher_dp_size == self.dp_size, (
-            f"teacher dp_size={teacher_dp_size} != student dp_size="
-            f"{self.dp_size}. Phase 1 of cross-topology IPC requires equal "
-            "dp_size; cross-DP batch routing is not yet implemented. Match "
-            "dp_size in your teacher and student configs."
+        assert teacher_gbs == student_gbs, (
+            f"teacher gbs={teacher_gbs} != student gbs={student_gbs}; "
+            "cross-DP routing requires identical global batch size"
         )
 
-        matched: dict[tuple[int, int], dict[str, Any]] = {}
+        # Group handles by (t_dp_rank, t_mb_idx); each group must contain a
+        # full (t_tp_rank, t_cp_rank) grid for IPC reconstruction to work.
+        handles_by_t_dp_mb: dict[
+            tuple[int, int], dict[tuple[int, int], dict[str, Any]]
+        ] = {}
+        handle_ranges: dict[tuple[int, int], tuple[int, int]] = {}
         for entry in teacher_logits:
             if not isinstance(entry, dict):
                 continue
-            handles = entry.get("microbatch_handles")
-            if not handles:
+            mb_handle_list = entry.get("microbatch_handles")
+            if not mb_handle_list:
                 continue
-            h0 = handles[0]
-            entry_dp_rank = h0.get("dp_rank", entry.get("dp_rank"))
-            if entry_dp_rank != student_dp_rank:
-                continue
-            t_tp_rank = h0.get("tp_rank")
-            t_cp_rank = h0.get("cp_rank")
-            assert t_tp_rank is not None and 0 <= t_tp_rank < teacher_tp_size, (
-                f"teacher handle has invalid tp_rank={t_tp_rank} "
-                f"(teacher tp_size={teacher_tp_size})"
+            entry_is_topk = bool(entry.get("is_topk", False))
+            assert entry_is_topk == is_topk, (
+                f"inconsistent is_topk across teacher entries: "
+                f"{entry_is_topk} vs {is_topk}"
             )
-            assert t_cp_rank is not None and 0 <= t_cp_rank < teacher_cp_size, (
-                f"teacher handle has invalid cp_rank={t_cp_rank} "
-                f"(teacher cp_size={teacher_cp_size})"
-            )
-            key = (t_tp_rank, t_cp_rank)
-            assert key not in matched, (
-                f"duplicate teacher entries for (tp_rank, cp_rank)={key} "
-                f"in my dp_rank={student_dp_rank}"
-            )
-            matched[key] = entry
+            for mb_idx, h in enumerate(mb_handle_list):
+                t_tp_rank = h["tp_rank"]
+                t_cp_rank = h["cp_rank"]
+                t_dp_rank = h["dp_rank"]
+                assert h["tp_size"] == teacher_tp_size, (
+                    f"teacher tp_size mismatch: handle has {h['tp_size']}, "
+                    f"expected {teacher_tp_size}"
+                )
+                assert h["cp_size"] == teacher_cp_size, (
+                    f"teacher cp_size mismatch: handle has {h['cp_size']}, "
+                    f"expected {teacher_cp_size}"
+                )
+                global_start = h["global_start"]
+                actual_b = h["actual_shape"][0]
+                global_end = global_start + actual_b
 
-        expected = teacher_tp_size * teacher_cp_size
-        assert len(matched) == expected, (
-            f"teacher DP-group incomplete: got {len(matched)} entries for "
-            f"dp_rank={student_dp_rank}, expected {expected} "
-            f"(teacher tp_size={teacher_tp_size}, cp_size={teacher_cp_size})"
-        )
-        sample_handles = next(iter(matched.values()))["microbatch_handles"]
-        first_handle = sample_handles[0]
-        missing = [
-            f
-            for f in (
-                "schema_version",
-                "tp_rank",
-                "tp_size",
-                "cp_rank",
-                "cp_size",
-                "dp_rank",
-                "dp_size",
-                "payload_ipc",
-                "actual_shape",
+                key = (t_dp_rank, mb_idx)
+                handles_by_t_dp_mb.setdefault(key, {})
+                inner = handles_by_t_dp_mb[key]
+                coord_key = (t_tp_rank, t_cp_rank)
+                assert coord_key not in inner, (
+                    f"duplicate teacher (tp_rank, cp_rank)={coord_key} "
+                    f"for (t_dp_rank={t_dp_rank}, mb_idx={mb_idx})"
+                )
+                inner[coord_key] = h
+                if key in handle_ranges:
+                    assert handle_ranges[key] == (global_start, global_end), (
+                        f"inconsistent global range across (tp, cp) handles "
+                        f"for (t_dp_rank={t_dp_rank}, mb_idx={mb_idx}): "
+                        f"{handle_ranges[key]} vs ({global_start}, {global_end})"
+                    )
+                else:
+                    handle_ranges[key] = (global_start, global_end)
+
+        expected_per_group = teacher_tp_size * teacher_cp_size
+        for key, group in handles_by_t_dp_mb.items():
+            assert len(group) == expected_per_group, (
+                f"teacher (t_dp_rank, mb_idx)={key} has {len(group)} "
+                f"(tp, cp) handles, expected {expected_per_group} "
+                f"(t_tp_size={teacher_tp_size}, t_cp_size={teacher_cp_size})"
             )
-            if f not in first_handle
-        ]
-        assert not missing, (
-            f"teacher microbatch handle missing required schema fields "
-            f"{missing} (dp_rank={student_dp_rank})"
-        )
-        return matched
+
+        # For each student microbatch, find all teacher (t_dp_rank, mb_idx)
+        # groups whose range overlaps. Sort by global_start to keep segments
+        # in canonical order (so concat along batch axis preserves identity).
+        sorted_keys = sorted(handle_ranges.keys(), key=lambda k: handle_ranges[k][0])
+
+        segments_per_student_mb: list[list[dict[str, Any]]] = []
+        for s_mb_idx in range(num_student_mbs):
+            student_a = student_local_start + s_mb_idx * student_mbs
+            student_b = student_a + student_mbs
+            segs: list[dict[str, Any]] = []
+            covered = 0
+            for key in sorted_keys:
+                t_a, t_b = handle_ranges[key]
+                lo = max(student_a, t_a)
+                hi = min(student_b, t_b)
+                if lo >= hi:
+                    continue
+                t_dp_rank, t_mb_idx = key
+                segs.append(
+                    {
+                        "handles_by_t_coord": handles_by_t_dp_mb[key],
+                        "src_slice": (lo - t_a, hi - t_a),
+                        "dst_slice": (lo - student_a, hi - student_a),
+                        "t_dp_rank": t_dp_rank,
+                        "t_mb_idx": t_mb_idx,
+                    }
+                )
+                covered += hi - lo
+            assert covered == student_mbs, (
+                f"student microbatch {s_mb_idx} (range "
+                f"[{student_a}, {student_b})) only has {covered} of "
+                f"{student_mbs} samples covered by teacher handles; "
+                f"check that GBS, dp_size, and mbs are aligned on both sides"
+            )
+            segments_per_student_mb.append(segs)
+
+        return {
+            "t_tp_size": teacher_tp_size,
+            "t_cp_size": teacher_cp_size,
+            "is_topk": is_topk,
+            "segments_per_student_mb": segments_per_student_mb,
+        }
 
     @wrap_with_nvtx_name("dtensor_policy_worker_v2/train_off_policy_distillation")
     def train_off_policy_distillation(
@@ -876,14 +950,15 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             self.model.train()
 
         teacher_worker_result: Optional[Any] = None
-        teacher_dp_group_entries: Optional[dict[tuple[int, int], dict[str, Any]]] = None
+        teacher_handle_plan: Optional[dict[str, Any]] = None
         if teacher_logits is not None:
             # Two container shapes are supported:
             #   - single teacher: list of dicts emitted by
             #     ``compute_teacher_logits_ipc`` (schema_version=1). The
-            #     student selects every entry whose ``dp_rank`` matches its
-            #     own and reconstructs the full teacher tensor locally via
-            #     CUDA IPC reads (cross-topology IPC, Phase 1).
+            #     student plans cross-DP routing using each handle's
+            #     ``global_start`` so it can pull from any teacher dp_rank /
+            #     microbatch — supports independent (TP, CP, DP, mbs) on
+            #     each side as long as GBS matches.
             #   - multi-teacher: ``dict[rank, list[T_payloads]]`` (built by
             #     ``_group_teacher_logits_by_rank``); cross-topology is not
             #     yet wired here, so this path stays at TP=CP=1 (asserted in
@@ -892,8 +967,12 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
                 rank = torch.distributed.get_rank()
                 teacher_worker_result = teacher_logits[rank]
             else:
-                teacher_dp_group_entries = self._select_teacher_results_for_dp_group(
-                    teacher_logits
+                teacher_handle_plan = (
+                    self._plan_teacher_handles_for_student_microbatches(
+                        teacher_logits,
+                        student_gbs=gbs,
+                        student_mbs=mbs,
+                    )
                 )
 
         def train_context_fn(processed_inputs):
@@ -925,7 +1004,7 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             enable_seq_packing=self.enable_seq_packing,
             sampling_params=None,
             teacher_result=teacher_worker_result,
-            teacher_dp_group_entries=teacher_dp_group_entries,
+            teacher_handle_plan=teacher_handle_plan,
         )
 
         def on_microbatch_start(mb_idx):
@@ -1117,6 +1196,13 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
         teacher_post_processor = self._get_or_create_teacher_ipc_post_processor(
             topk_logits
         )
+        # Provide the per-call layout so the post-processor can stamp
+        # ``global_start`` on each handle. The student uses these ranges to
+        # route handles when its dp_size or mbs differs from the teacher's.
+        teacher_post_processor.configure_global_layout(
+            samples_per_dp=local_gbs,
+            mbs=mbs,
+        )
 
         def on_microbatch_start(mb_idx):
             teacher_post_processor.set_microbatch_index(mb_idx)
@@ -1178,12 +1264,15 @@ class DTensorPolicyWorkerV2Impl(AbstractPolicyWorker, ColocatablePolicyInterface
             "world_rank": torch.distributed.get_rank(),
             "tp_size": self.tp_size,
             "cp_size": self.cp_size,
-            # dp_size lets the student verify it can match teacher slices by
-            # dp_rank without scanning every per-handle record. pp_size is
-            # always 1 in dtensor v2 (no PP), exposed for forward compat.
             "dp_size": self.dp_size,
             "pp_size": 1,
             "dp_rank": torch.distributed.get_rank(self.dp_mesh.get_group()),
+            # Layout fields that let the student plan cross-DP routing without
+            # rescanning every handle. ``mbs`` and ``samples_per_dp`` here are
+            # the teacher's; the student uses its own to compute overlaps.
+            "mbs": mbs,
+            "samples_per_dp": local_gbs,
+            "gbs": gbs,
         }
 
     @wrap_with_nvtx_name("dtensor_policy_worker_v2/get_logprobs")

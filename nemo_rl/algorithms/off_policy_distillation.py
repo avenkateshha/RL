@@ -26,6 +26,7 @@ Key difference from on-policy distillation (in distillation.py):
 """
 
 import importlib.util
+import math
 import os
 import sys
 import warnings
@@ -126,7 +127,11 @@ class OffPolicyDistillationConfig(TypedDict):
     val_period: NotRequired[int]  # Run validation every N steps (0 = disabled)
     val_batches: NotRequired[int]  # Number of validation batches (0 = all)
     val_global_batch_size: NotRequired[int]  # Validation batch size
-    val_micro_batch_size: NotRequired[int]  # Validation micro batch size
+    val_micro_batch_size: NotRequired[int]  # Validation micro batch size (student)
+    # Teacher's validation micro batch size; defaults to val_micro_batch_size.
+    # Useful when teacher is much larger than student and benefits from a
+    # smaller mbs during eval.
+    val_teacher_micro_batch_size: NotRequired[int]
     val_at_start: NotRequired[bool]  # Run validation before training starts
 
 
@@ -707,6 +712,24 @@ def validate(
         val_mbs = master_config["distillation"].get(
             "val_micro_batch_size", val_batch_size
         )
+        # Teacher may use a different mbs during validation than the student.
+        # Defaults to the student's val_mbs to preserve previous behavior; a
+        # smaller teacher_val_mbs is useful when the teacher is much larger.
+        teacher_val_mbs = master_config["distillation"].get(
+            "val_teacher_micro_batch_size", val_mbs
+        )
+        teacher_dp_size = teacher_policies[0].sharding_annotations.get_axis_size(
+            "data_parallel"
+        )
+        student_dp_size = student_policy.sharding_annotations.get_axis_size(
+            "data_parallel"
+        )
+        # Pad to the smallest size both sides can split into a whole number
+        # of microbatches. Teacher-side: dp_t * teacher_val_mbs; student-side:
+        # dp_s * val_mbs. lcm of those two keeps each side's grid intact.
+        val_pad_quantum = math.lcm(
+            student_dp_size * val_mbs, teacher_dp_size * teacher_val_mbs
+        )
 
         for batch_idx, val_batch in enumerate(val_dataloader):
             # Add loss masks for assistant tokens
@@ -746,12 +769,10 @@ def validate(
             # Must pad BEFORE teacher logits to avoid size mismatch:
             # teacher.get_topk_logits internally pads for its own DP sharding
             # and returns padded-size outputs, so all inputs must be
-            # uniformly padded first.
+            # uniformly padded first. Pad to a quantum both teacher and
+            # student can split (dp_size * mbs on each side).
             if val_data.size < val_batch_size:
-                dp_size = student_policy.sharding_annotations.get_axis_size(
-                    "data_parallel"
-                )
-                val_data = maybe_pad_last_batch(val_data, dp_size, val_mbs)
+                val_data = maybe_pad_last_batch(val_data, val_pad_quantum, 1)
 
             # Teacher IPC for cross-tokenizer loss must export full teacher
             # vocab logits; top-k is only valid for same-tokenizer KL.
@@ -773,13 +794,7 @@ def validate(
                     val_data,
                     topk_logits=teacher_topk_k,
                     gbs=val_data.size,
-                    mbs=master_config["distillation"].get(
-                        "val_micro_batch_size",
-                        master_config["distillation"].get(
-                            "val_global_batch_size",
-                            master_config["distillation"]["num_prompts_per_step"],
-                        ),
-                    ),
+                    mbs=teacher_val_mbs,
                 )
             else:
                 teacher_topk = teacher_policy.get_topk_logits(val_data, k=topk_k)
@@ -905,24 +920,37 @@ def off_policy_distillation_train(
         eval_hook_period: How often (in steps) to call *eval_hook*. 0 = disabled.
         eval_hook_at_start: If True, call eval_hook before the first training step.
     """
-    # Phase 1 of cross-topology IPC supports different (TP, CP) between
-    # teacher and student but still requires equal data-parallel size:
-    # teacher's IPC handles are matched to student ranks by ``dp_rank``, and
-    # mismatched dp_size means data shards have different sizes (no clean
-    # 1:1 mapping). Cross-DP routing is Phase 2 work; until it lands, fail
-    # loudly and early at the training entry point rather than mid-step.
+    # Cross-topology IPC supports different (TP, CP, DP, MBS) between teacher
+    # and student as long as the global batch size matches. The student plans
+    # cross-DP routing using each teacher handle's ``global_start`` plus its
+    # ``actual_shape[0]``; this requires both sides to slice the global batch
+    # cleanly, i.e. ``GBS % dp == 0`` and ``(GBS / dp) % mbs == 0`` on each.
     student_dp_size = student_policy.sharding_annotations.get_axis_size("data_parallel")
-    for t_idx, teacher_policy in enumerate(teacher_policies):
+    gbs = master_config["policy"]["train_global_batch_size"]
+    student_mbs = master_config["policy"]["train_micro_batch_size"]
+    assert gbs % student_dp_size == 0, (
+        f"train_global_batch_size={gbs} must be divisible by student "
+        f"dp_size={student_dp_size}"
+    )
+    assert (gbs // student_dp_size) % student_mbs == 0, (
+        f"student local batch ({gbs // student_dp_size}) must be divisible "
+        f"by student train_micro_batch_size={student_mbs}"
+    )
+    _entry_teacher_specs = _normalize_teacher_specs(master_config)
+    for t_idx, (teacher_policy, t_spec) in enumerate(
+        zip(teacher_policies, _entry_teacher_specs)
+    ):
         teacher_dp_size = teacher_policy.sharding_annotations.get_axis_size(
             "data_parallel"
         )
-        assert student_dp_size == teacher_dp_size, (
-            f"off-policy distillation currently requires student and teacher "
-            f"to have the same data_parallel size, but got student dp_size="
-            f"{student_dp_size} and teacher[{t_idx}] dp_size={teacher_dp_size}. "
-            f"(TP and CP can differ — Phase 1 cross-topology IPC handles that. "
-            f"Different dp_size needs cross-DP batch routing, which is Phase 2 "
-            f"work and not yet implemented.)"
+        teacher_mbs = t_spec["teacher"]["train_micro_batch_size"]
+        assert gbs % teacher_dp_size == 0, (
+            f"train_global_batch_size={gbs} must be divisible by teacher[{t_idx}] "
+            f"dp_size={teacher_dp_size}"
+        )
+        assert (gbs // teacher_dp_size) % teacher_mbs == 0, (
+            f"teacher[{t_idx}] local batch ({gbs // teacher_dp_size}) must be "
+            f"divisible by its train_micro_batch_size={teacher_mbs}"
         )
 
     timer = Timer()
@@ -1108,7 +1136,9 @@ def off_policy_distillation_train(
                                 teacher_fwd_data,
                                 topk_logits=teacher_topk_k,
                                 gbs=master_config["policy"]["train_global_batch_size"],
-                                mbs=master_config["policy"]["train_micro_batch_size"],
+                                mbs=teacher_specs[teacher_idx]["teacher"][
+                                    "train_micro_batch_size"
+                                ],
                             )
                             all_teacher_logits.append(teacher_logits)
                     else:

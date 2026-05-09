@@ -599,20 +599,27 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
     """Loss post-processor that injects teacher logits via CUDA IPC handles.
 
     Consumes records emitted by :class:`XTokenTeacherIPCExportPostProcessor`
-    (schema_version=1). Phase 1 of cross-topology IPC: the student
-    reconstructs the full teacher ``(B, S_full, V_full)`` tensor on each
-    rank by reading every teacher IPC handle in its DP group via CUDA IPC,
-    without participating in the teacher's process group. This decouples
-    the student's parallel layout (TP/CP) from the teacher's: only
-    ``dp_size`` has to match between the two.
+    (schema_version=1). Cross-topology IPC: the student reconstructs the
+    full teacher ``(B, S_full, V_full)`` tensor for each of its microbatches
+    by reading every overlapping teacher IPC handle via CUDA IPC, without
+    participating in the teacher's process group. Teacher and student may
+    differ along ``(tp_size, cp_size, dp_size, mbs)`` independently, as long
+    as they share the same global batch size.
 
-    Reconstruction is two stages:
+    Routing is precomputed by the worker as a list of segments per student
+    microbatch (see
+    :meth:`DTensorPolicyWorkerV2._plan_teacher_handles_for_student_microbatches`).
+    Each segment names one teacher ``(t_dp_rank, t_mb_idx)`` whose global
+    sample range overlaps the student microbatch, plus the source/destination
+    batch-axis slices needed to place its data into the student tensor.
+
+    The reconstruction within one segment is two stages:
 
     1. For each teacher CP rank, concat all teacher TP shards along the
-       vocab dim to recover ``(B, S_local_cp, V_full)``.
+       vocab dim to recover ``(B_handle, S_local_cp, V_full)``.
     2. De-zigzag those CP shards (NeMo-RL's load-balanced layout: rank
        ``c`` holds chunks ``c`` and ``2*cp_size-1-c``) to recover
-       ``(B, S_full, V_full)``.
+       ``(B_handle, S_full, V_full)``.
 
     Top-k values + indices are TP-global by construction (teacher uses
     :func:`distributed_vocab_topk`), so the TP gather is skipped on the
@@ -627,21 +634,19 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
         self,
         *args: Any,
         teacher_result: Optional[dict[str, Any]] = None,
-        teacher_dp_group_entries: Optional[
-            dict[tuple[int, int], dict[str, Any]]
-        ] = None,
+        teacher_handle_plan: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
         # Multi-teacher list path keeps the original "list of teacher payload
         # dicts" container under self._teacher_result.
         self._teacher_result = teacher_result
-        # Single-teacher cross-topology path: dict keyed by
-        # ``(t_tp_rank, t_cp_rank)`` over all teacher entries whose
-        # ``dp_rank`` matches this student's. The worker layer validates
-        # completeness (``len == teacher_tp_size * teacher_cp_size``)
-        # before passing this in.
-        self._teacher_dp_group_entries = teacher_dp_group_entries
+        # Single-teacher cross-topology + cross-DP path. Plan dict produced
+        # by the worker, with keys ``t_tp_size, t_cp_size, is_topk,
+        # segments_per_student_mb``. Completeness of each segment's
+        # ``handles_by_t_coord`` over the ``t_tp_size * t_cp_size`` (tp, cp)
+        # grid is validated by the worker before the plan is passed in.
+        self._teacher_handle_plan = teacher_handle_plan
         self._microbatch_idx = 0
         self._microbatch_start = 0
         # Cache parallel coordinates for diagnostics.
@@ -707,59 +712,31 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
         )
         return indices
 
-    def _collect_handles_for_microbatch(
+    def _segments_for_current_microbatch(
         self,
-    ) -> Optional[tuple[dict[tuple[int, int], dict[str, Any]], int, int, bool]]:
-        """Return all teacher handles for the current microbatch in my DP group.
+    ) -> Optional[tuple[list[dict[str, Any]], int, int, bool]]:
+        """Return the segment plan for this student microbatch.
 
-        Returns ``(handles_by_t_coord, t_tp_size, t_cp_size, is_topk)`` or
-        ``None`` if teacher export is unavailable. The caller must validate
-        that the dict has every ``(t_tp_rank, t_cp_rank)`` combination — that
-        invariant is established by the worker-layer selection helper.
+        Returns ``(segments, t_tp_size, t_cp_size, is_topk)`` or ``None`` when
+        no plan is available. ``segments`` is the per-microbatch list emitted
+        by the worker, each element a dict with keys
+        ``handles_by_t_coord, src_slice, dst_slice, t_dp_rank, t_mb_idx``.
+        The worker has already validated that every segment's
+        ``handles_by_t_coord`` is complete over the ``(t_tp_size, t_cp_size)``
+        grid and that segments perfectly tile the student microbatch.
         """
-        if self._teacher_dp_group_entries is None:
+        if self._teacher_handle_plan is None:
             return None
-
-        handles_by_t_coord: dict[tuple[int, int], dict[str, Any]] = {}
-        t_tp_size: Optional[int] = None
-        t_cp_size: Optional[int] = None
-        is_topk: Optional[bool] = None
-        for coord, entry in self._teacher_dp_group_entries.items():
-            handles = entry.get("microbatch_handles")
-            if not handles or self._microbatch_idx >= len(handles):
-                return None
-            h = handles[self._microbatch_idx]
-            handle_t_tp = h.get("tp_size")
-            handle_t_cp = h.get("cp_size")
-            handle_is_topk = bool(h.get("is_topk", False))
-            if t_tp_size is None:
-                t_tp_size = handle_t_tp
-                t_cp_size = handle_t_cp
-                is_topk = handle_is_topk
-            else:
-                assert handle_t_tp == t_tp_size and handle_t_cp == t_cp_size, (
-                    f"inconsistent teacher (tp_size, cp_size) across handles: "
-                    f"saw ({t_tp_size}, {t_cp_size}) and "
-                    f"({handle_t_tp}, {handle_t_cp})"
-                )
-                assert handle_is_topk == is_topk, (
-                    f"inconsistent is_topk across teacher handles in DP group: "
-                    f"{handle_is_topk} vs {is_topk}"
-                )
-            handles_by_t_coord[coord] = h
-
-        assert t_tp_size is not None and t_cp_size is not None
-        missing = [
-            (tp_r, cp_r)
-            for tp_r in range(t_tp_size)
-            for cp_r in range(t_cp_size)
-            if (tp_r, cp_r) not in handles_by_t_coord
-        ]
-        assert not missing, (
-            f"teacher DP-group handles incomplete for mb_idx="
-            f"{self._microbatch_idx}: missing (tp_rank, cp_rank) pairs={missing}"
+        per_mb = self._teacher_handle_plan["segments_per_student_mb"]
+        if self._microbatch_idx >= len(per_mb):
+            return None
+        segments = per_mb[self._microbatch_idx]
+        return (
+            segments,
+            self._teacher_handle_plan["t_tp_size"],
+            self._teacher_handle_plan["t_cp_size"],
+            bool(self._teacher_handle_plan["is_topk"]),
         )
-        return handles_by_t_coord, t_tp_size, t_cp_size, bool(is_topk)
 
     @staticmethod
     def _cp_shards_to_global_order(
@@ -857,30 +834,69 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
     def _inject_teacher_ipc_tensors(self, loss_kwargs: dict[str, Any]) -> None:
         """Populate ``loss_kwargs`` with full teacher tensors from IPC.
 
-        Reconstructs ``(B, S_full, V_full)`` on the full-logits path or
-        ``(B, S_full, K)`` on the top-k path, regardless of how teacher's
-        (TP, CP) compare to student's. No-op when sequence packing is enabled
-        (IPC path doesn't yet support packed sequences) or when no teacher
-        handle is available for the current microbatch index.
+        Reconstructs ``(B_student_mb, S_full, V_full)`` on the full-logits
+        path or ``(B_student_mb, S_full, K)`` on the top-k path, regardless
+        of how teacher's ``(TP, CP, DP, mbs)`` compare to student's. The
+        student microbatch may draw from multiple teacher microbatches
+        (when ``mbs`` differs) and/or multiple teacher dp_ranks (when
+        ``dp_size`` differs); each segment in the plan reconstructs one
+        teacher microbatch and contributes its source-slice into the student
+        destination-slice. No-op when sequence packing is enabled (IPC path
+        doesn't yet support packed sequences) or when no teacher handle is
+        available for the current microbatch index.
         """
         if self.enable_seq_packing:
             return
-        collected = self._collect_handles_for_microbatch()
+        collected = self._segments_for_current_microbatch()
         if collected is None:
             return
-        handles_by_t_coord, t_tp_size, t_cp_size, is_topk = collected
+        segments, t_tp_size, t_cp_size, is_topk = collected
+        if not segments:
+            return
 
         current_device_id = torch.cuda.current_device()
 
+        # Reconstruct each teacher microbatch overlapping this student
+        # microbatch, slice along batch axis, then concat in segment order
+        # (segments are already sorted by source global_start).
         if is_topk:
-            values, indices = self._reconstruct_full_teacher_topk(
-                handles_by_t_coord, t_tp_size, t_cp_size, current_device_id
+            value_pieces: list[torch.Tensor] = []
+            index_pieces: list[torch.Tensor] = []
+            for seg in segments:
+                values, indices = self._reconstruct_full_teacher_topk(
+                    seg["handles_by_t_coord"],
+                    t_tp_size,
+                    t_cp_size,
+                    current_device_id,
+                )
+                lo, hi = seg["src_slice"]
+                value_pieces.append(values[lo:hi])
+                index_pieces.append(indices[lo:hi])
+            loss_kwargs["teacher_logits"] = (
+                value_pieces[0]
+                if len(value_pieces) == 1
+                else torch.cat(value_pieces, dim=0)
             )
-            loss_kwargs["teacher_logits"] = values
-            loss_kwargs["teacher_topk_indices_ipc"] = indices
+            loss_kwargs["teacher_topk_indices_ipc"] = (
+                index_pieces[0]
+                if len(index_pieces) == 1
+                else torch.cat(index_pieces, dim=0)
+            )
         else:
-            loss_kwargs["teacher_logits"] = self._reconstruct_full_teacher_logits(
-                handles_by_t_coord, t_tp_size, t_cp_size, current_device_id
+            logit_pieces: list[torch.Tensor] = []
+            for seg in segments:
+                full = self._reconstruct_full_teacher_logits(
+                    seg["handles_by_t_coord"],
+                    t_tp_size,
+                    t_cp_size,
+                    current_device_id,
+                )
+                lo, hi = seg["src_slice"]
+                logit_pieces.append(full[lo:hi])
+            loss_kwargs["teacher_logits"] = (
+                logit_pieces[0]
+                if len(logit_pieces) == 1
+                else torch.cat(logit_pieces, dim=0)
             )
 
     def _multi_teacher_extract_payload(
@@ -933,7 +949,7 @@ class XTokenTeacherIPCLossPostProcessor(LossPostProcessor):
             loss_fn_ = self.loss_fn
 
         loss_kwargs: dict[str, Any] = {}
-        if self._teacher_dp_group_entries is not None and not self.enable_seq_packing:
+        if self._teacher_handle_plan is not None and not self.enable_seq_packing:
             self._inject_teacher_ipc_tensors(loss_kwargs)
         elif (
             self._teacher_result is not None
@@ -1017,12 +1033,19 @@ class XTokenTeacherIPCExportPostProcessor(LossPostProcessor):
         - world_rank (int): global rank that produced this record.
         - tp_rank, tp_size (int): tensor-parallel coordinates of the producer.
         - cp_rank, cp_size (int): context-parallel coordinates of the producer.
-        - dp_rank, dp_size (int): data-parallel coordinates. Phase 1 of cross-
-          topology IPC requires teacher dp_size == student dp_size; cross-DP
-          batch routing is Phase 2 work.
+        - dp_rank, dp_size (int): data-parallel coordinates. Student dp_size
+          may differ from teacher dp_size (cross-DP routing); the student
+          computes overlaps using ``global_start`` instead of 1:1 dp_rank
+          matching.
         - pp_rank, pp_size (int): pipeline-parallel coordinates. dtensor v2
           does not support PP, so these are always (0, 1) today, included for
           forward compatibility.
+        - global_start (int): index of the first global sample covered by this
+          microbatch's payload, in the global batch's canonical order
+          (``dp_rank * (gbs / dp_size) + microbatch_idx * mbs``). Combined
+          with ``actual_shape[0]`` this gives the half-open range
+          ``[global_start, global_start + actual_shape[0])`` the student uses
+          to route handles when its dp_size or mbs differs from the teacher's.
         - actual_shape (tuple): shape of the exported local shard (not the full
           tensor); the student must slice with these dims before clone.
         - sequence_sharded (bool): True iff cp_size > 1 (sequence dim sharded).
@@ -1089,6 +1112,27 @@ class XTokenTeacherIPCExportPostProcessor(LossPostProcessor):
         self._mb_idx_ipcs: list[tuple[Any]] = []
         self._mb_logits_buffers: list[torch.Tensor] = []
         self._mb_logits_ipcs: list[tuple[Any]] = []
+        # Per-call layout used to compute each handle's ``global_start``.
+        # Set via :meth:`configure_global_layout` before the forward pass.
+        self._samples_per_dp: Optional[int] = None
+        self._mbs: Optional[int] = None
+
+    def configure_global_layout(self, *, samples_per_dp: int, mbs: int) -> None:
+        """Set the per-call layout used to stamp ``global_start`` on handles.
+
+        Args:
+            samples_per_dp: Number of samples this teacher dp_rank handles
+                (``gbs // dp_size``).
+            mbs: Teacher microbatch size for this call.
+        """
+        assert samples_per_dp > 0 and mbs > 0, (
+            f"samples_per_dp and mbs must be positive, got {samples_per_dp}, {mbs}"
+        )
+        assert samples_per_dp % mbs == 0, (
+            f"samples_per_dp={samples_per_dp} must be divisible by mbs={mbs}"
+        )
+        self._samples_per_dp = samples_per_dp
+        self._mbs = mbs
 
     def set_microbatch_index(self, mb_idx: int) -> None:
         self._microbatch_idx = mb_idx
@@ -1194,6 +1238,14 @@ class XTokenTeacherIPCExportPostProcessor(LossPostProcessor):
         sequence_sharded: bool,
     ) -> dict[str, Any]:
         """Schema-v1 fields common to top-k and full-logits records."""
+        assert self._samples_per_dp is not None and self._mbs is not None, (
+            "configure_global_layout(samples_per_dp=..., mbs=...) must be "
+            "called before producing handles; otherwise global_start cannot "
+            "be stamped on the handle."
+        )
+        global_start = (
+            self.dp_rank * self._samples_per_dp + self._microbatch_idx * self._mbs
+        )
         return {
             "schema_version": 1,
             "world_rank": world_rank,
@@ -1205,6 +1257,7 @@ class XTokenTeacherIPCExportPostProcessor(LossPostProcessor):
             "dp_size": self.dp_size,
             "pp_rank": self.pp_rank,
             "pp_size": self.pp_size,
+            "global_start": global_start,
             "sequence_sharded": sequence_sharded,
             "vocab_start_index": vocab_start_index,
             "vocab_end_index": vocab_end_index,
