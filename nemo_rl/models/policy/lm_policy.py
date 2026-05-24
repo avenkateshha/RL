@@ -622,20 +622,12 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                 "or sequence packing in v0."
             )
         dp_size = self.sharding_annotations.get_axis_size("data_parallel")
-        with (
-            timer.time("get_full_logits_ipc/shard_data")
-            if timer
-            else nullcontext()
-        ):
+        with timer.time("get_full_logits_ipc/shard_data") if timer else nullcontext():
             sharded_data = data.shard_by_batch_size(  # type: ignore
                 dp_size,
                 batch_size=None,
             )
-        with (
-            timer.time("get_full_logits_ipc/submit")
-            if timer
-            else nullcontext()
-        ):
+        with timer.time("get_full_logits_ipc/submit") if timer else nullcontext():
             futures = self.worker_group.run_all_workers_sharded_data(
                 "get_full_logits_ipc",
                 data=sharded_data,
@@ -645,24 +637,40 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                     "tensor_parallel",
                     "pipeline_parallel",
                 ],
-                output_is_replicated=[
-                    "context_parallel",
-                    "tensor_parallel",
-                    "pipeline_parallel",
-                ],
+                # Keep every TP × CP output; consumer routes via overlap.
+                output_is_replicated=["pipeline_parallel"],
                 common_kwargs={"micro_batch_size": micro_batch_size},
             )
         worker_results = self.worker_group.get_all_worker_results(futures)
-        all_handles: list[dict[str, Any]] = []
-        for wr in worker_results:
-            all_handles.extend(wr["per_sample_handles"])
-        return all_handles
+        handles_by_dp_rank: dict[int, list[list[dict[str, Any]]]] = {}
+        for worker_result in worker_results:
+            dp_rank = worker_result["dp_rank"]
+            handles_by_dp_rank.setdefault(dp_rank, []).append(
+                worker_result["per_sample_handles"]
+            )
+        aggregated: list[dict[str, Any]] = []
+        for dp_rank in sorted(handles_by_dp_rank.keys()):
+            worker_handles_in_dp = handles_by_dp_rank[dp_rank]
+            num_samples = len(worker_handles_in_dp[0])
+            for worker_handles in worker_handles_in_dp:
+                assert len(worker_handles) == num_samples, (
+                    f"dp={dp_rank}: per_sample_handles length mismatch "
+                    f"{[len(h) for h in worker_handles_in_dp]}"
+                )
+            for sample_idx in range(num_samples):
+                aggregated.append(
+                    {
+                        "teacher_shards": [
+                            worker_handles[sample_idx]
+                            for worker_handles in worker_handles_in_dp
+                        ]
+                    }
+                )
+        return aggregated
 
     def release_ipc_buffer(self) -> None:
         """Tell all workers to drop their stashed IPC tensors."""
-        futures = self.worker_group.run_all_workers_single_data(
-            "release_ipc_buffer"
-        )
+        futures = self.worker_group.run_all_workers_single_data("release_ipc_buffer")
         ray.get(futures)
 
     def train(

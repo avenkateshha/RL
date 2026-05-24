@@ -128,16 +128,23 @@ def prepare_loss_input(
         }
     elif loss_fn.input_type == LossInputType.DISTILLATION_CROSS_TOKENIZER:
         # Materialize the teacher-side loss input: rebuild the microbatch's
-        # full-vocab teacher logits from the CUDA IPC handles shipped on the
-        # data dict. The student logits pass straight through; the loss fn
-        # does the projection / chunk-average / KL reductions on both.
+        # full-vocab teacher logits from the per-rank CUDA IPC handles shipped
+        # on the data dict, routing across the consumer's context-parallel
+        # group for heterogeneous TP/CP teacher/student layouts. The student
+        # logits pass straight through; the loss fn does the projection /
+        # chunk-average / KL reductions on both.
         from nemo_rl.algorithms.x_token.loss_utils import (
-            rebuild_teacher_full_logits_from_ipc,
+            rebuild_teacher_logits_from_ipc,
         )
 
+        teacher_full_logits = rebuild_teacher_logits_from_ipc(
+            data["teacher_full_logits_ipc"],
+            cp_group=context_parallel_group,
+            device=torch.cuda.current_device(),
+        )
         loss_input = {
             "logits": logits,
-            "teacher_full_logits": rebuild_teacher_full_logits_from_ipc(data),
+            "teacher_full_logits": teacher_full_logits,
         }
     elif loss_fn.input_type == LossInputType.DRAFT:
         from megatron.core.transformer.multi_token_prediction import roll_tensor

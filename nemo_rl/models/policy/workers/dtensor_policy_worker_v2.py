@@ -847,6 +847,9 @@ class DTensorPolicyWorkerV2Impl(
             else self.cfg["logprob_batch_size"]
         )
         sequence_dim, seq_dim_size = check_sequence_dim(data)
+        target_local_seq = (
+            seq_dim_size // self.cp_size if self.cp_size > 1 else seq_dim_size
+        )
 
         out_vals: list[torch.Tensor] = []
         self.model.eval()
@@ -893,7 +896,7 @@ class DTensorPolicyWorkerV2Impl(
                     continue
                 # Keep vals on CUDA for IPC; pad seq dim now so the stash
                 # tensor matches the canonical [B_r, T_t, V_t] shape.
-                pad_needed = seq_dim_size - vals.shape[1]
+                pad_needed = target_local_seq - vals.shape[1]
                 if pad_needed > 0:
                     vals = torch.nn.functional.pad(
                         vals, (0, 0, 0, pad_needed, 0, 0), mode="constant", value=0.0
@@ -916,23 +919,45 @@ class DTensorPolicyWorkerV2Impl(
         self._teacher_ipc_buffer[:B_r, :T_t, :V_t].copy_(final_vals)
         del final_vals, out_vals  # drop the cat intermediate; only the persistent buffer holds the data now
 
-        # Every per-sample entry carries the same stable rank-level
-        # handle plus its rank-local sample index. The consumer rebuilds
-        # the single handle once and slices into the contiguous
-        # microbatch range — no torch.stack, no allocation.
-        rank_shape = (B_r, T_t, V_t)
-        rank_dtype = self._teacher_ipc_buffer.dtype
+        # Per-rank handle metadata so the student can route across
+        # heterogeneous TP/CP. Handles are exported from the persistent IPC
+        # buffer (never freed between steps), so the consumer's view into the
+        # imported storage stays valid for the worker's lifetime.
+        tp_rank = self.tp_mesh.get_local_rank() if self.tp_mesh is not None else 0
+        cp_rank = self.cp_mesh.get_local_rank() if self.cp_mesh is not None else 0
+        dp_rank = self.dp_mesh.get_local_rank() if self.dp_mesh is not None else 0
+        world_rank = torch.distributed.get_rank()
+        local_seq_len = T_t
+        local_vocab_size = V_t
+        full_seq_len = local_seq_len * self.cp_size
+        full_vocab_size = local_vocab_size * self.tp_size
+        vocab_start_index = tp_rank * full_vocab_size // self.tp_size
+        vocab_end_index = (tp_rank + 1) * full_vocab_size // self.tp_size
+        global_seq_start = cp_rank * full_seq_len // self.cp_size
 
-        per_sample_handles: list[dict[str, Any]] = [
-            {
-                "rank_logits_ipc": self._teacher_ipc_handle,
-                "rank_shape": rank_shape,
-                "dtype": rank_dtype,
-                "sample_idx_within_rank": i,
-            }
-            for i in range(B_r)
-        ]
-        return {"per_sample_handles": per_sample_handles}
+        per_sample_handles: list[dict[str, Any]] = []
+        for i in range(B_r):
+            view_i = self._teacher_ipc_buffer[i, :T_t, :V_t]  # [T_t, V_t] view
+            per_sample_handles.append(
+                {
+                    "payload_ipc": get_handle_from_tensor(view_i),
+                    "actual_shape": tuple(view_i.shape),
+                    "dtype": view_i.dtype,
+                    "tp_rank": tp_rank,
+                    "cp_rank": cp_rank,
+                    "tp_size": self.tp_size,
+                    "cp_size": self.cp_size,
+                    "world_rank": world_rank,
+                    "vocab_start_index": vocab_start_index,
+                    "vocab_end_index": vocab_end_index,
+                    "global_seq_start": global_seq_start,
+                    "full_vocab_size": full_vocab_size,
+                    "full_seq_len": full_seq_len,
+                    "vocab_sharded": self.tp_size > 1,
+                    "sequence_sharded": self.cp_size > 1,
+                }
+            )
+        return {"per_sample_handles": per_sample_handles, "dp_rank": dp_rank}
 
     def _ensure_teacher_ipc_buffer(
         self,

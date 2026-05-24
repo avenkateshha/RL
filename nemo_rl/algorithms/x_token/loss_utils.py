@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import fields
-from typing import Any, Dict, Mapping, Tuple, Union
+from typing import Any, Dict, Mapping, Optional, Tuple, Union
 
 import torch
 
@@ -131,21 +131,48 @@ class Fp32SparseMM(torch.autograd.Function):
 
     @staticmethod
     @torch.amp.custom_fwd(device_type="cuda", cast_inputs=torch.float32)
-    def forward(
-        ctx: Any, sparse_M: torch.Tensor, dense: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(ctx: Any, sparse_M: torch.Tensor, dense: torch.Tensor) -> torch.Tensor:
         ctx.sparse_M = sparse_M
         return torch.sparse.mm(sparse_M.t(), dense)
 
     @staticmethod
     @torch.amp.custom_bwd(device_type="cuda")
-    def backward(
-        ctx: Any, grad_out: torch.Tensor
-    ) -> tuple[None, torch.Tensor]:
+    def backward(ctx: Any, grad_out: torch.Tensor) -> tuple[None, torch.Tensor]:
         sparse_M = ctx.sparse_M
         # out = sparse_M.t() @ dense, so d/d_dense = sparse_M @ grad_out.
         grad_dense = torch.sparse.mm(sparse_M, grad_out)
         return None, grad_dense
+
+
+def chunk_average_log_probs_partial(
+    log_probs: torch.Tensor,
+    chunk_id: torch.Tensor,
+    max_chunks: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Local bmm + bucket count, no division.
+
+    Output is summable across CP; callers that need cross-rank chunks to
+    aggregate correctly should ``AllReduceSum`` both tensors before
+    :func:`chunk_average_finalize`. ``chunk_id == -1`` contributes to no
+    bucket.
+    """
+    device = log_probs.device
+    chunk_arange = torch.arange(max_chunks, device=device).view(1, 1, -1)
+    chunk_mask = chunk_id.unsqueeze(-1) == chunk_arange
+    chunk_mask_f = chunk_mask.transpose(1, 2).to(log_probs.dtype)
+    chunk_sums = torch.bmm(chunk_mask_f, log_probs)  # [B, C, V]
+    chunk_sizes = chunk_mask.sum(dim=1).float()  # [B, C]
+    return chunk_sums, chunk_sizes
+
+
+def chunk_average_finalize(
+    chunk_sums: torch.Tensor,
+    chunk_sizes: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Divide sums by sizes; ``eps`` guards empty buckets."""
+    eps = 1e-10
+    chunk_log_probs = chunk_sums / (chunk_sizes.unsqueeze(-1) + eps)
+    return chunk_log_probs, chunk_sizes
 
 
 def chunk_average_log_probs(
@@ -169,16 +196,139 @@ def chunk_average_log_probs(
         chunk_log_probs: ``[B, max_chunks, V]`` averaged log-probs.
         chunk_sizes:    ``[B, max_chunks]`` float tensor of bucket sizes.
     """
-    eps = 1e-10
-    device = log_probs.device
-    chunk_arange = torch.arange(max_chunks, device=device).view(1, 1, -1)
-    # [B, T, max_chunks] — -1 entries compare false everywhere.
-    chunk_mask = chunk_id.unsqueeze(-1) == chunk_arange
-    chunk_mask_f = chunk_mask.transpose(1, 2).to(log_probs.dtype)
-    chunk_sums = torch.bmm(chunk_mask_f, log_probs)        # [B, C, V]
-    chunk_sizes = chunk_mask.sum(dim=1).float()            # [B, C]
-    chunk_log_probs = chunk_sums / (chunk_sizes.unsqueeze(-1) + eps)
-    return chunk_log_probs, chunk_sizes
+    chunk_sums, chunk_sizes = chunk_average_log_probs_partial(
+        log_probs, chunk_id, max_chunks
+    )
+    return chunk_average_finalize(chunk_sums, chunk_sizes)
+
+
+class AllReduceSum(torch.autograd.Function):
+    """Autograd-aware SUM all-reduce; forward clones + reduces, backward is identity.
+
+    Math: ``y = Σ_r x_r`` ⇒ ``dy/dx_r = 1``; same template as the
+    autograd Functions in :mod:`nemo_rl.distributed.model_utils`.
+    """
+
+    @staticmethod
+    def forward(  # pyrefly: ignore[bad-override]
+        ctx: Any,
+        x: torch.Tensor,
+        group: Optional[torch.distributed.ProcessGroup],
+    ) -> torch.Tensor:
+        ctx.group = group
+        if group is None or torch.distributed.get_world_size(group) <= 1:
+            return x
+        out = x.clone()
+        torch.distributed.all_reduce(
+            out, op=torch.distributed.ReduceOp.SUM, group=group
+        )
+        return out
+
+    @staticmethod
+    def backward(  # pyrefly: ignore[bad-override]
+        ctx: Any, grad_out: torch.Tensor
+    ) -> tuple[torch.Tensor, None]:
+        return grad_out, None
+
+
+def collect_overlapping_teacher_shards(
+    teacher_shards: list[dict[str, Any]],
+    student_cp_rank: int,
+    student_cp_size: int,
+    full_seq_len: int,
+) -> list[tuple[dict[str, Any], slice, slice, slice, slice]]:
+    """Plan ``(src_seq, src_vocab, dest_seq, dest_vocab)`` slices per teacher shard.
+
+    Dest is ``[T_t/CP_s, V_t]`` (vocab fully reassembled, seq is this
+    student CP rank's range). Shards with no seq overlap are skipped.
+    """
+    student_seq_start = student_cp_rank * full_seq_len // student_cp_size
+    student_seq_end = (student_cp_rank + 1) * full_seq_len // student_cp_size
+
+    matches: list[tuple[dict[str, Any], slice, slice, slice, slice]] = []
+    for handle in teacher_shards:
+        teacher_vocab_start = int(handle["vocab_start_index"])
+        teacher_vocab_end = int(handle["vocab_end_index"])
+        teacher_seq_start = int(handle["global_seq_start"])
+        teacher_seq_end = teacher_seq_start + int(handle["actual_shape"][0])
+
+        overlap_seq_start = max(student_seq_start, teacher_seq_start)
+        overlap_seq_end = min(student_seq_end, teacher_seq_end)
+        if overlap_seq_end <= overlap_seq_start:
+            continue
+
+        src_seq = slice(
+            overlap_seq_start - teacher_seq_start,
+            overlap_seq_end - teacher_seq_start,
+        )
+        src_vocab = slice(0, teacher_vocab_end - teacher_vocab_start)
+        dest_seq = slice(
+            overlap_seq_start - student_seq_start,
+            overlap_seq_end - student_seq_start,
+        )
+        dest_vocab = slice(teacher_vocab_start, teacher_vocab_end)
+        matches.append((handle, src_seq, src_vocab, dest_seq, dest_vocab))
+    return matches
+
+
+def assemble_teacher_logits_from_shards(
+    teacher_shards: list[dict[str, Any]],
+    student_cp_rank: int,
+    student_cp_size: int,
+    device: int,
+) -> torch.Tensor:
+    """P2P-IPC-read overlapping teacher shards into a ``[T_t/CP_s, V_t]`` dest.
+
+    ``device`` is a CUDA device index (matches
+    :func:`rebuild_cuda_tensor_from_ipc`'s ``device_id`` signature).
+    """
+    from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
+
+    if not teacher_shards:
+        raise ValueError("teacher_shards must be non-empty")
+    full_seq_len = int(teacher_shards[0]["full_seq_len"])
+    full_vocab_size = int(teacher_shards[0]["full_vocab_size"])
+    local_seq_len = full_seq_len // student_cp_size
+
+    dest = torch.zeros(
+        (local_seq_len, full_vocab_size),
+        dtype=torch.float32,
+        device=device,
+    )
+    matches = collect_overlapping_teacher_shards(
+        teacher_shards,
+        student_cp_rank=student_cp_rank,
+        student_cp_size=student_cp_size,
+        full_seq_len=full_seq_len,
+    )
+    for handle, src_seq, src_vocab, dest_seq, dest_vocab in matches:
+        src = rebuild_cuda_tensor_from_ipc(handle["payload_ipc"], device).detach()
+        dest[dest_seq, dest_vocab] = src[src_seq, src_vocab].to(torch.float32)
+    return dest
+
+
+def rebuild_teacher_logits_from_ipc(
+    per_sample_entries: list[dict[str, Any]],
+    cp_group: Optional[torch.distributed.ProcessGroup],
+    device: int,
+) -> torch.Tensor:
+    """Stack per-sample teacher shards into ``[B, T_t/CP_s, V_t]`` on this student rank."""
+    student_cp_rank = (
+        torch.distributed.get_rank(cp_group) if cp_group is not None else 0
+    )
+    student_cp_size = (
+        torch.distributed.get_world_size(cp_group) if cp_group is not None else 1
+    )
+    rebuilt = [
+        assemble_teacher_logits_from_shards(
+            entry["teacher_shards"],
+            student_cp_rank=student_cp_rank,
+            student_cp_size=student_cp_size,
+            device=device,
+        )
+        for entry in per_sample_entries
+    ]
+    return torch.stack(rebuilt, dim=0)
 
 
 def valid_chunk_mask(
@@ -239,9 +389,7 @@ def parse_projection_file(
                 f"{top_indices.shape} vs {top_likelihoods.shape}"
             )
         v_student, top_k = top_indices.shape
-        student_idx = (
-            torch.arange(v_student).unsqueeze(1).expand(-1, top_k).reshape(-1)
-        )
+        student_idx = torch.arange(v_student).unsqueeze(1).expand(-1, top_k).reshape(-1)
         teacher_idx = top_indices.reshape(-1)
         values = top_likelihoods.reshape(-1)
         indices = torch.stack([student_idx, teacher_idx], dim=0)
@@ -259,12 +407,8 @@ def parse_projection_file(
         teacher_idx = torch.tensor([k[1] for k in keys], dtype=torch.long)
         indices = torch.stack([student_idx, teacher_idx], dim=0)
         values = torch.tensor(values_list, dtype=torch.float32)
-        v_student = (
-            int(student_idx.max().item()) + 1 if student_idx.numel() > 0 else 0
-        )
-        v_teacher = (
-            int(teacher_idx.max().item()) + 1 if teacher_idx.numel() > 0 else 0
-        )
+        v_student = int(student_idx.max().item()) + 1 if student_idx.numel() > 0 else 0
+        v_teacher = int(teacher_idx.max().item()) + 1 if teacher_idx.numel() > 0 else 0
         return indices, values, v_student, v_teacher
 
     raise ValueError(
@@ -286,9 +430,7 @@ def parse_projection_file(
 # size would build a different tensor. The top-k cache key is
 # ``(path, device)`` — the raw top-k arrays don't depend on a vocab-size
 # knob.
-_SPARSE_PROJECTION_CACHE: dict[
-    Tuple[str, torch.device, int, int], torch.Tensor
-] = {}
+_SPARSE_PROJECTION_CACHE: dict[Tuple[str, torch.device, int, int], torch.Tensor] = {}
 _TOPK_PROJECTION_CACHE: dict[
     Tuple[str, torch.device], Tuple[torch.Tensor, torch.Tensor]
 ] = {}
@@ -365,8 +507,11 @@ def get_sparse_projection_matrix(
     v_teacher = max(int(teacher_vocab_size), projection_max_teacher)
 
     sparse = torch.sparse_coo_tensor(
-        indices, values, (v_student, v_teacher),
-        device=device, dtype=torch.float32,
+        indices,
+        values,
+        (v_student, v_teacher),
+        device=device,
+        dtype=torch.float32,
     ).coalesce()
     _SPARSE_PROJECTION_CACHE[key] = sparse
     return sparse
@@ -402,11 +547,7 @@ def get_topk_projection(
     if not os.path.exists(path):
         raise FileNotFoundError(f"Projection matrix file not found: {path}")
     data = torch.load(path, map_location="cpu", weights_only=False)
-    if not (
-        isinstance(data, dict)
-        and "indices" in data
-        and "likelihoods" in data
-    ):
+    if not (isinstance(data, dict) and "indices" in data and "likelihoods" in data):
         raise ValueError(
             f"gold_loss requires the dense projection-matrix format "
             f"(dict with 'indices' and 'likelihoods' tensors). File "

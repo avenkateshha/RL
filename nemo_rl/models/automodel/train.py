@@ -575,7 +575,11 @@ class LossPostProcessor:
 
         # Wrap prepare_loss_input with sampling_params
         prepare_loss_input_wrapped = partial(
-            prepare_loss_input, sampling_params=self.sampling_params
+            prepare_loss_input,
+            sampling_params=self.sampling_params,
+            context_parallel_group=(
+                self.cp_mesh.get_group() if self.cp_mesh is not None else None
+            ),
         )
         # Wrap loss function for sequence packing if needed
         if self.enable_seq_packing:
@@ -990,34 +994,18 @@ class FullLogitsPostProcessor:
         original_seq_len: int,
         sequence_dim: int = 1,
     ) -> torch.Tensor:
-        if self.cp_size > 1:
-            raise NotImplementedError(
-                "FullLogitsPostProcessor: context_parallel_size > 1 is "
-                "not supported in v0."
-            )
         if self.enable_seq_packing:
             raise NotImplementedError(
-                "FullLogitsPostProcessor: sequence packing is not "
-                "supported in v0."
+                "FullLogitsPostProcessor: sequence packing is not supported in v0."
             )
         if isinstance(logits, DTensor):
-            tp_group = self.tp_mesh.get_group() if self.tp_mesh is not None else None
-            tp_size = (
-                torch.distributed.get_world_size(tp_group)
-                if tp_group is not None
-                else 1
-            )
-            if tp_size > 1:
-                raise NotImplementedError(
-                    "FullLogitsPostProcessor: tensor_parallel_size > 1 "
-                    "is not supported in v0."
-                )
             logits = logits.to_local()
 
         # Teacher is frozen (init_optimizer=False) and the consumer does not
         # backprop into these logits; downstream log_softmax/KL kernels upcast
         # to fp32 internally where they need it. Ship native compute dtype
-        # (bf16 under autocast) to halve the IPC buffer footprint.
+        # (bf16 under autocast) to halve the IPC buffer footprint. The
+        # cross-tokenizer shard consumer upcasts to fp32 on reassembly.
         return logits  # [B, S, V_t]
 
 
