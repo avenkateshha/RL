@@ -15,6 +15,7 @@
 from typing import Any, Optional
 
 import torch
+import torch.distributed.nn.functional
 from megatron.core.models.gpt import GPTModel
 from megatron.core.parallel_state import (
     get_tensor_model_parallel_group,
@@ -30,24 +31,11 @@ from nemo_rl.algorithms.logits_sampling_utils import (
 )
 
 
-@torch.no_grad()
-def _compute_distributed_log_softmax(
+def _compute_distributed_log_softmax_with_grad(
     vocab_parallel_logits: torch.Tensor, group: torch.distributed.ProcessGroup
 ) -> torch.Tensor:
-    """Compute a stable distributed log softmax across tensor parallel workers.
-
-    Taken from: https://github.com/NVIDIA/NeMo-Aligner/blob/9faab404f21994a7eb1d6ed5890b76152b941636/nemo_aligner/utils/distributed.py#L265
-
-    Args:
-        vocab_parallel_logits (torch.Tensor): Logits tensor with shape [batch_size, seq_length, vocab_size//TP]
-            where TP is the tensor parallel size.
-        group (torch.distributed.ProcessGroup): Process group for the all-reduce operations.
-
-    Returns:
-        torch.Tensor: Log softmax output with the same shape as input, but values represent
-            log probabilities normalized across the full vocabulary dimension.
-    """
-    logits_max = torch.amax(vocab_parallel_logits, dim=-1, keepdim=True)
+    """Differentiable distributed log_softmax across TP workers."""
+    logits_max = torch.amax(vocab_parallel_logits, dim=-1, keepdim=True).detach()
     torch.distributed.all_reduce(
         logits_max,
         op=torch.distributed.ReduceOp.MAX,
@@ -59,13 +47,31 @@ def _compute_distributed_log_softmax(
 
     sum_exp_logits = vocab_parallel_logits.exp().sum(-1, keepdim=True).float()
 
-    torch.distributed.all_reduce(
+    sum_exp_logits = torch.distributed.nn.functional.all_reduce(
         sum_exp_logits,
         op=torch.distributed.ReduceOp.SUM,
         group=group,
     )
 
-    return vocab_parallel_logits - sum_exp_logits.log_().to(vocab_parallel_logits.dtype)
+    return vocab_parallel_logits - sum_exp_logits.log().to(vocab_parallel_logits.dtype)
+
+
+@torch.no_grad()
+def _compute_distributed_log_softmax(
+    vocab_parallel_logits: torch.Tensor, group: torch.distributed.ProcessGroup
+) -> torch.Tensor:
+    """Compute a stable distributed log softmax across tensor parallel workers.
+
+    Args:
+        vocab_parallel_logits (torch.Tensor): Logits tensor with shape [batch_size, seq_length, vocab_size//TP]
+            where TP is the tensor parallel size.
+        group (torch.distributed.ProcessGroup): Process group for the all-reduce operations.
+
+    Returns:
+        torch.Tensor: Log softmax output with the same shape as input, but values represent
+            log probabilities normalized across the full vocabulary dimension.
+    """
+    return _compute_distributed_log_softmax_with_grad(vocab_parallel_logits, group)
 
 
 @torch.no_grad()
@@ -104,6 +110,51 @@ def _compute_distributed_softmax(
     exp_logits.div_(sum_exp_logits)
 
     return exp_logits
+
+
+class DistributedLogSoftmax(torch.autograd.Function):
+    """Autograd-aware vocab-parallel log_softmax. Input and output are TP-sharded.
+
+    Forward delegates to :func:`_compute_distributed_log_softmax`. The
+    helper is forward-only safe (it uses in-place ``dist.all_reduce`` on
+    autograd-tracked tensors), so this Function provides the missing
+    backward.
+
+    Backward applies the standard log_softmax gradient with the vocab-axis
+    sum all-reduced across the TP group:
+
+        d_loss / d_logit_k_local
+            = grad_out_k_local - softmax_k_local * SUM_global(grad_out)
+
+    where ``SUM_global`` is the sum over the global vocab axis (across all
+    TP ranks). Without the cross-rank reduce, each rank would use its
+    LOCAL ``sum(grad_out)``, which is incorrect.
+    """
+
+    @staticmethod
+    def forward(  # pyrefly: ignore[bad-override]
+        ctx: Any,
+        vocab_parallel_logits: torch.Tensor,
+        group: torch.distributed.ProcessGroup,
+    ) -> torch.Tensor:
+        log_probs = _compute_distributed_log_softmax(vocab_parallel_logits, group=group)
+        ctx.save_for_backward(log_probs.exp())
+        ctx.group = group
+        return log_probs
+
+    @staticmethod
+    def backward(  # pyrefly: ignore[bad-override]
+        ctx: Any, grad_output: torch.Tensor
+    ) -> tuple[torch.Tensor, None]:
+        (softmax_output,) = ctx.saved_tensors
+        sum_grad = grad_output.sum(dim=-1, keepdim=True)
+        group = ctx.group
+        if group is not None and torch.distributed.get_world_size(group) > 1:
+            torch.distributed.all_reduce(
+                sum_grad, op=torch.distributed.ReduceOp.SUM, group=group
+            )
+        grad_input = grad_output - softmax_output * sum_grad
+        return grad_input, None
 
 
 class DistributedLogprob(torch.autograd.Function):
@@ -1226,6 +1277,38 @@ def allgather_cp_sharded_tensor(
     tensor, cp_group, seq_dim=1
 ):  # , unpadded_seqlen=None):
     return AllGatherCPTensor.apply(tensor, cp_group, seq_dim)  # , unpadded_seqlen)
+
+
+class AllReduceSum(torch.autograd.Function):
+    """Autograd-aware SUM all-reduce; forward clones + reduces, backward is identity.
+
+    Math: ``y = Σ_r x_r`` ⇒ ``dy/dx_r = 1``. Every rank holds the same
+    ``y`` after forward, so the upstream grad is identical across ranks
+    — passing it back as ``grad_x_r`` lets the rank-local chain rule
+    route gradients to each rank's own input shard with no cross-rank
+    coupling.
+    """
+
+    @staticmethod
+    def forward(  # pyrefly: ignore[bad-override]
+        ctx: Any,
+        x: torch.Tensor,
+        group: Optional[torch.distributed.ProcessGroup],
+    ) -> torch.Tensor:
+        ctx.group = group
+        if group is None or torch.distributed.get_world_size(group) <= 1:
+            return x
+        out = x.clone()
+        torch.distributed.all_reduce(
+            out, op=torch.distributed.ReduceOp.SUM, group=group
+        )
+        return out
+
+    @staticmethod
+    def backward(  # pyrefly: ignore[bad-override]
+        ctx: Any, grad_out: torch.Tensor
+    ) -> tuple[torch.Tensor, None]:
+        return grad_out, None
 
 
 class AllGatherCPTensor(torch.autograd.Function):

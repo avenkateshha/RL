@@ -580,6 +580,9 @@ class LossPostProcessor:
             context_parallel_group=(
                 self.cp_mesh.get_group() if self.cp_mesh is not None else None
             ),
+            vocab_parallel_group=(
+                self.tp_mesh.get_group() if self.tp_mesh is not None else None
+            ),
         )
         # Wrap loss function for sequence packing if needed
         if self.enable_seq_packing:
@@ -1000,13 +1003,28 @@ class FullLogitsPostProcessor:
             )
         if isinstance(logits, DTensor):
             logits = logits.to_local()
+        logits = logits.to(torch.float32)
 
-        # Teacher is frozen (init_optimizer=False) and the consumer does not
-        # backprop into these logits; downstream log_softmax/KL kernels upcast
-        # to fp32 internally where they need it. Ship native compute dtype
-        # (bf16 under autocast) to halve the IPC buffer footprint. The
-        # cross-tokenizer shard consumer upcasts to fp32 on reassembly.
-        return logits  # [B, S, V_t]
+        # Torch's context_parallel shards the seq dim with a load-balanced
+        # (interleaved) scheme so each rank holds two non-contiguous chunks.
+        # The IPC consumer routes by a contiguous ``global_seq_start`` over
+        # the teacher CP group, so allgather across teacher CP to restore
+        # the global seq order here and emit this rank's contiguous slice.
+        # Without this, heterogeneous teacher_cp != student_cp puts teacher
+        # data at the wrong seq positions in the consumer's dest tensor.
+        if self.cp_size > 1 and self.cp_mesh is not None:
+            from nemo_rl.distributed.model_utils import allgather_cp_sharded_tensor
+
+            cp_group = self.cp_mesh.get_group()
+            cp_rank = self.cp_mesh.get_local_rank()
+            full_logits = allgather_cp_sharded_tensor(
+                logits, cp_group, seq_dim=sequence_dim
+            )
+            local_seq_len = full_logits.shape[sequence_dim] // self.cp_size
+            logits = full_logits.narrow(
+                sequence_dim, cp_rank * local_seq_len, local_seq_len
+            ).contiguous()
+        return logits  # [B, S_local_contiguous, V_t]
 
 
 class ScorePostProcessor:

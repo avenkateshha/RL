@@ -142,9 +142,13 @@ def prepare_loss_input(
             cp_group=context_parallel_group,
             device=torch.cuda.current_device(),
         )
+        # Thread the TP/CP groups so the loss can do TP/CP-aware projection,
+        # distributed log_softmax, and partial chunk_average + AllReduceSum.
         loss_input = {
             "logits": logits,
             "teacher_full_logits": teacher_full_logits,
+            "tp_group": vocab_parallel_group,
+            "cp_group": context_parallel_group,
         }
     elif loss_fn.input_type == LossInputType.DRAFT:
         from megatron.core.transformer.multi_token_prediction import roll_tensor

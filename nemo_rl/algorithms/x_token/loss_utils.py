@@ -19,8 +19,10 @@ and :mod:`nemo_rl.algorithms.loss.loss_functions`:
     - :class:`Fp32SparseMM` — FP32 sparse-dense matmul autograd Function
       that ignores the surrounding BF16 autocast (PyTorch has no BF16
       sparse-mm kernel).
-    - :func:`chunk_average_log_probs`, :func:`valid_chunk_mask` —
-      chunk-aggregation helpers for the cross-tokenizer KL paths.
+    - :func:`chunk_log_prob_sums`, :func:`chunk_average_finalize`,
+      :func:`valid_chunk_mask` — chunk-aggregation helpers for the
+      cross-tokenizer KL paths (partial + finalize split lets callers
+      insert CP all_reduce in the middle).
     - :func:`parse_projection_file` — single source of truth for
       reading the on-disk projection matrix file (both the dense top-k
       format and the sparse ``dict[(s, t)] -> count`` format) into COO
@@ -48,6 +50,7 @@ from typing import Any, Dict, Mapping, Optional, Tuple, Union
 import torch
 
 from nemo_rl.algorithms.x_token.token_aligner import AlignmentBatch
+from nemo_rl.distributed.model_utils import AllReduceSum
 
 
 def alignment_from_flat_batch(data: Mapping[str, Any]) -> AlignmentBatch:
@@ -144,7 +147,7 @@ class Fp32SparseMM(torch.autograd.Function):
         return None, grad_dense
 
 
-def chunk_average_log_probs_partial(
+def chunk_log_prob_sums(
     log_probs: torch.Tensor,
     chunk_id: torch.Tensor,
     max_chunks: int,
@@ -179,56 +182,46 @@ def chunk_average_log_probs(
     log_probs: torch.Tensor,
     chunk_id: torch.Tensor,
     max_chunks: int,
+    *,
+    cp_group: Optional[torch.distributed.ProcessGroup] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Average ``log_probs`` over the chunks defined by ``chunk_id``.
+    """Average ``log_probs`` over chunks defined by ``chunk_id``.
 
-    Builds a one-hot chunk mask from ``chunk_id`` (``-1`` means "no
-    chunk", contributes to no bucket), then ``bmm``-aggregates and
-    divides by chunk sizes. Both inputs and outputs match PT's
-    chunk-averaging math at ``tokenalign.py:3617–3637``.
-
-    Args:
-        log_probs: ``[B, T, V]`` log-probabilities.
-        chunk_id: ``[B, T]`` long tensor, values in ``[-1, max_chunks)``.
-        max_chunks: number of chunk buckets.
-
-    Returns:
-        chunk_log_probs: ``[B, max_chunks, V]`` averaged log-probs.
-        chunk_sizes:    ``[B, max_chunks]`` float tensor of bucket sizes.
+    When ``cp_group`` is given and has world > 1, sums (not averages) are
+    AllReduceSum'd across CP ranks before division — mean is non-linear so the
+    reduce must happen before the divide.
     """
-    chunk_sums, chunk_sizes = chunk_average_log_probs_partial(
-        log_probs, chunk_id, max_chunks
-    )
+    chunk_sums, chunk_sizes = chunk_log_prob_sums(log_probs, chunk_id, max_chunks)
+    if cp_group is not None and torch.distributed.get_world_size(cp_group) > 1:
+        chunk_sums = AllReduceSum.apply(chunk_sums, cp_group)
+        chunk_sizes = AllReduceSum.apply(chunk_sizes, cp_group)
     return chunk_average_finalize(chunk_sums, chunk_sizes)
 
 
-class AllReduceSum(torch.autograd.Function):
-    """Autograd-aware SUM all-reduce; forward clones + reduces, backward is identity.
+def slice_sparse_projection_rows(
+    sparse_matrix: torch.Tensor,
+    row_start: int,
+    row_end: int,
+) -> torch.Tensor:
+    """Row-slice a sparse-COO projection ``[V_s, V_t]`` to ``[row_end-row_start, V_t]``.
 
-    Math: ``y = Σ_r x_r`` ⇒ ``dy/dx_r = 1``; same template as the
-    autograd Functions in :mod:`nemo_rl.distributed.model_utils`.
+    Filters COO indices in-place: keeps entries with row in ``[row_start, row_end)``
+    and shifts the row index by ``-row_start``. Used by the TP-aware P-KL path
+    where each rank owns a contiguous slab of the student vocab axis.
     """
-
-    @staticmethod
-    def forward(  # pyrefly: ignore[bad-override]
-        ctx: Any,
-        x: torch.Tensor,
-        group: Optional[torch.distributed.ProcessGroup],
-    ) -> torch.Tensor:
-        ctx.group = group
-        if group is None or torch.distributed.get_world_size(group) <= 1:
-            return x
-        out = x.clone()
-        torch.distributed.all_reduce(
-            out, op=torch.distributed.ReduceOp.SUM, group=group
-        )
-        return out
-
-    @staticmethod
-    def backward(  # pyrefly: ignore[bad-override]
-        ctx: Any, grad_out: torch.Tensor
-    ) -> tuple[torch.Tensor, None]:
-        return grad_out, None
+    indices = sparse_matrix.indices()
+    values = sparse_matrix.values()
+    mask = (indices[0] >= row_start) & (indices[0] < row_end)
+    local_indices = indices[:, mask].clone()
+    local_indices[0] -= row_start
+    local_values = values[mask]
+    return torch.sparse_coo_tensor(
+        local_indices,
+        local_values,
+        (row_end - row_start, sparse_matrix.size(1)),
+        device=sparse_matrix.device,
+        dtype=sparse_matrix.dtype,
+    ).coalesce()
 
 
 def collect_overlapping_teacher_shards(
@@ -302,7 +295,14 @@ def assemble_teacher_logits_from_shards(
         full_seq_len=full_seq_len,
     )
     for handle, src_seq, src_vocab, dest_seq, dest_vocab in matches:
-        src = rebuild_cuda_tensor_from_ipc(handle["payload_ipc"], device).detach()
+        # Producer's IPC payload is the full contiguous storage
+        # [N_microbatches, B_mb, T_t_local, V_t_local]; index the slot
+        # then the sample row, then apply the seq/vocab overlap slices.
+        src_full = rebuild_cuda_tensor_from_ipc(handle["payload_ipc"], device).detach()
+        buf_idx = int(handle["buf_idx"])
+        sample_idx = int(handle["sample_index_in_buf"])
+        local_seq_t, local_vocab_t = handle["actual_shape"]
+        src = src_full[buf_idx, sample_idx, :local_seq_t, :local_vocab_t]
         dest[dest_seq, dest_vocab] = src[src_seq, src_vocab].to(torch.float32)
     return dest
 
@@ -619,9 +619,7 @@ def build_exact_token_map(
     v_student = indices.shape[0]
     v_teacher = int(teacher_vocab_size)
 
-    sorted_values, sorted_in_topk = torch.sort(
-        likelihoods, dim=-1, descending=True
-    )
+    sorted_values, sorted_in_topk = torch.sort(likelihoods, dim=-1, descending=True)
     if xtoken_loss:
         has_exact_map = sorted_values[:, 0] >= 0.6
     else:
@@ -629,9 +627,7 @@ def build_exact_token_map(
         # mapping. `indices[:, 1] == -1` is the sentinel used by the
         # `_exact_map_remapped` projection files for "no second
         # mapping" — matches the PT check at tokenalign.py:3517.
-        has_exact_map = (sorted_values[:, 0] == 1.0) & (
-            indices[:, 1] == -1
-        )
+        has_exact_map = (sorted_values[:, 0] == 1.0) & (indices[:, 1] == -1)
 
     # Gather (s_idx, t_idx, prob) for each exact-map candidate.
     s_candidates = torch.where(has_exact_map)[0]
@@ -646,9 +642,7 @@ def build_exact_token_map(
         _EXACT_TOKEN_MAP_CACHE[key] = result
         return result
 
-    t_candidates = indices[
-        s_candidates, sorted_in_topk[s_candidates, 0]
-    ]
+    t_candidates = indices[s_candidates, sorted_in_topk[s_candidates, 0]]
     prob_candidates = sorted_values[s_candidates, 0]
 
     in_bounds = (t_candidates >= 0) & (t_candidates < v_teacher)
@@ -677,12 +671,8 @@ def build_exact_token_map(
     # lose the amin reduction.
     sentinel = torch.tensor(v_student, dtype=s_vec.dtype, device=device)
     eligible_s = torch.where(eligible, s_vec, sentinel.expand_as(s_vec))
-    min_s_per_t = torch.full(
-        (v_teacher,), v_student, device=device, dtype=s_vec.dtype
-    )
-    min_s_per_t.scatter_reduce_(
-        0, t_vec, eligible_s, reduce="amin", include_self=True
-    )
+    min_s_per_t = torch.full((v_teacher,), v_student, device=device, dtype=s_vec.dtype)
+    min_s_per_t.scatter_reduce_(0, t_vec, eligible_s, reduce="amin", include_self=True)
     winner_mask = eligible & (s_vec == min_s_per_t[t_vec])
 
     common_student = s_vec[winner_mask]

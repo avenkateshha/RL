@@ -154,8 +154,8 @@ def setup(
     train_dataset: AllTaskProcessedDataset,
     val_dataset: Optional[AllTaskProcessedDataset],
 ) -> tuple[
-    Policy,                         # student
-    Policy,                         # teacher
+    Policy,  # student
+    Policy,  # teacher
     StatefulDataLoader,
     Optional[StatefulDataLoader],
     CrossTokenizerDistillationLossFn,
@@ -177,9 +177,11 @@ def setup(
     assert policy_config["dtensor_cfg"]["enabled"] and policy_config["dtensor_cfg"].get(
         "_v2", False
     ), "xtoken distillation requires policy.dtensor_cfg.enabled=true and _v2=true."
-    assert teacher_config["dtensor_cfg"]["enabled"] and teacher_config["dtensor_cfg"].get(
-        "_v2", False
-    ), "xtoken distillation requires teacher.dtensor_cfg.enabled=true and _v2=true."
+    assert teacher_config["dtensor_cfg"]["enabled"] and teacher_config[
+        "dtensor_cfg"
+    ].get("_v2", False), (
+        "xtoken distillation requires teacher.dtensor_cfg.enabled=true and _v2=true."
+    )
 
     set_seed(distillation_config["seed"])
 
@@ -451,19 +453,12 @@ def xtoken_off_policy_distillation_train(
                     student_policy.prepare_for_training()
 
                 with timer.time("policy_training"):
-                    try:
-                        train_results = student_policy.train(
-                            train_data,
-                            loss_fn,
-                            timer=timer,
-                            skip_keys=XTOKEN_NON_STUDENT_SEQ_KEYS,
-                        )
-                    finally:
-                        # Producer-side CUDA tensors must be freed before
-                        # the next teacher forward — otherwise memory grows
-                        # unboundedly. Always release, even on student
-                        # failure.
-                        teacher_policy.release_ipc_buffer()
+                    train_results = student_policy.train(
+                        train_data,
+                        loss_fn,
+                        timer=timer,
+                        skip_keys=XTOKEN_NON_STUDENT_SEQ_KEYS,
+                    )
 
                 is_last_step = (total_steps + 1 >= max_steps) or (
                     (current_epoch + 1 == max_epochs)
@@ -535,10 +530,14 @@ def xtoken_off_policy_distillation_train(
                     off_policy_distillation_state["current_epoch"] = current_epoch
                     off_policy_distillation_state["current_step"] = current_step + 1
                     off_policy_distillation_state["total_steps"] = total_steps + 1
-                    off_policy_distillation_state["total_valid_tokens"] = total_valid_tokens
+                    off_policy_distillation_state["total_valid_tokens"] = (
+                        total_valid_tokens
+                    )
                     off_policy_distillation_state["consumed_samples"] = consumed_samples
                     if val_metrics is not None and "loss" in val_metrics:
-                        off_policy_distillation_state["val_loss"] = float(val_metrics["loss"])
+                        off_policy_distillation_state["val_loss"] = float(
+                            val_metrics["loss"]
+                        )
                     elif "val_loss" in off_policy_distillation_state:
                         del off_policy_distillation_state["val_loss"]
 
@@ -547,16 +546,18 @@ def xtoken_off_policy_distillation_train(
                         prefix, metric_name = full_metric_name.split(":", 1)
                         source = metrics if prefix == "train" else (val_metrics or {})
                         if metric_name in source:
-                            off_policy_distillation_state[full_metric_name] = float(source[metric_name])
+                            off_policy_distillation_state[full_metric_name] = float(
+                                source[metric_name]
+                            )
 
                     with timer.time("checkpointing"):
                         ckpt_path = checkpointer.init_tmp_checkpoint(
-                            total_steps + 1, off_policy_distillation_state, master_config
+                            total_steps + 1,
+                            off_policy_distillation_state,
+                            master_config,
                         )
                         student_policy.save_checkpoint(
-                            weights_path=os.path.join(
-                                ckpt_path, "policy", "weights"
-                            ),
+                            weights_path=os.path.join(ckpt_path, "policy", "weights"),
                             optimizer_path=os.path.join(
                                 ckpt_path, "policy", "optimizer"
                             )
@@ -592,15 +593,13 @@ def xtoken_off_policy_distillation_train(
             if "kl_loss" in metrics:
                 kl_sum = float(metrics["kl_loss"])
                 print(
-                    f"  • KL:   {kl_sum:.4f} "
-                    f"(per-MB-mean: {kl_sum / n_mb:.4f})",
+                    f"  • KL:   {kl_sum:.4f} (per-MB-mean: {kl_sum / n_mb:.4f})",
                     flush=True,
                 )
             if "ce_loss" in metrics:
                 ce_sum = float(metrics["ce_loss"])
                 print(
-                    f"  • CE:   {ce_sum:.4f} "
-                    f"(per-MB-mean: {ce_sum / n_mb:.4f})",
+                    f"  • CE:   {ce_sum:.4f} (per-MB-mean: {ce_sum / n_mb:.4f})",
                     flush=True,
                 )
             # Gold-loss path metrics — kl_common/l1_uncommon are already
@@ -628,7 +627,10 @@ def xtoken_off_policy_distillation_train(
                     f"  • ProjAcc: {metrics['proj_accuracy'] * 100:.2f}%",
                     flush=True,
                 )
-            print(f"  • Total step time: {timing_metrics.get('total_step_time', 0):.2f}s", flush=True)
+            print(
+                f"  • Total step time: {timing_metrics.get('total_step_time', 0):.2f}s",
+                flush=True,
+            )
             for k, v in sorted(
                 timing_metrics.items(), key=lambda kv: kv[1], reverse=True
             ):
@@ -644,13 +646,16 @@ def xtoken_off_policy_distillation_train(
 
             if should_save_by_timeout:
                 print("Timeout reached, stopping training early.", flush=True)
+                teacher_policy.release_ipc_buffer()
                 return
             if total_steps >= max_steps:
                 print("Max steps reached, stopping training.", flush=True)
+                teacher_policy.release_ipc_buffer()
                 return
 
         current_epoch += 1
         current_step = 0
+    teacher_policy.release_ipc_buffer()
 
 
 # ===============================================================================
@@ -714,15 +719,12 @@ def validate(
             )
             train_data.to("cpu")
             student_policy.prepare_for_training()
-            try:
-                results = student_policy.train(
-                    train_data,
-                    loss_fn,
-                    eval_mode=True,
-                    skip_keys=XTOKEN_NON_STUDENT_SEQ_KEYS,
-                )
-            finally:
-                teacher_policy.release_ipc_buffer()
+            results = student_policy.train(
+                train_data,
+                loss_fn,
+                eval_mode=True,
+                skip_keys=XTOKEN_NON_STUDENT_SEQ_KEYS,
+            )
             losses.append(float(results["loss"].numpy()))
             mb_metrics = results.get("all_mb_metrics", {})
             if "kl_loss" in mb_metrics:
@@ -732,9 +734,8 @@ def validate(
             if "kl_common" in mb_metrics:
                 kl_common_losses.append(float(np.mean(mb_metrics["kl_common"])))
             if "l1_uncommon" in mb_metrics:
-                l1_uncommon_losses.append(
-                    float(np.mean(mb_metrics["l1_uncommon"]))
-                )
+                l1_uncommon_losses.append(float(np.mean(mb_metrics["l1_uncommon"])))
+        teacher_policy.release_ipc_buffer()
         teacher_policy.offload_after_refit()
 
     metrics: dict[str, Any] = {
