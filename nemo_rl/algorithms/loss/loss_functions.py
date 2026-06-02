@@ -1201,26 +1201,33 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # the same worker share one load.
 
     @staticmethod
-    def _dp_all_reduce_sum(local: torch.Tensor) -> torch.Tensor:
-        """Sum-reduce a scalar count across the data-parallel group.
+    def _dp_all_reduce_sum(local: torch.Tensor, *, tp_world: int = 1) -> torch.Tensor:
+        """Count distinct valid chunks across the data-partitioned ranks (DP×CP).
 
-        Used to compute ``global_valid_chunks`` from each rank's local
-        chunk count, so the chunk-KL denominator matches the
-        ``sum(global_valid_chunk_kl) / sum(global_valid_chunks)``
-        objective (the same convention CE follows via
-        ``global_valid_toks``). The cross-tokenizer setup asserts
-        ``cp_size=1, tp_size=1`` in
-        ``xtoken_off_policy_distillation.setup``, so the default
-        process group equals the DP group — calling all-reduce on the
-        default group therefore sums across DP only.
+        ``global_valid_chunks`` is the denominator for the chunk-KL / L1
+        terms, so it must count each distinct chunk exactly once (mirroring
+        the ``sum(global_valid_chunk_kl) / sum(global_valid_chunks)``
+        objective that CE follows via ``global_valid_toks``). The worker's
+        default process group spans the policy's full mesh (DP×CP×TP):
 
-        Returns a fresh ``float32`` scalar; the input tensor is not
-        modified. Falls back to a copy of the local value when
-        distributed is not initialized (unit tests).
+        - DP and CP *partition* the data (each rank holds distinct chunks),
+          so summing over them is correct.
+        - TP *replicates* the data (it shards the vocab, not the
+          batch/sequence), so each chunk is counted ``tp_world`` times.
+
+        We therefore all-reduce over the default group and divide by
+        ``tp_world`` to recover the DP×CP-distinct count. (This used to
+        assume ``tp_size=cp_size=1``; cross-tokenizer now supports TP/CP.)
+
+        Returns a fresh ``float32`` scalar; the input is not modified.
+        Falls back to ``local / tp_world`` when distributed is not
+        initialized (unit tests).
         """
         out = local.detach().to(torch.float32).clone()
         if torch.distributed.is_initialized():
             torch.distributed.all_reduce(out)
+        if tp_world > 1:
+            out = out / tp_world
         return out
 
     def __call__(
@@ -1508,7 +1515,9 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # mirrors the `global_valid_toks` convention used by CE.
         sample_mask_bool = to_local_if_dtensor(data["sample_mask"]).bool()
         valid_bool = chunk_mask & sample_mask_bool.unsqueeze(-1)
-        global_valid_chunks = self._dp_all_reduce_sum(valid_bool.sum())
+        global_valid_chunks = self._dp_all_reduce_sum(
+            valid_bool.sum(), tp_world=tp_world
+        )
         if global_valid_chunks.item() == 0:
             zero = torch.zeros((), device=device, dtype=proj_log_chunks.dtype)
             return (
@@ -1673,7 +1682,9 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # both `kl_common` and `l1_uncommon` use this as their denom so
         # the loss is normalized by `sum(global_valid_chunks)`, not a
         # per-rank mean.
-        global_valid_chunks = self._dp_all_reduce_sum(valid_chunk.sum())
+        global_valid_chunks = self._dp_all_reduce_sum(
+            valid_chunk.sum(), tp_world=tp_world
+        )
         if global_valid_chunks.item() == 0:
             zero = torch.zeros((), device=device, dtype=zero_dtype)
             return (

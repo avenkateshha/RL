@@ -32,13 +32,13 @@ loss function does only loss math; this module is just plumbing.
 
 from __future__ import annotations
 
+import math
 import os
 from typing import Any, NotRequired, Optional, TypedDict, cast
 
-from pydantic import BaseModel
-
 import numpy as np
 import torch
+from pydantic import BaseModel
 from torchdata.stateful_dataloader import StatefulDataLoader
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
@@ -101,6 +101,10 @@ class OffPolicyDistillationConfig(TypedDict):
         val_period: Validation cadence in steps. ``0`` disables validation.
         val_at_start: Run validation before training begins.
         val_at_end: Run validation on the final step.
+        val_teacher_micro_batch_size: Teacher microbatch size used for the
+            validation logits export. Defaults to the teacher's
+            ``train_micro_batch_size``; tune independently for val
+            memory/throughput.
     """
 
     num_prompts_per_step: int
@@ -110,6 +114,7 @@ class OffPolicyDistillationConfig(TypedDict):
     val_period: int
     val_at_start: bool
     val_at_end: bool
+    val_teacher_micro_batch_size: NotRequired[int]
 
 
 class OffPolicyDistillationSaveState(TypedDict):
@@ -131,8 +136,80 @@ def _default_off_policy_distillation_save_state() -> OffPolicyDistillationSaveSt
     }
 
 
+def _data_parallel_size(policy: Policy) -> int:
+    """Data-parallel degree of a policy, read from its sharding annotations."""
+    return policy.sharding_annotations.get_axis_size("data_parallel")
+
+
+def _assert_distillation_grid(
+    *,
+    gbs: int,
+    student_dp: int,
+    teacher_dp: int,
+    student_mbs: int,
+    teacher_mbs: int,
+) -> None:
+    """Fail fast unless the global batch tiles cleanly on both sides.
+
+    Teacher and student may run at different data-parallel degrees and
+    microbatch sizes, but they consume the SAME global batch in the SAME
+    global order (teacher logits are exported as a global-batch-ordered
+    per-sample list and the student slices it by its own DP/MBS). That
+    decoupling only holds when each side can split the global batch into
+    whole per-DP-rank chunks and whole microbatches.
+    """
+    assert gbs % student_dp == 0, (
+        f"global batch size ({gbs}) must be divisible by student "
+        f"data_parallel size ({student_dp})."
+    )
+    assert gbs % teacher_dp == 0, (
+        f"global batch size ({gbs}) must be divisible by teacher "
+        f"data_parallel size ({teacher_dp})."
+    )
+    assert (gbs // student_dp) % student_mbs == 0, (
+        f"student local batch (gbs/student_dp = {gbs // student_dp}) must be "
+        f"divisible by student micro batch size ({student_mbs})."
+    )
+    assert (gbs // teacher_dp) % teacher_mbs == 0, (
+        f"teacher local batch (gbs/teacher_dp = {gbs // teacher_dp}) must be "
+        f"divisible by teacher micro batch size ({teacher_mbs})."
+    )
+
+
+def _pad_distillation_val_batch(
+    batch: BatchedDataDict[Any], target_size: int
+) -> BatchedDataDict[Any]:
+    """Pad every key of a validation batch up to ``target_size`` (batch axis).
+
+    Validation uses ``drop_last=False``, so the final batch can be smaller
+    than ``num_prompts_per_step`` and may not tile evenly across the teacher
+    and student DP/MBS grids. Padding the whole batch symmetrically (student,
+    teacher and alignment keys together) lets both sides run the existing
+    even-split path with zero shared-code changes. The padded rows carry
+    ``sample_mask == 0``, so they are excluded from the valid-sample counts in
+    ``process_global_batch`` and contribute nothing to the loss or gradients.
+    """
+    current_size = batch.size
+    if target_size == current_size:
+        return batch
+    assert target_size > current_size, (
+        f"target_size ({target_size}) must be >= batch size ({current_size})."
+    )
+    pad = target_size - current_size
+
+    padded: BatchedDataDict[Any] = BatchedDataDict()
+    for key, value in batch.items():
+        if torch.is_tensor(value):
+            pad_rows = value[-1:].repeat(pad, *([1] * (value.dim() - 1)))
+            padded[key] = torch.cat([value, pad_rows], dim=0)
+        else:
+            padded[key] = list(value) + [value[-1]] * pad
+    padded["sample_mask"][current_size:] = 0
+    return padded
+
+
 class MasterConfig(BaseModel, extra="allow"):
-    policy: PolicyConfig    # student
+    policy: PolicyConfig  # student
     teacher: PolicyConfig
     loss_fn: CrossTokenizerDistillationLossConfig
     data: DataConfig
@@ -309,6 +386,47 @@ def setup(
     )
 
     # ==========================
+    #   Teacher/student grid
+    # ==========================
+    # Teacher and student may differ in DP and MBS, but they must agree on
+    # the global batch size (one dataloader batch feeds both, in the same
+    # global order) — assert that explicitly, then check both sides tile it
+    # cleanly into per-DP-rank chunks and whole microbatches.
+    gbs = distillation_config["num_prompts_per_step"]
+    assert (
+        policy_config["train_global_batch_size"]
+        == teacher_config["train_global_batch_size"]
+        == gbs
+    ), (
+        "student/teacher train_global_batch_size and num_prompts_per_step must "
+        f"all match, got student={policy_config['train_global_batch_size']}, "
+        f"teacher={teacher_config['train_global_batch_size']}, "
+        f"num_prompts_per_step={gbs}."
+    )
+    student_dp = _data_parallel_size(student_policy)
+    teacher_dp = _data_parallel_size(teacher_policy)
+    val_teacher_mbs = distillation_config.get(
+        "val_teacher_micro_batch_size", teacher_config["train_micro_batch_size"]
+    )
+    # Training grid.
+    _assert_distillation_grid(
+        gbs=gbs,
+        student_dp=student_dp,
+        teacher_dp=teacher_dp,
+        student_mbs=policy_config["train_micro_batch_size"],
+        teacher_mbs=teacher_config["train_micro_batch_size"],
+    )
+    # Validation grid: the student reuses its train MBS in eval mode; the
+    # teacher uses val_teacher_micro_batch_size for the val export.
+    _assert_distillation_grid(
+        gbs=gbs,
+        student_dp=student_dp,
+        teacher_dp=teacher_dp,
+        student_mbs=policy_config["train_micro_batch_size"],
+        teacher_mbs=val_teacher_mbs,
+    )
+
+    # ==========================
     #         Loss
     # ==========================
     # Inject both tokenizer vocab sizes so the projection matrix's V_s
@@ -418,7 +536,11 @@ def xtoken_off_policy_distillation_train(
                     # full vocab (gold path) or derives a microbatch-global
                     # top-k from this inline (P-KL path).
                     teacher_handles = teacher_policy.get_full_logits_ipc(
-                        teacher_data, timer=timer
+                        teacher_data,
+                        micro_batch_size=master_config.teacher[
+                            "train_micro_batch_size"
+                        ],
+                        timer=timer,
                     )
                     # Model offload frees the teacher's PARAMS to CPU; the
                     # IPC-stashed logit tensors live in worker Python state
@@ -518,8 +640,7 @@ def xtoken_off_policy_distillation_train(
                 # ===== Checkpointing =====
                 should_save_by_step = (
                     is_last_step
-                    or (total_steps + 1)
-                    % master_config.checkpointing["save_period"]
+                    or (total_steps + 1) % master_config.checkpointing["save_period"]
                     == 0
                 )
                 should_save_by_timeout = timeout.check_save()
@@ -688,16 +809,33 @@ def validate(
     kl_common_losses: list[float] = []
     l1_uncommon_losses: list[float] = []
 
+    # Teacher and student may differ in DP/MBS; the final val batch (with
+    # drop_last=False) can be ragged. Pad each batch up to the smallest size
+    # that tiles cleanly on both grids so the existing even-split path applies.
+    student_dp = _data_parallel_size(student_policy)
+    teacher_dp = _data_parallel_size(teacher_policy)
+    student_mbs = master_config.policy["train_micro_batch_size"]
+    val_teacher_mbs = distill_cfg.get(
+        "val_teacher_micro_batch_size",
+        master_config.teacher["train_micro_batch_size"],
+    )
+    pad_quantum = math.lcm(student_dp * student_mbs, teacher_dp * val_teacher_mbs)
+
     with timer.time("validation_total"):
         teacher_policy.prepare_for_lp_inference()
         for batch in val_dataloader:
+            target_size = math.ceil(batch.size / pad_quantum) * pad_quantum
+            batch = _pad_distillation_val_batch(batch, target_size)
+
             teacher_data = BatchedDataDict(
                 input_ids=batch["teacher_input_ids"],
                 input_lengths=batch["teacher_input_lengths"],
                 token_mask=batch["teacher_token_mask"],
                 sample_mask=batch["sample_mask"],
             )
-            teacher_handles = teacher_policy.get_full_logits_ipc(teacher_data)
+            teacher_handles = teacher_policy.get_full_logits_ipc(
+                teacher_data, micro_batch_size=val_teacher_mbs
+            )
 
             train_data: BatchedDataDict[Any] = BatchedDataDict(
                 input_ids=batch["input_ids"],
