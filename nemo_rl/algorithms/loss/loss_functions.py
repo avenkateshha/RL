@@ -1143,12 +1143,12 @@ class CrossTokenizerDistillationLossDataDict(TypedDict):
     # fn either derives a microbatch-global top-k subset internally (P-KL
     # path) or uses full vocab end-to-end (gold-loss path).
     teacher_full_logits_ipc: list[dict[str, Any]]
-    alignment_pair_valid: torch.Tensor         # [B, max_pairs]
-    alignment_pair_is_correct: torch.Tensor    # [B, max_pairs]
+    alignment_pair_valid: torch.Tensor  # [B, max_pairs]
+    alignment_pair_is_correct: torch.Tensor  # [B, max_pairs]
     alignment_student_exact_partition_mask: torch.Tensor
     alignment_teacher_exact_partition_mask: torch.Tensor
-    alignment_student_chunk_id: torch.Tensor   # [B, T_s], -1 = no chunk
-    alignment_teacher_chunk_id: torch.Tensor   # [B, T_t]
+    alignment_student_chunk_id: torch.Tensor  # [B, T_s], -1 = no chunk
+    alignment_teacher_chunk_id: torch.Tensor  # [B, T_t]
     alignment_num_chunks: torch.Tensor
 
 
@@ -1201,33 +1201,31 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # the same worker share one load.
 
     @staticmethod
-    def _dp_all_reduce_sum(local: torch.Tensor, *, tp_world: int = 1) -> torch.Tensor:
-        """Count distinct valid chunks across the data-partitioned ranks (DP×CP).
+    def _dp_all_reduce_sum(local: torch.Tensor) -> torch.Tensor:
+        """Sum a local valid-chunk count over the worker's full process group.
 
         ``global_valid_chunks`` is the denominator for the chunk-KL / L1
-        terms, so it must count each distinct chunk exactly once (mirroring
-        the ``sum(global_valid_chunk_kl) / sum(global_valid_chunks)``
-        objective that CE follows via ``global_valid_toks``). The worker's
-        default process group spans the policy's full mesh (DP×CP×TP):
+        terms (``sum(global_valid_chunk_kl) / sum(global_valid_chunks)``).
+        The all-reduce runs over the default group, which spans the policy's
+        full mesh (DP×CP×TP):
 
-        - DP and CP *partition* the data (each rank holds distinct chunks),
-          so summing over them is correct.
+        - DP and CP *partition* the data, so summing over them accumulates
+          distinct chunks — exactly what the global denominator needs.
         - TP *replicates* the data (it shards the vocab, not the
-          batch/sequence), so each chunk is counted ``tp_world`` times.
-
-        We therefore all-reduce over the default group and divide by
-        ``tp_world`` to recover the DP×CP-distinct count. (This used to
-        assume ``tp_size=cp_size=1``; cross-tokenizer now supports TP/CP.)
+          batch/sequence). The resulting count is therefore ``tp_world``×
+          inflated, but that is intentional: the loss reduction sums the
+          (TP-replicated) numerator over the same full mesh, so the matching
+          ``tp_world`` factor cancels and the normalized loss is
+          parallelism-invariant. Dividing the count by ``tp_world`` here
+          would break that cancellation and scale the loss by ``tp_world``.
 
         Returns a fresh ``float32`` scalar; the input is not modified.
-        Falls back to ``local / tp_world`` when distributed is not
+        Falls back to a copy of the local value when distributed is not
         initialized (unit tests).
         """
         out = local.detach().to(torch.float32).clone()
         if torch.distributed.is_initialized():
             torch.distributed.all_reduce(out)
-        if tp_world > 1:
-            out = out / tp_world
         return out
 
     def __call__(
@@ -1304,9 +1302,8 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             )
             denom = acc_mask.sum().clamp(min=1.0)
             accuracy = (
-                ((student_argmax == shift_labels).float() * acc_mask).sum()
-                / denom
-            )
+                (student_argmax == shift_labels).float() * acc_mask
+            ).sum() / denom
 
         if cfg["dynamic_loss_scaling"]:
             # Match PT reference exactly (train_distillation_ddp.py:1745-1747):
@@ -1323,13 +1320,8 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             )
             loss = kl_scale * kl_loss + ce_loss
         else:
-            kl_scale = torch.tensor(
-                1.0, device=kl_loss.device, dtype=kl_loss.dtype
-            )
-            loss = (
-                cfg["kl_loss_weight"] * kl_loss
-                + cfg["ce_loss_scale"] * ce_loss
-            )
+            kl_scale = torch.tensor(1.0, device=kl_loss.device, dtype=kl_loss.dtype)
+            loss = cfg["kl_loss_weight"] * kl_loss + cfg["ce_loss_scale"] * ce_loss
 
         metrics = {
             "loss": loss.item(),
@@ -1468,8 +1460,10 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             global_top_indices = global_top_indices.sort().values  # [k]
 
         # Slice both sides to the shared [k] columns.
-        projected_topk = projected_full[..., global_top_indices]      # [B, T_s, k]
-        teacher_topk_logits = teacher_full_logits[..., global_top_indices]  # [B, T_t, k]
+        projected_topk = projected_full[..., global_top_indices]  # [B, T_s, k]
+        teacher_topk_logits = teacher_full_logits[
+            ..., global_top_indices
+        ]  # [B, T_t, k]
         target_log_probs = torch.log_softmax(
             teacher_topk_logits / T, dim=-1
         )  # [B, T_t, k] (renormalized within the [k] subset, matching PT).
@@ -1515,9 +1509,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # mirrors the `global_valid_toks` convention used by CE.
         sample_mask_bool = to_local_if_dtensor(data["sample_mask"]).bool()
         valid_bool = chunk_mask & sample_mask_bool.unsqueeze(-1)
-        global_valid_chunks = self._dp_all_reduce_sum(
-            valid_bool.sum(), tp_world=tp_world
-        )
+        global_valid_chunks = self._dp_all_reduce_sum(valid_bool.sum())
         if global_valid_chunks.item() == 0:
             zero = torch.zeros((), device=device, dtype=proj_log_chunks.dtype)
             return (
@@ -1530,7 +1522,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # projected distribution vs the teacher's argmax over the same
         # top-k subset. Mirrors PT reference at tokenalign.py:4097–4104.
         with torch.no_grad():
-            proj_top1 = proj_chunks.argmax(dim=-1)               # [B, C]
+            proj_top1 = proj_chunks.argmax(dim=-1)  # [B, C]
             tgt_top1 = torch.exp(tgt_log_chunks).argmax(dim=-1)  # [B, C]
             proj_matches = (proj_top1 == tgt_top1) & chunk_mask
             proj_acc = proj_matches.sum().float() / chunk_mask.sum().float().clamp(
@@ -1682,9 +1674,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # both `kl_common` and `l1_uncommon` use this as their denom so
         # the loss is normalized by `sum(global_valid_chunks)`, not a
         # per-rank mean.
-        global_valid_chunks = self._dp_all_reduce_sum(
-            valid_chunk.sum(), tp_world=tp_world
-        )
+        global_valid_chunks = self._dp_all_reduce_sum(valid_chunk.sum())
         if global_valid_chunks.item() == 0:
             zero = torch.zeros((), device=device, dtype=zero_dtype)
             return (
@@ -1697,17 +1687,21 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
         # ---------------------- KL on common ----------------------
         if common_s.numel() > 0:
-            student_common = student_chunks[:, :, common_s]   # [B, C, N_common]
-            teacher_common = teacher_chunks[:, :, common_t]   # [B, C, N_common]
+            student_common = student_chunks[:, :, common_s]  # [B, C, N_common]
+            teacher_common = teacher_chunks[:, :, common_t]  # [B, C, N_common]
             if cfg["reverse_kl"]:
                 kl_per_elem = torch.nn.functional.kl_div(
-                    teacher_common, student_common,
-                    reduction="none", log_target=True,
+                    teacher_common,
+                    student_common,
+                    reduction="none",
+                    log_target=True,
                 )
             else:
                 kl_per_elem = torch.nn.functional.kl_div(
-                    student_common, teacher_common,
-                    reduction="none", log_target=True,
+                    student_common,
+                    teacher_common,
+                    reduction="none",
+                    log_target=True,
                 )
             kl_per_chunk = kl_per_elem.sum(dim=-1) * valid_chunk  # [B, C]
             kl_common = kl_per_chunk.sum() / global_valid_chunks.to(
@@ -1723,8 +1717,12 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # -------------------- L1 on uncommon ----------------------
         uncommon_topk = cfg["uncommon_topk"]
         if uncommon_s.numel() > 0 or uncommon_t.numel() > 0:
-            student_unc = student_chunks[:, :, uncommon_s][valid_chunk]   # [N_valid, N_u_s]
-            teacher_unc = teacher_chunks[:, :, uncommon_t][valid_chunk]   # [N_valid, N_u_t]
+            student_unc = student_chunks[:, :, uncommon_s][
+                valid_chunk
+            ]  # [N_valid, N_u_s]
+            teacher_unc = teacher_chunks[:, :, uncommon_t][
+                valid_chunk
+            ]  # [N_valid, N_u_t]
             n_valid = student_unc.shape[0]
             max_uncommon = min(
                 student_unc.shape[-1],
@@ -1750,9 +1748,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     teacher_sorted = teacher_unc_probs.sort(
                         dim=-1, descending=True
                     ).values
-                min_len = min(
-                    student_sorted.shape[-1], teacher_sorted.shape[-1]
-                )
+                min_len = min(student_sorted.shape[-1], teacher_sorted.shape[-1])
                 student_sorted = student_sorted[:, :min_len]
                 teacher_sorted = teacher_sorted[:, :min_len]
                 l1_per_chunk = torch.nn.functional.l1_loss(
@@ -1776,9 +1772,10 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 s_common_valid = student_common[valid_chunk]
                 t_common_valid = teacher_common[valid_chunk]
                 matches = (
-                    s_common_valid.argmax(dim=-1)
-                    == t_common_valid.argmax(dim=-1)
-                ).sum().float()
+                    (s_common_valid.argmax(dim=-1) == t_common_valid.argmax(dim=-1))
+                    .sum()
+                    .float()
+                )
                 top1_acc = matches / valid_chunk.sum().float().clamp(min=1.0)
             else:
                 top1_acc = torch.zeros((), device=device, dtype=zero_dtype)
