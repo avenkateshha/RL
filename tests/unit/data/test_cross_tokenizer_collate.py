@@ -16,12 +16,14 @@
 These tests pin the collator's *contract* (output keys, shapes, padding,
 truncation) without needing real HF tokenizers or pre-captured artifacts.
 The collator is multi-teacher: it takes per-teacher lists and emits
-teacher-indexed keys (``teacher_{i}_*`` / ``alignment_{i}_*``). These tests
-exercise the single-cross-tokenizer-teacher case (index 0).
+teacher-indexed keys (``teacher_{i}_*`` / ``alignment_{i}_*``). Cross-tokenizer
+cases use one teacher; reuse-limit tests use multiple teachers to prove that
+each teacher's independent context is checked.
 """
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -42,10 +44,8 @@ class FakeTokenizer:
     """Minimal tokenizer that satisfies ``CrossTokenizerCollator``'s contract.
 
     Tokenization is character-level with a fixed pad token at id 0.
-    Texts longer than ``max_length`` are truncated; shorter texts are
-    padded to ``max_length``. Returns the dict shape HF fast tokenizers
-    produce (``input_ids``, ``attention_mask``, and ``offset_mapping`` when
-    ``return_offsets_mapping=True``) when called with ``return_tensors="pt"``.
+    The production collator requests exact, untruncated tokenization one row at
+    a time and performs dense padding itself.
     Character-level tokenization makes offsets trivial: content token ``k``
     covers ``(k, k+1)``; padding covers ``(0, 0)``.
     """
@@ -61,39 +61,17 @@ class FakeTokenizer:
 
     def __call__(
         self,
-        texts,
-        padding,
-        truncation,
-        max_length,
-        return_tensors,
+        text,
+        truncation=False,
+        add_special_tokens=False,
         return_offsets_mapping=False,
-        add_special_tokens=True,
     ):
-        assert not add_special_tokens
-        assert padding == "max_length"
-        assert truncation is True
-        assert return_tensors == "pt"
-        all_ids = []
-        all_mask = []
-        all_offsets = []
-        for t in texts:
-            ids = [2 + (ord(c) % (self.vocab_size - 2)) for c in t][:max_length]
-            mask = [1] * len(ids)
-            offsets = [(k, k + 1) for k in range(len(ids))]
-            if len(ids) < max_length:
-                pad_n = max_length - len(ids)
-                ids = ids + [self.pad_token_id] * pad_n
-                mask = mask + [0] * pad_n
-                offsets = offsets + [(0, 0)] * pad_n
-            all_ids.append(ids)
-            all_mask.append(mask)
-            all_offsets.append(offsets)
-        out = {
-            "input_ids": torch.tensor(all_ids, dtype=torch.long),
-            "attention_mask": torch.tensor(all_mask, dtype=torch.long),
-        }
+        assert truncation is False
+        assert add_special_tokens is False
+        ids = [2 + (ord(c) % (self.vocab_size - 2)) for c in text]
+        out = {"input_ids": ids}
         if return_offsets_mapping:
-            out["offset_mapping"] = torch.tensor(all_offsets, dtype=torch.long)
+            out["offset_mapping"] = [(k, k + 1) for k in range(len(ids))]
         return out
 
     def convert_ids_to_tokens(self, ids):
@@ -115,6 +93,7 @@ def _datum(text: str, idx: int = 0, loss_multiplier: float = 1.0) -> dict:
         "extra_env_info": None,
         "loss_multiplier": loss_multiplier,
         "idx": idx,
+        "sample_id": f"test-source#{idx}",
     }
 
 
@@ -142,6 +121,7 @@ _EXPECTED_COLLATOR_KEYS = {
     "input_ids",
     "input_lengths",
     "token_mask",
+    "kd_token_mask",
     "sample_mask",
     "teacher_0_input_ids",
     "teacher_0_input_lengths",
@@ -151,6 +131,7 @@ _EXPECTED_COLLATOR_KEYS = {
     "alignment_0_student_chunk_id",
     "alignment_0_teacher_chunk_id",
     "idx",
+    "sample_id",
 }
 
 
@@ -195,6 +176,112 @@ class TestCollatorOutputKeys:
             )
 
 
+class TestRouterReplayMetadata:
+    def test_preserves_and_pads_rollout_routes(self):
+        student_tok = FakeTokenizer(vocab_size=32, prefix="s")
+        text = "abc"
+        token_ids = student_tok(text)["input_ids"]
+        routed_experts = torch.arange(3 * 2 * 2).reshape(3, 2, 2)
+        datum = _datum(text)
+        # Use lists to exercise the JSON-serialized rollout representation.
+        datum["message_log"][0]["token_ids"] = token_ids
+        datum["message_log"][0]["routed_experts"] = routed_experts.tolist()
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[student_tok],
+            aligners=[None],
+            ctx_length_student=8,
+            ctx_length_teachers=[8],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+            make_seq_div_by_student=8,
+            require_routed_experts=True,
+        )
+
+        out = collator([datum])
+
+        assert out["routed_experts"].shape == (1, 8, 2, 2)
+        assert torch.equal(out["routed_experts"][0, :3], routed_experts)
+        assert torch.count_nonzero(out["routed_experts"][0, 3:]) == 0
+
+    def test_enabled_replay_fails_clearly_when_routes_are_unavailable(self):
+        student_tok = FakeTokenizer(vocab_size=32, prefix="s")
+        datum = _datum("abc")
+        datum["message_log"][0]["token_ids"] = student_tok("abc")["input_ids"]
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[student_tok],
+            aligners=[None],
+            ctx_length_student=8,
+            ctx_length_teachers=[8],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+            require_routed_experts=True,
+        )
+
+        with pytest.raises(
+            RuntimeError,
+            match=r"policy\.router_replay\.enabled=true.*missing routed_experts",
+        ):
+            collator([datum])
+
+    def test_rejects_routes_from_a_different_student_tokenization(self):
+        student_tok = FakeTokenizer(vocab_size=32, prefix="s")
+        datum = _datum("abc")
+        datum["message_log"][0]["token_ids"] = [99, 98, 97]
+        datum["message_log"][0]["routed_experts"] = torch.zeros(3, 2, 2)
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[student_tok],
+            aligners=[None],
+            ctx_length_student=8,
+            ctx_length_teachers=[8],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+            require_routed_experts=True,
+        )
+
+        with pytest.raises(RuntimeError, match="do not match.*student tokenization"):
+            collator([datum])
+
+    def test_chat_mode_preserves_per_message_rollout_routes(self):
+        student_tok = FakeChatTokenizer(
+            {"user": ("[U]", ""), "assistant": ("[A]", "[E]")}
+        )
+        messages: list[dict[str, Any]] = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "ok"},
+        ]
+        rendered_prefix = student_tok.apply_chat_template(messages[:1])
+        rendered = student_tok.apply_chat_template(messages)
+        full_token_ids = student_tok(rendered, add_special_tokens=False)["input_ids"]
+        prefix_len = len(rendered_prefix)
+        full_routes = torch.arange(len(full_token_ids) * 2 * 2).reshape(
+            len(full_token_ids), 2, 2
+        )
+        messages[0]["token_ids"] = full_token_ids[:prefix_len]
+        messages[0]["routed_experts"] = full_routes[:prefix_len]
+        messages[1]["token_ids"] = full_token_ids[prefix_len:]
+        messages[1]["routed_experts"] = full_routes[prefix_len:]
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[student_tok],
+            aligners=[None],
+            ctx_length_student=32,
+            ctx_length_teachers=[32],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+            require_routed_experts=True,
+        )
+
+        datum = _datum("")
+        datum["sample_id"] = "chat#routes"
+        datum["message_log"] = messages
+        out = collator([datum])
+
+        assert torch.equal(out["routed_experts"][0, : len(full_token_ids)], full_routes)
+
+
 class TestCollatorShapes:
     def test_student_and_teacher_axes_independent(self):
         student_tok = FakeTokenizer(vocab_size=32, prefix="s")
@@ -208,6 +295,8 @@ class TestCollatorShapes:
             ctx_length_student=8,
             ctx_length_teachers=[16],
             drop_first_assistant_chunk_kl_by_teacher=[False],
+            make_seq_div_by_student=8,
+            make_seq_div_by_teachers=[16],
         )
         out = collator([_datum("ab", 0), _datum("cd", 1)])
         assert out["input_ids"].shape == (2, 8)
@@ -218,6 +307,7 @@ class TestCollatorShapes:
         assert out["alignment_0_pair_valid"].shape == (2, 3)
         assert out["alignment_0_student_chunk_id"].shape == (2, 8)
         assert out["alignment_0_teacher_chunk_id"].shape == (2, 16)
+        assert out["alignment_0_pair_valid"].shape[0] == 2
 
     def test_input_lengths_match_attention_mask_sum(self):
         student_tok = FakeTokenizer(vocab_size=32, prefix="s")
@@ -238,8 +328,8 @@ class TestCollatorShapes:
         assert int(out["teacher_0_input_lengths"][0]) == 3
 
 
-class TestCollatorTruncation:
-    def test_long_text_truncates_trailing_tokens_not_drops_sample(self):
+class TestCollatorOverflow:
+    def test_long_text_fails_with_sample_id_instead_of_truncating(self):
         student_tok = FakeTokenizer(vocab_size=32, prefix="s")
         teacher_tok = FakeTokenizer(vocab_size=24, prefix="t")
         ctx = 4
@@ -253,19 +343,51 @@ class TestCollatorTruncation:
             ctx_length_teachers=[ctx],
             drop_first_assistant_chunk_kl_by_teacher=[False],
         )
-        # 10 chars; ctx=4 → sample is kept, trailing 6 chars dropped.
-        out = collator([_datum("abcdefghij", 0)])
-        assert out["input_ids"].shape == (1, 4)
-        # token_mask should be all 1s (4 real tokens, no padding).
-        assert int(out["token_mask"][0].sum()) == 4
-        assert int(out["input_lengths"][0]) == 4
+        datum = _datum("abcdefghij", 0)
+        datum["sample_id"] = "corpus#17"
+        with pytest.raises(ValueError, match="corpus#17.*truncation is forbidden"):
+            collator([datum])
+
+    @pytest.mark.parametrize(
+        ("teacher_ctx", "teacher_divisor", "effective_length"),
+        [(4, 1, 5), (6, 4, 8)],
+    )
+    def test_same_token_teacher_enforces_independent_text_context(
+        self,
+        teacher_ctx,
+        teacher_divisor,
+        effective_length,
+    ):
+        tokenizer = FakeTokenizer(vocab_size=32)
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(),
+            student_tokenizer=tokenizer,
+            teacher_tokenizers=[tokenizer, tokenizer],
+            aligners=[None, None],
+            ctx_length_student=16,
+            ctx_length_teachers=[16, teacher_ctx],
+            drop_first_assistant_chunk_kl_by_teacher=[False, False],
+            make_seq_div_by_teachers=[1, teacher_divisor],
+        )
+        datum = _datum("abcde")
+        datum["sample_id"] = "same-token#text"
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "same-token#text.*teacher_1 context: exact token length 5, "
+                f"effective length {effective_length}, capacity {teacher_ctx}"
+            ),
+        ):
+            collator([datum])
 
 
 class TestCollatorSequenceDivisibility:
     def test_seq_padded_up_to_multiple(self):
         student_tok = FakeTokenizer(vocab_size=32, prefix="s")
         teacher_tok = FakeTokenizer(vocab_size=24, prefix="t")
-        # ctx=10, make_seq_div_by=8 → output sequence length = 16.
+        # ctx=16, make_seq_div_by=8 → output sequence length = 8 for two
+        # tokens. Verify both student and teacher pad independently.
         # Verify both student and teacher pad independently.
         aligner = _fake_aligner(b=1, t_s=16, t_t=12)
         collator = CrossTokenizerCollator(
@@ -280,10 +402,10 @@ class TestCollatorSequenceDivisibility:
             make_seq_div_by_teachers=[4],
         )
         out = collator([_datum("hi", 0)])
-        assert out["input_ids"].shape == (1, 16)
-        assert out["token_mask"].shape == (1, 16)
-        assert out["teacher_0_input_ids"].shape == (1, 12)
-        assert out["teacher_0_token_mask"].shape == (1, 12)
+        assert out["input_ids"].shape == (1, 8)
+        assert out["token_mask"].shape == (1, 8)
+        assert out["teacher_0_input_ids"].shape == (1, 4)
+        assert out["teacher_0_token_mask"].shape == (1, 4)
         # Padded slots have token_mask=0.
         assert int(out["token_mask"][0].sum()) == 2  # only "hi" -> 2 real toks
 
@@ -330,6 +452,7 @@ class TestCollatorReadsMessageLog:
                 {
                     "loss_multiplier": 1.0,
                     "idx": 0,
+                    "sample_id": "chat#alt-text",
                     "message_log": [{"role": "assistant", "content": "alt-text"}],
                 }
             ]
@@ -408,6 +531,342 @@ def _chat_aligner(student_tok, teacher_tok) -> TokenAligner:
 
 
 class TestCollatorChatMode:
+    def test_chat_aligns_only_assistant_content(self):
+        # Same content, different scaffold => different full-string coordinates.
+        student_tok = FakeChatTokenizer(
+            {"user": ("[U]", ""), "assistant": ("[A]", "[E]")}
+        )
+        teacher_tok = FakeChatTokenizer(
+            {"user": ("<usr>", ""), "assistant": ("<asst>", "<end>")}
+        )
+        aligner = _chat_aligner(student_tok, teacher_tok)
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[teacher_tok],
+            aligners=[aligner],
+            ctx_length_student=64,
+            ctx_length_teachers=[64],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+        )
+        datum = {
+            "loss_multiplier": 1.0,
+            "idx": 0,
+            "sample_id": "chat#content",
+            "message_log": [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "Hello world"},
+            ],
+        }
+        out = collator([datum])
+
+        # CE and KD retain assistant content and EOT, excluding the template scaffold.
+        tok_mask = out["token_mask"][0].tolist()
+        assert [p for p, v in enumerate(tok_mask) if v == 1] == list(range(8, 20))
+        kd_mask = out["kd_token_mask"][0].tolist()
+        assert [p for p, v in enumerate(kd_mask) if v == 1] == list(range(8, 20))
+        assert out["student_semantic_regions"][0] == (
+            (1, "assistant", "content", 8, 19),
+            (1, "assistant", "eot", 19, 20),
+        )
+
+        # Alignment covers assistant content + the EOT token (char 19), scaffold
+        # stays unaligned (chunk_id == -1).
+        assert out["alignment_0_pair_valid"][0].any()
+        s_chunk = out["alignment_0_student_chunk_id"][0].tolist()
+        assert all(s_chunk[p] != -1 for p in range(8, 20)), s_chunk
+        assert all(s_chunk[p] == -1 for p in list(range(0, 8)) + [20, 21]), s_chunk
+
+    def test_same_tokenizer_teacher_bypasses_alignment(self):
+        tok = FakeChatTokenizer({"user": ("[U]", ""), "assistant": ("[A]", "[E]")})
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=tok,
+            teacher_tokenizers=[tok],
+            aligners=[None],
+            ctx_length_student=32,
+            ctx_length_teachers=[32],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+        )
+        out = collator(
+            [
+                {
+                    "sample_id": f"fixture#{0}",
+                    "loss_multiplier": 1.0,
+                    "idx": 0,
+                    "message_log": [
+                        {"role": "user", "content": "hi"},
+                        {"role": "assistant", "content": "ok"},
+                    ],
+                }
+            ]
+        )
+
+        assert "teacher_0_input_ids" not in out
+        assert not any(key.startswith("alignment_0_") for key in out.keys())
+
+    def test_drop_first_flag_uses_original_teacher_index(self):
+        student_tok = FakeChatTokenizer(
+            {"user": ("[U]", ""), "assistant": ("[A]", "[E]")}
+        )
+        teacher_0_tok = FakeChatTokenizer(
+            {"user": ("<u0>", ""), "assistant": ("<a0>", "<e0>")}
+        )
+        teacher_2_tok = FakeChatTokenizer(
+            {"user": ("<u2>", ""), "assistant": ("<a2>", "<e2>")}
+        )
+        aligner_0 = _chat_aligner(student_tok, teacher_0_tok)
+        aligner_2 = _chat_aligner(student_tok, teacher_2_tok)
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[teacher_0_tok, student_tok, teacher_2_tok],
+            aligners=[aligner_0, None, aligner_2],
+            ctx_length_student=64,
+            ctx_length_teachers=[64, 64, 64],
+            drop_first_assistant_chunk_kl_by_teacher=[False, False, True],
+        )
+        datum = {
+            "sample_id": f"fixture#{0}",
+            "loss_multiplier": 1.0,
+            "idx": 0,
+            "message_log": [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "ok"},
+            ],
+        }
+
+        with (
+            patch.object(
+                aligner_0,
+                "align_one_offset_per_asst",
+                wraps=aligner_0.align_one_offset_per_asst,
+            ) as align_0,
+            patch.object(
+                aligner_2,
+                "align_one_offset_per_asst",
+                wraps=aligner_2.align_one_offset_per_asst,
+            ) as align_2,
+        ):
+            out = collator([datum])
+
+        assert align_0.call_args.kwargs["drop_first_content_pair"] is False
+        assert align_2.call_args.kwargs["drop_first_content_pair"] is True
+        assert "teacher_0_input_ids" in out and "alignment_0_pair_valid" in out
+        assert "teacher_2_input_ids" in out and "alignment_2_pair_valid" in out
+        assert "teacher_1_input_ids" not in out
+        assert not any(key.startswith("alignment_1_") for key in out.keys())
+
+    def test_repeated_assistant_content_cannot_match_role_or_prior_turns(self):
+        student_tok = FakeChatTokenizer(
+            {"user": ("[U]", ""), "assistant": ("assistant|", "[E]")}
+        )
+        teacher_tok = FakeChatTokenizer(
+            {"user": ("<U>", ""), "assistant": ("<assistant>", "<STOP>")}
+        )
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[teacher_tok],
+            aligners=[_chat_aligner(student_tok, teacher_tok)],
+            ctx_length_student=128,
+            ctx_length_teachers=[128],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+        )
+        out = collator(
+            [
+                {
+                    "loss_multiplier": 1.0,
+                    "idx": 0,
+                    "sample_id": "chat#repeated-collision",
+                    "message_log": [
+                        {"role": "user", "content": "assistant"},
+                        {"role": "assistant", "content": "assistant"},
+                        {"role": "user", "content": "assistant"},
+                        {"role": "assistant", "content": "assistant"},
+                    ],
+                }
+            ]
+        )
+
+        assert out["student_semantic_regions"][0] == (
+            (1, "assistant", "content", 22, 31),
+            (1, "assistant", "eot", 31, 32),
+            (3, "assistant", "content", 56, 65),
+            (3, "assistant", "eot", 65, 66),
+        )
+        assert out["teacher_0_semantic_regions"][0] == (
+            (1, "assistant", "content", 23, 32),
+            (1, "assistant", "eot", 32, 33),
+            (3, "assistant", "content", 61, 70),
+            (3, "assistant", "eot", 70, 71),
+        )
+        assert torch.nonzero(out["kd_token_mask"][0]).flatten().tolist() == [
+            *range(22, 32),
+            *range(56, 66),
+        ]
+        student_chunk_ids = out["alignment_0_student_chunk_id"][0]
+        assert torch.all(student_chunk_ids[:22] == -1)
+        assert torch.all(student_chunk_ids[32:56] == -1)
+        assert torch.all(student_chunk_ids[66:] == -1)
+
+    def test_same_token_chat_rejects_slow_student_during_construction(self):
+        student_tok = FakeChatTokenizer({"assistant": ("[A]", "[E]")})
+        student_tok.is_fast = False
+        with pytest.raises(ValueError, match="fast student tokenizer"):
+            CrossTokenizerCollator(
+                config=CrossTokenizerCollatorConfig(mode="chat"),
+                student_tokenizer=student_tok,
+                teacher_tokenizers=[student_tok],
+                aligners=[None],
+                ctx_length_student=64,
+                ctx_length_teachers=[64],
+                drop_first_assistant_chunk_kl_by_teacher=[False],
+            )
+
+    def test_same_token_chat_emits_explicit_side_local_semantic_regions(self):
+        tokenizer = FakeChatTokenizer({"assistant": ("[A]", "[E]")})
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=tokenizer,
+            teacher_tokenizers=[tokenizer],
+            aligners=[None],
+            ctx_length_student=64,
+            ctx_length_teachers=[64],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+        )
+        out = collator(
+            [
+                {
+                    "loss_multiplier": 1.0,
+                    "idx": 0,
+                    "sample_id": "chat#same",
+                    "message_log": [{"role": "assistant", "content": "ok"}],
+                }
+            ]
+        )
+        assert out["teacher_0_semantic_regions"] == out["student_semantic_regions"]
+
+    @pytest.mark.parametrize(
+        ("teacher_ctx", "teacher_divisor", "content", "raw_length", "effective_length"),
+        [(7, 1, "ok", 8, 8), (10, 4, "hey", 9, 12)],
+    )
+    def test_same_token_teacher_enforces_independent_chat_context(
+        self,
+        teacher_ctx,
+        teacher_divisor,
+        content,
+        raw_length,
+        effective_length,
+    ):
+        tokenizer = FakeChatTokenizer({"assistant": ("[A]", "[E]")})
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=tokenizer,
+            teacher_tokenizers=[tokenizer, tokenizer],
+            aligners=[None, None],
+            ctx_length_student=16,
+            ctx_length_teachers=[16, teacher_ctx],
+            drop_first_assistant_chunk_kl_by_teacher=[False, False],
+            make_seq_div_by_teachers=[1, teacher_divisor],
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "same-token#chat.*teacher_1 context: exact post-template length "
+                f"{raw_length}, effective length {effective_length}, "
+                f"capacity {teacher_ctx}"
+            ),
+        ):
+            collator(
+                [
+                    {
+                        "loss_multiplier": 1.0,
+                        "idx": 0,
+                        "sample_id": "same-token#chat",
+                        "message_log": [{"role": "assistant", "content": content}],
+                    }
+                ]
+            )
+
+    def test_teacher_post_template_overflow_names_teacher_side(self):
+        student_tok = FakeChatTokenizer({"assistant": ("[A]", "[E]")})
+        teacher_tok = FakeChatTokenizer({"assistant": ("<VERY-LONG-ASSISTANT>", "<E>")})
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[teacher_tok],
+            aligners=[_chat_aligner(student_tok, teacher_tok)],
+            ctx_length_student=64,
+            ctx_length_teachers=[8],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+        )
+        with pytest.raises(
+            ValueError, match="teacher 0.*chat#teacher-overflow.*overlength"
+        ):
+            collator(
+                [
+                    {
+                        "loss_multiplier": 1.0,
+                        "idx": 0,
+                        "sample_id": "chat#teacher-overflow",
+                        "message_log": [{"role": "assistant", "content": "x"}],
+                    }
+                ]
+            )
+
+    def test_tools_reach_each_template_and_tool_call_only_fails_closed(self):
+        class RecordingChatTokenizer(FakeChatTokenizer):
+            def __init__(self, scaffold):
+                super().__init__(scaffold)
+                self.seen_tools = []
+
+            def apply_chat_template(self, messages, tokenize=False, **kwargs):
+                self.seen_tools.append(kwargs.get("tools"))
+                return super().apply_chat_template(messages, tokenize=tokenize)
+
+        student_tok = RecordingChatTokenizer({"assistant": ("[A]", "[E]")})
+        teacher_tok = RecordingChatTokenizer({"assistant": ("<A>", "<E>")})
+        collator = CrossTokenizerCollator(
+            config=CrossTokenizerCollatorConfig(mode="chat"),
+            student_tokenizer=student_tok,
+            teacher_tokenizers=[teacher_tok],
+            aligners=[_chat_aligner(student_tok, teacher_tok)],
+            ctx_length_student=64,
+            ctx_length_teachers=[64],
+            drop_first_assistant_chunk_kl_by_teacher=[False],
+        )
+        tools = [{"type": "function", "function": {"name": "weather"}}]
+        datum = {
+            "loss_multiplier": 1.0,
+            "idx": 0,
+            "sample_id": "chat#0",
+            "tools": tools,
+            "message_log": [{"role": "assistant", "content": "sunny"}],
+        }
+        collator([datum])
+        assert student_tok.seen_tools and all(
+            seen == tools for seen in student_tok.seen_tools
+        )
+        assert teacher_tok.seen_tools and all(
+            seen == tools for seen in teacher_tok.seen_tools
+        )
+
+        datum["message_log"] = [
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{"function": {"name": "weather"}}],
+            }
+        ]
+        with pytest.raises(ValueError, match="chat#0"):
+            collator([datum])
+
+        datum["message_log"][0]["content"] = " \n\t"
+        with pytest.raises(ValueError, match="chat#0"):
+            collator([datum])
+
     def test_teacher_scoring_masks_assistant_content_and_terminators(self):
         student_tok = FakeChatTokenizer(
             {"system": ("[S]", ""), "user": ("[U]", ""), "assistant": ("[A]", "[E]")}
@@ -446,7 +905,12 @@ class TestCollatorChatMode:
         ]
         out = collator(
             [
-                {"loss_multiplier": 1.0, "idx": i, "message_log": messages}
+                {
+                    "sample_id": f"fixture#{i}",
+                    "loss_multiplier": 1.0,
+                    "idx": i,
+                    "message_log": messages,
+                }
                 for i, messages in enumerate(conversations)
             ]
         )
@@ -475,125 +939,6 @@ class TestCollatorChatMode:
             # The shorter conversation has padding in both tokenizations.
             assert out[f"{prefix}input_lengths"][1] < out[f"{prefix}input_ids"].shape[1]
 
-    def test_chat_aligns_only_assistant_content(self):
-        # Same content, different scaffold => different full-string coordinates.
-        student_tok = FakeChatTokenizer(
-            {"user": ("[U]", ""), "assistant": ("[A]", "[E]")}
-        )
-        teacher_tok = FakeChatTokenizer(
-            {"user": ("<usr>", ""), "assistant": ("<asst>", "<end>")}
-        )
-        aligner = _chat_aligner(student_tok, teacher_tok)
-        collator = CrossTokenizerCollator(
-            student_tokenizer=student_tok,
-            teacher_tokenizers=[teacher_tok],
-            aligners=[aligner],
-            ctx_length_student=64,
-            ctx_length_teachers=[64],
-            drop_first_assistant_chunk_kl_by_teacher=[False],
-            config=CrossTokenizerCollatorConfig(mode="chat"),
-        )
-        datum = {
-            "loss_multiplier": 1.0,
-            "idx": 0,
-            "message_log": [
-                {"role": "user", "content": "hi"},
-                {"role": "assistant", "content": "Hello world"},
-            ],
-        }
-        out = collator([datum])
-
-        # student render "[U]hi[A]Hello world[E]" -> assistant content chars [8,19)
-        tok_mask = out["token_mask"][0].tolist()
-        assert [p for p, v in enumerate(tok_mask) if v == 1] == list(range(8, 20))
-
-        # Alignment covers assistant content + the EOT token (char 19), scaffold
-        # stays unaligned (chunk_id == -1).
-        assert out["alignment_0_pair_valid"][0].any()
-        s_chunk = out["alignment_0_student_chunk_id"][0].tolist()
-        assert all(s_chunk[p] != -1 for p in range(8, 20)), s_chunk
-        assert all(s_chunk[p] == -1 for p in list(range(0, 8)) + [20, 21]), s_chunk
-
-    def test_same_tokenizer_teacher_bypasses_alignment(self):
-        tok = FakeChatTokenizer({"user": ("[U]", ""), "assistant": ("[A]", "[E]")})
-        collator = CrossTokenizerCollator(
-            student_tokenizer=tok,
-            teacher_tokenizers=[tok],
-            aligners=[None],
-            ctx_length_student=32,
-            ctx_length_teachers=[32],
-            drop_first_assistant_chunk_kl_by_teacher=[False],
-            config=CrossTokenizerCollatorConfig(mode="chat"),
-        )
-        out = collator(
-            [
-                {
-                    "loss_multiplier": 1.0,
-                    "idx": 0,
-                    "message_log": [
-                        {"role": "user", "content": "hi"},
-                        {"role": "assistant", "content": "ok"},
-                    ],
-                }
-            ]
-        )
-
-        assert not any(
-            key.startswith(("teacher_0_", "alignment_0_")) for key in out.keys()
-        )
-
-    def test_drop_first_flag_uses_original_teacher_index(self):
-        student_tok = FakeChatTokenizer(
-            {"user": ("[U]", ""), "assistant": ("[A]", "[E]")}
-        )
-        teacher_0_tok = FakeChatTokenizer(
-            {"user": ("<u0>", ""), "assistant": ("<a0>", "<e0>")}
-        )
-        teacher_2_tok = FakeChatTokenizer(
-            {"user": ("<u2>", ""), "assistant": ("<a2>", "<e2>")}
-        )
-        aligner_0 = _chat_aligner(student_tok, teacher_0_tok)
-        aligner_2 = _chat_aligner(student_tok, teacher_2_tok)
-        collator = CrossTokenizerCollator(
-            student_tokenizer=student_tok,
-            teacher_tokenizers=[teacher_0_tok, student_tok, teacher_2_tok],
-            aligners=[aligner_0, None, aligner_2],
-            ctx_length_student=64,
-            ctx_length_teachers=[64, 64, 64],
-            drop_first_assistant_chunk_kl_by_teacher=[False, False, True],
-            config=CrossTokenizerCollatorConfig(mode="chat"),
-        )
-        datum = {
-            "loss_multiplier": 1.0,
-            "idx": 0,
-            "message_log": [
-                {"role": "user", "content": "hi"},
-                {"role": "assistant", "content": "ok"},
-            ],
-        }
-
-        with (
-            patch.object(
-                aligner_0,
-                "align_chat",
-                wraps=aligner_0.align_chat,
-            ) as align_0,
-            patch.object(
-                aligner_2,
-                "align_chat",
-                wraps=aligner_2.align_chat,
-            ) as align_2,
-        ):
-            out = collator([datum])
-
-        assert align_0.call_args.kwargs["drop_first_content_pair"] is False
-        assert align_2.call_args.kwargs["drop_first_content_pair"] is True
-        assert "teacher_0_input_ids" in out and "alignment_0_pair_valid" in out
-        assert "teacher_2_input_ids" in out and "alignment_2_pair_valid" in out
-        assert not any(
-            key.startswith(("teacher_1_", "alignment_1_")) for key in out.keys()
-        )
-
     def test_native_thinking_alignment_rejects_unsupported_layout(self):
         tok = FakeChatTokenizer({"assistant": ("", "")})
         aligner = _chat_aligner(tok, tok)
@@ -614,6 +959,7 @@ class TestCollatorChatMode:
             collator(
                 [
                     {
+                        "sample_id": f"fixture#{0}",
                         "idx": 0,
                         "loss_multiplier": 1.0,
                         "message_log": [{"role": "assistant", "content": "hello"}],

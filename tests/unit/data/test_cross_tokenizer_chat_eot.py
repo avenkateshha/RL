@@ -99,7 +99,12 @@ def _datum(*, multiple_turns: bool = False, trailing_content: str = "") -> dict:
                 {"role": "assistant", "content": "Done"},
             ]
         )
-    return {"message_log": messages, "loss_multiplier": 1.0, "idx": 0}
+    return {
+        "message_log": messages,
+        "loss_multiplier": 1.0,
+        "idx": 0,
+        "sample_id": "chat-eot#0",
+    }
 
 
 @pytest.mark.parametrize("separator", ["", " \n\n"])

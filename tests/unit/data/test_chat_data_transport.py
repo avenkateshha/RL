@@ -38,6 +38,7 @@ from nemo_rl.data.processors import (
 
 def _row() -> dict[str, Any]:
     return {
+        "sample_id": "native-chat#0",
         "messages": [
             {"role": "user", "content": "First request"},
             {
@@ -87,6 +88,7 @@ def test_processors_preserve_context_and_isolate_nested_metadata(processor) -> N
     assert result["tools"] == row["tools"]
     assert result["message_loss_mask"] == [0, 0, 0, 1]
     assert result["idx"] == 7
+    assert result["sample_id"] == row["sample_id"]
     assert result["task_name"] == "chat_kd"
     assert all("token_ids" not in message for message in result["message_log"])
 

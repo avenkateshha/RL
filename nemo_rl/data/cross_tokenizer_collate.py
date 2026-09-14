@@ -25,9 +25,9 @@ The collator runs inside DataLoader worker processes. It does:
    aligns assistant messages independently. Teacher scoring masks also
    select assistant content and end-of-turn tokens in chat mode. Dense-padded alignment and
    teacher inputs are emitted under ``alignment_{i}_*`` / ``teacher_{i}_*``.
-3. *Same-tokenizer* teachers (``aligners[i] is None``) emit nothing extra —
-   their forward reuses the student tokenization, so projection and alignment
-   are skipped.
+3. *Same-tokenizer* teachers (``aligners[i] is None``) reuse the student
+   tokenization and skip projection/alignment tensors. Chat mode also records
+   each side's selected semantic regions for lockstep packing.
 4. Returns a :class:`BatchedDataDict` with the keys :class:`Policy.train`
    expects (``input_ids``, ``input_lengths``, ``token_mask``,
    ``sample_mask``) plus per-teacher tensors and alignment tensors.
@@ -38,8 +38,10 @@ to KL/CE math runs here.
 
 from __future__ import annotations
 
+from copy import copy
 from dataclasses import fields as dataclass_fields
-from typing import Any, List, Literal, Optional
+from functools import partial
+from typing import Any, List, Literal, Optional, cast
 
 import torch
 from pydantic import BaseModel, PositiveInt
@@ -66,8 +68,8 @@ class CrossTokenizerCollatorConfig(BaseModel, extra="allow"):
             Requires chat mode and thinking loss.
         kd_alignment_regions: Optional subset of reasoning, close, answer,
             and eot regions. Requires native thinking alignment.
-        num_packed_rows: Positive number of examples packed into each row.
-            Only one is currently supported.
+        num_packed_rows: Source rows per logical sample. Must remain one;
+            controller-level sequence packing combines complete logical samples.
     """
 
     mode: Literal["text", "chat"] = "text"
@@ -111,6 +113,9 @@ class CrossTokenizerCollator:
         make_seq_div_by_student: Round student sequence length up to a
             multiple of this value (typically TP * CP * 2 for DTensor V2).
         make_seq_div_by_teachers: Per-teacher sequence-length divisors.
+        require_routed_experts: Validate and retain rollout routes for replay.
+        student_chat_template_kwargs: Explicit student template controls.
+        teacher_chat_template_kwargs: Explicit template controls for each teacher.
     """
 
     def __init__(
@@ -125,6 +130,9 @@ class CrossTokenizerCollator:
         drop_first_assistant_chunk_kl_by_teacher: List[bool],
         make_seq_div_by_student: int = 1,
         make_seq_div_by_teachers: Optional[List[int]] = None,
+        require_routed_experts: bool = False,
+        student_chat_template_kwargs: Optional[dict[str, Any]] = None,
+        teacher_chat_template_kwargs: Optional[List[dict[str, Any]]] = None,
     ) -> None:
         n = len(aligners)
         assert len(teacher_tokenizers) == n and len(ctx_length_teachers) == n, (
@@ -172,10 +180,28 @@ class CrossTokenizerCollator:
                 "kd_alignment_regions must be a non-empty subset of reasoning, close, answer, eot"
             )
         if config.num_packed_rows != 1:
-            raise NotImplementedError(
-                "num_packed_rows > 1 (lockstep packing) is not yet implemented "
-                "in this collator; use num_packed_rows=1."
+            raise ValueError(
+                "xToken lockstep packing keeps one source row as one logical "
+                "sample; collator.num_packed_rows must remain 1."
             )
+        if teacher_chat_template_kwargs is None:
+            teacher_chat_template_kwargs = [{} for _ in range(n)]
+        if len(teacher_chat_template_kwargs) != n:
+            raise ValueError(
+                "teacher_chat_template_kwargs must have one entry per teacher"
+            )
+        self.require_routed_experts = require_routed_experts
+        student_tokenizer = self._with_template_kwargs(
+            student_tokenizer, student_chat_template_kwargs or {}, side_id="student"
+        )
+        teacher_tokenizers = [
+            self._with_template_kwargs(tokenizer, kwargs, side_id=f"teacher_{i}")
+            if tokenizer is not None
+            else None
+            for i, (tokenizer, kwargs) in enumerate(
+                zip(teacher_tokenizers, teacher_chat_template_kwargs, strict=True)
+            )
+        ]
         self.student_tokenizer = student_tokenizer
         self.teacher_tokenizers = teacher_tokenizers
         self.aligners = aligners
@@ -221,20 +247,18 @@ class CrossTokenizerCollator:
         # kd_data_processor carries the raw text as a single assistant
         # message; the collator tokenizes that content for the student and
         # each cross-tokenizer teacher.
-        texts: list[str] = []
-        for datum in batch:
-            content = datum["message_log"][0]["content"]
-            if not isinstance(content, str):
-                raise TypeError(
-                    "CrossTokenizerCollator text mode requires string content"
-                )
-            texts.append(content)
+        texts = [datum["message_log"][0]["content"] for datum in batch]
+        if any(not isinstance(text, str) for text in texts):
+            raise TypeError("CrossTokenizerCollator text mode requires string content")
+        sample_ids = self._required_sample_ids(batch)
         student_input_ids, student_attention_mask, student_offsets = (
             self._tokenize_batch(
                 texts,
                 self.student_tokenizer,
                 self.ctx_length_student,
                 self.make_seq_div_by_student,
+                sample_ids=sample_ids,
+                side_id="student",
             )
         )
 
@@ -242,21 +266,36 @@ class CrossTokenizerCollator:
             [datum["loss_multiplier"] for datum in batch], dtype=torch.float32
         )
         idx = [datum["idx"] for datum in batch]
+        student_input_lengths = student_attention_mask.sum(dim=-1).long()
 
         out: dict[str, Any] = {
             # Student-side keys map onto Policy.train's expected names. A
             # single student tokenization is shared across all teachers.
             "input_ids": student_input_ids,
-            "input_lengths": student_attention_mask.sum(dim=-1).long(),
+            "input_lengths": student_input_lengths,
             "token_mask": student_attention_mask.long(),
+            # Plain-text KD and CE share the same target region. Chat mode
+            # overrides this with assistant content plus explicit EOT targets.
+            "kd_token_mask": student_attention_mask.long(),
             "sample_mask": sample_mask,
             "idx": idx,
+            "sample_id": sample_ids,
         }
 
         for i, aligner in enumerate(self.aligners):
             if aligner is None:
                 # Same-tokenizer teacher: no re-tokenization, no projection,
-                # no alignment. Its forward reuses the student tokenization.
+                # no alignment. Its forward reuses the student tokenization,
+                # but its independent context and padding constraints still
+                # apply to every reused row.
+                self._validate_reused_teacher_context(
+                    student_input_lengths.tolist(),
+                    sample_ids=sample_ids,
+                    ctx_length=self.ctx_length_teachers[i],
+                    make_seq_div_by=self.make_seq_div_by_teachers[i],
+                    side_id=f"teacher_{i}",
+                    length_description="exact token length",
+                )
                 continue
             teacher_input_ids, teacher_attention_mask, teacher_offsets = (
                 self._tokenize_batch(
@@ -264,6 +303,8 @@ class CrossTokenizerCollator:
                     self.teacher_tokenizers[i],
                     self.ctx_length_teachers[i],
                     self.make_seq_div_by_teachers[i],
+                    sample_ids=sample_ids,
+                    side_id=f"teacher_{i}",
                 )
             )
             alignment = aligner.align(
@@ -281,10 +322,17 @@ class CrossTokenizerCollator:
             ).long()
             out[f"teacher_{i}_token_mask"] = teacher_attention_mask.long()
             # Alignment payload, dense-padded so DTensor V2 can shard on dim 0.
-            # Keys follow AlignmentBatch fields to keep the payload consistent.
+            # Keys are driven off AlignmentBatch fields so they can't drift
+            # from `alignment_from_flat_batch(data, prefix=f"alignment_{i}_")`.
             for f in dataclass_fields(alignment):
                 out[f"alignment_{i}_{f.name}"] = getattr(alignment, f.name)
 
+        self._add_router_replay_metadata(
+            out,
+            batch,
+            student_input_ids=student_input_ids,
+            student_input_lengths=student_input_lengths,
+        )
         return BatchedDataDict(out)
 
     def _render_document(
@@ -295,7 +343,7 @@ class CrossTokenizerCollator:
         side: str,
     ) -> RenderedChatDocument:
         try:
-            return _render_and_tokenize_chat(
+            document = _render_and_tokenize_chat(
                 tokenizer,
                 datum["message_log"],
                 ctx_length,
@@ -306,16 +354,28 @@ class CrossTokenizerCollator:
                 skip_overlength=True,
             )
         except (ValueError, TypeError) as error:
-            raise ValueError(f"{side}, sample idx={datum['idx']}: {error}") from error
+            raise ValueError(
+                f"{side}, sample idx={datum['idx']}: sample_id={datum.get('sample_id')!r}: {error}"
+            ) from error
+        return document
 
     def _call_chat(self, batch: List[DatumSpec]) -> BatchedDataDict[Any]:
         """Render complete conversations and align selected assistant regions."""
+        sample_ids = self._required_sample_ids(batch)
         student_docs = [
             self._render_document(
                 self.student_tokenizer, datum, self.ctx_length_student, "student"
             )
             for datum in batch
         ]
+        self._validate_reused_teacher_context(
+            [len(doc.input_ids) for doc in student_docs],
+            sample_ids=sample_ids,
+            ctx_length=self.ctx_length_student,
+            make_seq_div_by=self.make_seq_div_by_student,
+            side_id="student",
+            length_description="exact post-template length",
+        )
         (
             student_input_ids,
             student_attention_mask,
@@ -332,6 +392,14 @@ class CrossTokenizerCollator:
             "input_ids": student_input_ids,
             "input_lengths": student_attention_mask.sum(dim=-1).long(),
             "token_mask": (student_attention_mask * student_asst_mask).long(),
+            "kd_token_mask": self._pad_chat_masks(
+                [self._document_kd_mask(doc) for doc in student_docs],
+                max_len=student_input_ids.shape[1],
+            ),
+            "sample_id": sample_ids,
+            "student_semantic_regions": [
+                self._document_token_regions(doc) for doc in student_docs
+            ],
             "sample_mask": torch.tensor(
                 [datum["loss_multiplier"] for datum in batch], dtype=torch.float32
             ),
@@ -339,11 +407,17 @@ class CrossTokenizerCollator:
         }
         for i, aligner in enumerate(self.aligners):
             if aligner is None:
-                for datum, doc in zip(batch, student_docs):
-                    if len(doc.input_ids) > self.ctx_length_teachers[i]:
-                        raise ValueError(
-                            f"teacher {i}, sample idx={datum['idx']}: shared tokenization exceeds context length {self.ctx_length_teachers[i]}; overlength rows are rejected"
-                        )
+                self._validate_reused_teacher_context(
+                    [len(doc.input_ids) for doc in student_docs],
+                    sample_ids=sample_ids,
+                    ctx_length=self.ctx_length_teachers[i],
+                    make_seq_div_by=self.make_seq_div_by_teachers[i],
+                    side_id=f"teacher_{i}",
+                    length_description="exact post-template length",
+                )
+                out[f"teacher_{i}_semantic_regions"] = list(
+                    out["student_semantic_regions"]
+                )
                 continue
             tokenizer = self.teacher_tokenizers[i]
             teacher_docs = [
@@ -352,6 +426,14 @@ class CrossTokenizerCollator:
                 )
                 for datum in batch
             ]
+            self._validate_reused_teacher_context(
+                [len(doc.input_ids) for doc in teacher_docs],
+                sample_ids=sample_ids,
+                ctx_length=self.ctx_length_teachers[i],
+                make_seq_div_by=self.make_seq_div_by_teachers[i],
+                side_id=f"teacher_{i}",
+                length_description="exact post-template length",
+            )
             for sample, (student_doc, teacher_doc) in enumerate(
                 zip(student_docs, teacher_docs)
             ):
@@ -418,8 +500,17 @@ class CrossTokenizerCollator:
             out[f"teacher_{i}_token_mask"] = (
                 teacher_attention_mask * teacher_asst_mask
             ).long()
+            out[f"teacher_{i}_semantic_regions"] = [
+                self._document_token_regions(doc) for doc in teacher_docs
+            ]
             for field in dataclass_fields(alignment):
                 out[f"alignment_{i}_{field.name}"] = getattr(alignment, field.name)
+        self._add_router_replay_metadata(
+            out,
+            batch,
+            student_input_ids=student_input_ids,
+            student_input_lengths=out["input_lengths"],
+        )
         return BatchedDataDict(out)
 
     @staticmethod
@@ -489,6 +580,9 @@ class CrossTokenizerCollator:
         tokenizer: PreTrainedTokenizerBase,
         ctx_length: int,
         make_seq_div_by: int,
+        *,
+        sample_ids: Optional[List[str | int]] = None,
+        side_id: str = "model",
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Tokenize a batch and pad to a multiple of ``make_seq_div_by``.
 
@@ -497,31 +591,325 @@ class CrossTokenizerCollator:
         tokenizations of the same source text. This requires a *fast* HF
         tokenizer; special and padding positions carry ``(0, 0)``.
         """
-        encoded = tokenizer(
-            texts,
-            padding="max_length",
-            truncation=True,
-            max_length=ctx_length,
-            return_offsets_mapping=True,
-            return_tensors="pt",
-            add_special_tokens=False,
-        )
-        input_ids: torch.Tensor = encoded["input_ids"]
-        attention_mask: torch.Tensor = encoded["attention_mask"]
-        offset_mapping: torch.Tensor = encoded["offset_mapping"]
+        if sample_ids is None:
+            sample_ids = list(range(len(texts)))
+        if len(sample_ids) != len(texts):
+            raise ValueError("sample_ids and texts must have the same length")
 
-        b, t = input_ids.shape
-        pad = (make_seq_div_by - (t % make_seq_div_by)) % make_seq_div_by
-        if pad > 0:
-            pad_ids = torch.full(
-                (b, pad),
-                tokenizer.pad_token_id,
-                dtype=input_ids.dtype,
+        ids_list: list[list[int]] = []
+        offsets_list: list[list[tuple[int, int]]] = []
+        for text, sample_id in zip(texts, sample_ids, strict=True):
+            encoded = tokenizer(
+                text,
+                truncation=False,
+                add_special_tokens=False,
+                return_offsets_mapping=True,
             )
-            pad_mask = torch.zeros((b, pad), dtype=attention_mask.dtype)
-            pad_offsets = torch.zeros((b, pad, 2), dtype=offset_mapping.dtype)
-            input_ids = torch.cat([input_ids, pad_ids], dim=1)
-            attention_mask = torch.cat([attention_mask, pad_mask], dim=1)
-            offset_mapping = torch.cat([offset_mapping, pad_offsets], dim=1)
+            ids = list(encoded["input_ids"])
+            offsets = [tuple(offset) for offset in encoded["offset_mapping"]]
+            effective_len = (
+                (len(ids) + make_seq_div_by - 1) // make_seq_div_by
+            ) * make_seq_div_by
+            if len(ids) > ctx_length or effective_len > ctx_length:
+                raise ValueError(
+                    f"xToken sample_id={sample_id!r} exceeds {side_id} context: "
+                    f"exact token length {len(ids)}, effective length "
+                    f"{effective_len}, capacity {ctx_length}; truncation is "
+                    "forbidden."
+                )
+            ids_list.append(ids)
+            offsets_list.append(offsets)
 
+        b = len(ids_list)
+        max_len = max((len(ids) for ids in ids_list), default=0)
+        max_len = max(max_len, 1)
+        if make_seq_div_by > 1:
+            max_len = (
+                (max_len + make_seq_div_by - 1) // make_seq_div_by
+            ) * make_seq_div_by
+        input_ids = torch.full((b, max_len), tokenizer.pad_token_id, dtype=torch.long)
+        attention_mask = torch.zeros((b, max_len), dtype=torch.long)
+        offset_mapping = torch.zeros((b, max_len, 2), dtype=torch.long)
+        for batch_index, (ids, offsets) in enumerate(
+            zip(ids_list, offsets_list, strict=True)
+        ):
+            length = len(ids)
+            if length:
+                input_ids[batch_index, :length] = torch.tensor(ids, dtype=torch.long)
+                attention_mask[batch_index, :length] = 1
+                offset_mapping[batch_index, :length] = torch.tensor(
+                    offsets, dtype=torch.long
+                )
         return input_ids, attention_mask, offset_mapping
+
+    def _add_router_replay_metadata(
+        self,
+        out: dict[str, Any],
+        batch: List[DatumSpec],
+        *,
+        student_input_ids: torch.Tensor,
+        student_input_lengths: torch.Tensor,
+    ) -> None:
+        """Validate and batch rollout-recorded routes for the student forward.
+
+        Router replay is meaningful only when the recorded routes describe the
+        exact token sequence that the student will train on.  xToken normally
+        re-tokenizes source text/chat in the collator, so compare the persisted
+        per-message ``token_ids`` with that result before carrying the matching
+        ``routed_experts`` tensor forward.  This turns stale tokenizer/template
+        settings into an actionable input error instead of silently replaying
+        routes at the wrong token positions.
+        """
+        if not self.require_routed_experts:
+            return
+
+        padded_seq_len = student_input_ids.shape[1]
+        routed_rows: list[torch.Tensor] = []
+        route_shape: Optional[tuple[int, int]] = None
+        route_dtype: Optional[torch.dtype] = None
+
+        for row_index, datum in enumerate(batch):
+            sample_id = datum["sample_id"]
+            token_parts: list[torch.Tensor] = []
+            route_parts: list[torch.Tensor] = []
+            message_log = cast(List[dict[str, Any]], datum["message_log"])
+            for turn_index, message in enumerate(message_log):
+                token_ids_value = message.get("token_ids")
+                routed_experts_value = message.get("routed_experts")
+                if token_ids_value is None:
+                    raise RuntimeError(
+                        "policy.router_replay.enabled=true requires rollout-recorded "
+                        "token_ids and routed_experts on every message; "
+                        f"sample_id={sample_id!r}, turn_index={turn_index} is "
+                        "missing metadata. Use a vLLM router-replay rollout as "
+                        "the xToken data source."
+                    )
+
+                token_ids = torch.as_tensor(token_ids_value, dtype=torch.long)
+                if token_ids.dim() != 1:
+                    raise ValueError(
+                        "router-replay token_ids must have shape [tokens]; "
+                        f"sample_id={sample_id!r}, turn_index={turn_index}, "
+                        f"got {tuple(token_ids.shape)}."
+                    )
+                # Some message serializers erase the trailing dimensions of an
+                # empty [0, L, K] tensor. Empty turns contribute no positions,
+                # so they can be skipped without weakening route coverage.
+                if token_ids.numel() == 0:
+                    continue
+                if routed_experts_value is None:
+                    raise RuntimeError(
+                        "policy.router_replay.enabled=true requires rollout-recorded "
+                        "token_ids and routed_experts on every non-empty message; "
+                        f"sample_id={sample_id!r}, turn_index={turn_index} is "
+                        "missing routed_experts. Use a vLLM router-replay "
+                        "rollout as the xToken data source."
+                    )
+                routed_experts = torch.as_tensor(routed_experts_value)
+                if routed_experts.dim() != 3:
+                    raise ValueError(
+                        "router-replay routed_experts must have shape "
+                        "[tokens, layers, topk]; "
+                        f"sample_id={sample_id!r}, turn_index={turn_index}, "
+                        f"got {tuple(routed_experts.shape)}."
+                    )
+                if routed_experts.shape[0] != token_ids.shape[0]:
+                    raise ValueError(
+                        "router-replay token_ids and routed_experts token axes "
+                        f"differ for sample_id={sample_id!r}, "
+                        f"turn_index={turn_index}: {token_ids.shape[0]} != "
+                        f"{routed_experts.shape[0]}."
+                    )
+
+                current_shape = (
+                    int(routed_experts.shape[1]),
+                    int(routed_experts.shape[2]),
+                )
+                if route_shape is None:
+                    route_shape = current_shape
+                    route_dtype = routed_experts.dtype
+                elif (
+                    current_shape != route_shape or routed_experts.dtype != route_dtype
+                ):
+                    raise ValueError(
+                        "router-replay routed_experts must use one [layers, topk] "
+                        "shape and dtype across the batch; "
+                        f"expected {route_shape}/{route_dtype}, got "
+                        f"{current_shape}/{routed_experts.dtype} for "
+                        f"sample_id={sample_id!r}, turn_index={turn_index}."
+                    )
+                token_parts.append(token_ids.detach().cpu())
+                route_parts.append(routed_experts.detach().cpu())
+
+            if not token_parts or route_shape is None or route_dtype is None:
+                raise RuntimeError(
+                    "policy.router_replay.enabled=true requires non-empty "
+                    f"rollout route metadata; sample_id={sample_id!r} has none."
+                )
+
+            recorded_token_ids = torch.cat(token_parts, dim=0)
+            recorded_routes = torch.cat(route_parts, dim=0)
+            student_length = int(student_input_lengths[row_index].item())
+            expected_token_ids = student_input_ids[row_index, :student_length].cpu()
+            if not torch.equal(recorded_token_ids, expected_token_ids):
+                raise RuntimeError(
+                    "Cannot replay routed experts because rollout-recorded "
+                    "student token_ids do not match the xToken student "
+                    f"tokenization for sample_id={sample_id!r} "
+                    f"(recorded={recorded_token_ids.shape[0]} tokens, "
+                    f"retokenized={student_length}). Keep the rollout and "
+                    "training tokenizer/chat-template settings identical."
+                )
+
+            pad_len = padded_seq_len - recorded_routes.shape[0]
+            if pad_len < 0:
+                raise RuntimeError(
+                    "router-replay route metadata is longer than the student "
+                    f"batch row for sample_id={sample_id!r}: "
+                    f"{recorded_routes.shape[0]} > {padded_seq_len}."
+                )
+            if pad_len:
+                recorded_routes = torch.nn.functional.pad(
+                    recorded_routes, (0, 0, 0, 0, 0, pad_len), value=0
+                )
+            routed_rows.append(recorded_routes)
+
+        out["routed_experts"] = torch.stack(routed_rows, dim=0)
+
+    @staticmethod
+    def _required_sample_ids(batch: List[DatumSpec]) -> list[object]:
+        """Return durable source IDs; post-transform indices are not identity."""
+        sample_ids: list[object] = []
+        for row_index, datum in enumerate(batch):
+            sample_id = datum.get("sample_id")
+            if sample_id is None or not str(sample_id).strip():
+                raise ValueError(
+                    "CrossTokenizerCollator requires a durable, non-empty "
+                    "sample_id on every row; positional idx cannot survive "
+                    f"filtering/splitting (batch row {row_index})."
+                )
+            sample_ids.append(sample_id)
+        return sample_ids
+
+    @staticmethod
+    def _validate_reused_teacher_context(
+        raw_lengths: List[int],
+        *,
+        sample_ids: List[object],
+        ctx_length: int,
+        make_seq_div_by: int,
+        side_id: str,
+        length_description: str,
+    ) -> None:
+        """Enforce one same-tokenizer teacher's independent context limit."""
+        if len(raw_lengths) != len(sample_ids):
+            raise ValueError("raw_lengths and sample_ids must have the same length")
+        for raw_length, sample_id in zip(raw_lengths, sample_ids, strict=True):
+            effective_len = (
+                (raw_length + make_seq_div_by - 1) // make_seq_div_by
+            ) * make_seq_div_by
+            if raw_length > ctx_length or effective_len > ctx_length:
+                raise ValueError(
+                    f"xToken sample_id={sample_id!r} exceeds {side_id} context: "
+                    f"{length_description} {raw_length}, effective length "
+                    f"{effective_len}, capacity {ctx_length}; truncation is "
+                    "forbidden."
+                )
+
+    @staticmethod
+    def _pad_chat_masks(masks: List[List[int]], *, max_len: int) -> torch.Tensor:
+        """Right-pad semantic masks to an already materialized sequence width."""
+        padded = torch.zeros((len(masks), max_len), dtype=torch.long)
+        for row_index, mask in enumerate(masks):
+            if len(mask) > max_len:
+                raise ValueError(
+                    f"semantic mask length {len(mask)} exceeds padded width {max_len}"
+                )
+            if mask:
+                padded[row_index, : len(mask)] = torch.tensor(mask, dtype=torch.long)
+        return padded
+
+    @staticmethod
+    def _validate_template_kwargs(
+        kwargs: dict[str, Any], *, side_id: str
+    ) -> dict[str, Any]:
+        reserved = {"tokenize", "tools"}.intersection(kwargs)
+        if reserved:
+            raise ValueError(
+                f"{side_id} chat template kwargs may not override controller-owned "
+                f"keys {sorted(reserved)!r}."
+            )
+        return dict(kwargs)
+
+    @staticmethod
+    def _with_template_kwargs(
+        tokenizer: PreTrainedTokenizerBase,
+        kwargs: dict[str, Any],
+        *,
+        side_id: str,
+    ) -> PreTrainedTokenizerBase:
+        """Bind side-specific controls without changing the caller's tokenizer."""
+        kwargs = CrossTokenizerCollator._validate_template_kwargs(
+            kwargs, side_id=side_id
+        )
+        if kwargs.get("add_generation_prompt", False):
+            raise ValueError(f"{side_id} training requires add_generation_prompt=false")
+        if not kwargs:
+            return tokenizer
+        configured = copy(tokenizer)
+        configured.apply_chat_template = partial(
+            tokenizer.apply_chat_template, **kwargs
+        )
+        return configured
+
+    def _document_token_regions(
+        self, document: RenderedChatDocument
+    ) -> tuple[tuple[int, str, str, int, int], ...]:
+        """Record selected logical turns in each tokenizer's own token coordinates."""
+        regions: list[tuple[int, str, str, int, int]] = []
+        for ordinal, (turn, span, eot) in enumerate(
+            zip(
+                document.source_turn_indices,
+                document.assistant_spans,
+                document.eot_indices,
+                strict=True,
+            )
+        ):
+            if self.native_thinking_alignment:
+                native_regions = document.alignment_regions[ordinal]
+                char_regions = [
+                    (name, value)
+                    for name in ("reasoning", "close", "answer")
+                    if (value := native_regions.get(name)) is not None
+                    and (
+                        self.kd_alignment_regions is None
+                        or name in self.kd_alignment_regions
+                    )
+                ]
+            else:
+                char_regions = [("content", span)]
+            for name, (start, end) in char_regions:
+                indices = [
+                    index
+                    for index, (left, right) in enumerate(document.offsets)
+                    if start <= left < right <= end and document.assistant_mask[index]
+                ]
+                if indices:
+                    regions.append(
+                        (turn, "assistant", name, indices[0], indices[-1] + 1)
+                    )
+            if eot >= 0 and (
+                self.kd_alignment_regions is None or "eot" in self.kd_alignment_regions
+            ):
+                regions.append((turn, "assistant", "eot", eot, eot + 1))
+        return tuple(regions)
+
+    def _document_kd_mask(self, document: RenderedChatDocument) -> list[int]:
+        """Limit same-tokenizer KD to selected semantic regions without changing CE."""
+        if not self.native_thinking_alignment or self.kd_alignment_regions is None:
+            return list(document.assistant_mask)
+        mask = [0] * len(document.input_ids)
+        for _, _, _, start, end in self._document_token_regions(document):
+            for index in range(start, end):
+                mask[index] = document.assistant_mask[index]
+        return mask

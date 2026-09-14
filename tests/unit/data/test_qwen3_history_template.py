@@ -289,6 +289,7 @@ def test_real_qwen_history_masks_and_kd(
                 "message_log": messages,
                 "message_loss_mask": selected,
                 "loss_multiplier": 1.0,
+                "sample_id": "qwen-history#17",
                 "idx": 17,
             }
         ]
@@ -401,6 +402,7 @@ def test_stock_qwen_dropped_history_fails_with_sample_context(
                     "message_log": conversation(),
                     "message_loss_mask": [0, 0, 0, 1],
                     "loss_multiplier": 1.0,
+                    "sample_id": "qwen-history#71",
                     "idx": 71,
                 }
             ]
@@ -429,7 +431,14 @@ def test_native_collator_rejects_configured_history_truncation(flags):
     )
     with pytest.raises(ValueError, match="student, sample idx=29.*reasoning"):
         _native_collator(tokenizer, None, same_tokenizer=True)(
-            [{"message_log": conversation(), "loss_multiplier": 1.0, "idx": 29}]
+            [
+                {
+                    "message_log": conversation(),
+                    "loss_multiplier": 1.0,
+                    "sample_id": "qwen-history#29",
+                    "idx": 29,
+                }
+            ]
         )
 
 

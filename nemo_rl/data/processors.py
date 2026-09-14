@@ -15,8 +15,8 @@
 """Contains data processors for evaluation."""
 
 import json
-import logging
 from copy import deepcopy
+import logging
 from typing import Any, Dict, cast
 
 import torch
@@ -170,20 +170,31 @@ def sft_processor(
 
     length = sum(len(m["token_ids"]) for m in message_log)
 
-    loss_multiplier = 1.0
-    if length >= max_seq_length:
-        # make smaller and mask out
+    # When the formatted sequence exceeds max_seq_length, drop trailing
+    # tokens rather than the whole sample. Required for arrow_text /
+    # continued-pretraining where every sample is expected to fill
+    # context, and harmless for instruction-tuning pipelines where the
+    # tail is the assistant response — partial supervision is preferable
+    # to silently zeroing the sample.
+    if length > max_seq_length:
+        remaining = max_seq_length
+        truncated_log = []
         for message in message_log:
-            message["token_ids"] = message["token_ids"][
-                : min(4, max_seq_length // len(message_log))
-            ]
-        loss_multiplier = 0.0
+            n = len(message["token_ids"])
+            if n >= remaining:
+                message["token_ids"] = message["token_ids"][:remaining]
+                truncated_log.append(message)
+                break
+            truncated_log.append(message)
+            remaining -= n
+        message_log = truncated_log
+        length = sum(len(m["token_ids"]) for m in message_log)
 
     output: DatumSpec = {
         "message_log": message_log,
         "length": length,
         "extra_env_info": None,
-        "loss_multiplier": loss_multiplier,
+        "loss_multiplier": 1.0,
         "idx": idx,
     }
     return output
@@ -990,12 +1001,21 @@ def kd_data_processor(
     Tokenization is deferred to the collator, so the text is carried forward
     as a single assistant message in ``message_log``.
     """
+    sample_id = datum_dict.get("sample_id")
+    if sample_id is None or not str(sample_id).strip():
+        raise ValueError(
+            "kd_data_processor requires a durable, non-empty sample_id attached "
+            "by the source dataset before filtering, mapping, or splitting; "
+            f"post-processing idx={idx} is not a valid identity fallback."
+        )
+
     output: DatumSpec = {
         # Tool call arguments can contain nested dictionaries and lists. Isolate
         # the complete message payload from downstream preparation and rendering.
         "message_log": deepcopy(datum_dict["messages"]),
         "loss_multiplier": 1.0,
         "idx": idx,
+        "sample_id": sample_id,
         # fake keys (not used for cross-tokenizer distillation)
         "length": 0,
         "extra_env_info": None,

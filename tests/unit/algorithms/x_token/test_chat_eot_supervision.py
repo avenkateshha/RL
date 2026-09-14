@@ -92,7 +92,16 @@ def _batch(
         make_seq_div_by_student=16,
         make_seq_div_by_teachers=[16],
     )
-    return collator([{"message_log": _MESSAGES, "loss_multiplier": 1.0, "idx": 0}])
+    return collator(
+        [
+            {
+                "message_log": _MESSAGES,
+                "loss_multiplier": 1.0,
+                "idx": 0,
+                "sample_id": "loss-eot#0",
+            }
+        ]
+    )
 
 
 def _loss_fn(vocab_size: int) -> CrossTokenizerDistillationLossFn:

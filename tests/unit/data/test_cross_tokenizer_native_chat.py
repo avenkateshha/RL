@@ -19,7 +19,10 @@ from copy import deepcopy
 from typing import Any
 
 import pytest
+import torch
+import torch.nn.functional as F
 
+from nemo_rl.algorithms.x_token.packing_loss import XTokenSequencePackingLossWrapper
 from nemo_rl.algorithms.x_token.token_aligner import TokenAligner
 from nemo_rl.data.cross_tokenizer_collate import (
     CrossTokenizerCollator,
@@ -30,6 +33,12 @@ from nemo_rl.data.native_chat import (
     _render_and_tokenize_chat,
     _render_chat_text,
 )
+from nemo_rl.data.packing.lockstep import (
+    LockstepPackingItem,
+    SidePackingSpec,
+    build_lockstep_packing_plan,
+)
+from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 
 
 class _NativeThinkingTokenizer:
@@ -303,6 +312,7 @@ def test_native_collator_wires_semantic_regions_and_tools() -> None:
     result = collator(
         [
             {
+                "sample_id": f"fixture#{7}",
                 "idx": 7,
                 "message_log": _messages(),
                 "tools": tools,
@@ -360,6 +370,7 @@ def test_native_collator_supervises_corrected_canonical_tool_call_only() -> None
     result = collator(
         [
             {
+                "sample_id": f"fixture#{12}",
                 "idx": 12,
                 "message_log": messages,
                 "tools": tools,
@@ -416,7 +427,16 @@ def test_kd_alignment_regions_filter_to_answer_and_eot() -> None:
         ),
         drop_first_assistant_chunk_kl_by_teacher=[False],
     )
-    result = collator([{"idx": 7, "message_log": _messages(), "loss_multiplier": 1.0}])
+    result = collator(
+        [
+            {
+                "sample_id": f"fixture#{7}",
+                "idx": 7,
+                "message_log": _messages(),
+                "loss_multiplier": 1.0,
+            }
+        ]
+    )
 
     valid = result["alignment_0_pair_valid"][0]
     student_text = _decode_valid_spans(
@@ -450,6 +470,7 @@ def test_native_message_loss_mask_excludes_context_only_turn() -> None:
     result = collator(
         [
             {
+                "sample_id": f"fixture#{8}",
                 "idx": 8,
                 "message_log": messages,
                 "message_loss_mask": [0, 0, 0, 1],
@@ -542,6 +563,7 @@ def test_chat_collator_rejects_overlength_instead_of_left_truncating() -> None:
         collator(
             [
                 {
+                    "sample_id": f"fixture#{99}",
                     "idx": 99,
                     "message_log": _messages(),
                     "loss_multiplier": 1.0,
@@ -683,6 +705,7 @@ def test_native_tool_parts_preserve_ce_and_align_matching_payloads(
     result = collator(
         [
             {
+                "sample_id": f"fixture#{0}",
                 "idx": 0,
                 "message_log": messages,
                 "message_loss_mask": selected,
@@ -763,7 +786,16 @@ def test_native_parts_reject_unexpected_tool_serializer_difference() -> None:
         },
     ]
     with pytest.raises(ValueError, match="different student/teacher text"):
-        collator([{"idx": 0, "message_log": messages, "loss_multiplier": 1.0}])
+        collator(
+            [
+                {
+                    "sample_id": f"fixture#{0}",
+                    "idx": 0,
+                    "message_log": messages,
+                    "loss_multiplier": 1.0,
+                }
+            ]
+        )
 
 
 @pytest.mark.parametrize("select_history", [False, True])
@@ -806,6 +838,7 @@ def test_history_retention_and_supervision_are_independent(select_history, inlin
     result = collator(
         [
             {
+                "sample_id": f"fixture#{7}",
                 "idx": 7,
                 "message_log": messages,
                 "message_loss_mask": selected,
@@ -973,8 +1006,17 @@ def test_same_tokenizer_teacher_context_limit_is_enforced():
         ctx_length_teachers=[8],
         drop_first_assistant_chunk_kl_by_teacher=[False],
     )
-    with pytest.raises(ValueError, match="teacher 0, sample idx=9:.*overlength"):
-        collator([{"idx": 9, "message_log": _messages(), "loss_multiplier": 1.0}])
+    with pytest.raises(ValueError, match="teacher_0 context.*truncation"):
+        collator(
+            [
+                {
+                    "sample_id": f"fixture#{9}",
+                    "idx": 9,
+                    "message_log": _messages(),
+                    "loss_multiplier": 1.0,
+                }
+            ]
+        )
 
 
 class _OrdinaryChatTokenizer(_NativeThinkingTokenizer):
@@ -1037,7 +1079,16 @@ def test_ordinary_canonical_spans_bind_repeated_logical_turns():
         ctx_length_teachers=[512],
         drop_first_assistant_chunk_kl_by_teacher=[False],
     )
-    result = collator([{"idx": 0, "message_log": messages, "loss_multiplier": 1.0}])
+    result = collator(
+        [
+            {
+                "sample_id": f"fixture#{0}",
+                "idx": 0,
+                "message_log": messages,
+                "loss_multiplier": 1.0,
+            }
+        ]
+    )
     aligned = _decode_valid_spans(
         student,
         result["input_ids"][0].tolist(),
@@ -1080,6 +1131,7 @@ def test_ordinary_boundary_whitespace_token_keeps_ce_but_is_not_exact_kd():
     result = collator(
         [
             {
+                "sample_id": f"fixture#{0}",
                 "idx": 0,
                 "message_log": [{"role": "assistant", "content": " Hello"}],
                 "loss_multiplier": 1.0,
@@ -1129,11 +1181,12 @@ def test_ordinary_separate_reasoning_loss_requires_native_alignment(select_histo
     )
     with pytest.raises(
         ValueError,
-        match="student, sample idx=17: turn 1:.*native_thinking_alignment=true",
+        match="student, sample idx=17:.*turn 1:.*native_thinking_alignment=true",
     ):
         collator(
             [
                 {
+                    "sample_id": f"fixture#{17}",
                     "idx": 17,
                     "loss_multiplier": 1.0,
                     "message_loss_mask": [0, int(select_history), 0, 1],
@@ -1168,3 +1221,198 @@ def test_ordinary_inline_reasoning_can_receive_loss():
         [token for token, keep in zip(doc.input_ids, doc.assistant_mask) if keep]
     )
     assert supervised == "reason</think>answer<|im_end|>"
+
+
+@pytest.mark.parametrize("content", ["", None])
+def test_native_tool_conversations_keep_loss_and_gradients_under_lockstep_packing(
+    content,
+):
+    """Native collation remains row-local through unequal-side FFD packing."""
+    special = ("<|im_start|>", "<|im_end|>", "<think>", "</think>")
+    student = _XmlToolTokenizer("nano", special)
+    teacher = _XmlToolTokenizer("qwen", special + ("lookup", "answer"))
+    collator = CrossTokenizerCollator(
+        student_tokenizer=student,
+        teacher_tokenizers=[teacher, student],
+        aligners=[TokenAligner(student, teacher, None), None],
+        ctx_length_student=1024,
+        ctx_length_teachers=[1024, 1024],
+        make_seq_div_by_student=8,
+        make_seq_div_by_teachers=[16, 8],
+        drop_first_assistant_chunk_kl_by_teacher=[False, False],
+        config=CrossTokenizerCollatorConfig(
+            mode="chat",
+            include_thinking_in_loss=True,
+            native_thinking_alignment=True,
+            kd_alignment_regions=["answer", "eot"],
+        ),
+    )
+    messages = [
+        {"role": "user", "content": "check"},
+        {"role": "assistant", "content": "context only"},
+        {"role": "user", "content": "use lookup"},
+        {
+            "role": "assistant",
+            "content": content,
+            "tool_calls": [
+                {"function": {"name": "lookup", "arguments": {"query": "status"}}}
+            ],
+        },
+        {"role": "tool", "content": "private tool response"},
+        {
+            "role": "assistant",
+            "reasoning_content": "think carefully",
+            "content": "final answer",
+        },
+    ]
+    batch = collator(
+        [
+            {
+                "idx": 0,
+                "sample_id": "source#short",
+                "loss_multiplier": 1.0,
+                "message_log": [{"role": "assistant", "content": "ok"}],
+            },
+            {
+                "idx": 1,
+                "sample_id": "source#tools",
+                "loss_multiplier": 1.0,
+                "message_log": messages,
+                "message_loss_mask": [0, 0, 0, 1, 0, 1],
+            },
+        ]
+    )
+    assert {region[0] for region in batch["student_semantic_regions"][1]} == {3, 5}
+    assert {region[2] for region in batch["student_semantic_regions"][1]} == {
+        "answer",
+        "eot",
+    }
+    assert batch["teacher_1_semantic_regions"] == batch["student_semantic_regions"]
+    ce_text = student.decode(
+        batch["input_ids"][1][batch["token_mask"][1].bool()].tolist()
+    )
+    kd_text = student.decode(
+        batch["input_ids"][1][batch["kd_token_mask"][1].bool()].tolist()
+    )
+    assert "lookup" in kd_text and "status" in kd_text and "final answer" in kd_text
+    assert "private tool response" not in ce_text and "context only" not in ce_text
+    assert "think carefully" in ce_text and "think carefully" not in kd_text
+
+    sides = []
+    for side_id, key, divisor in (
+        ("student", "input_lengths", 8),
+        ("teacher_0", "teacher_0_input_lengths", 16),
+    ):
+        raw = tuple(batch[key].tolist())
+        effective = tuple((n + divisor - 1) // divisor * divisor for n in raw)
+        sides.append(
+            SidePackingSpec(
+                side_id=side_id,
+                capacity=1024,
+                raw_lengths=raw,
+                effective_lengths=effective,
+            )
+        )
+    plan = build_lockstep_packing_plan(
+        batch_uid=7,
+        items=[
+            LockstepPackingItem(sample_id=value, batch_item_id=i)
+            for i, value in enumerate(batch["sample_id"])
+        ],
+        sides=sides,
+        data_parallel_size=1,
+    )
+    assert plan.bins == ((1, 0),)
+    for side in plan.sides.values():
+        raw = side.raw_cu_seqlens_by_bin[0]
+        assert raw == (0, side.raw_lengths[1], sum(side.raw_lengths))
+    assert plan.sides["student"].raw_lengths != plan.sides["teacher_0"].raw_lengths
+    order = list(plan.bins[0])
+    data = BatchedDataDict(
+        {
+            key: value[order] if torch.is_tensor(value) else [value[i] for i in order]
+            for key, value in batch.items()
+        }
+    )
+    geometry = plan.sides["student"]
+    padded = geometry.padded_cu_seqlens_by_bin[0]
+    widths = [b - a for a, b in zip(padded[:-1], padded[1:])]
+    generator = torch.Generator().manual_seed(31)
+    logits = [
+        torch.randn(
+            1, width, 256, generator=generator, dtype=torch.float64, requires_grad=True
+        )
+        for width in widths
+    ]
+    packed_logits = torch.cat(
+        [value.detach() for value in logits], dim=1
+    ).requires_grad_()
+
+    class AlignedLoss:
+        def __call__(self, *, logical_logits, data, **_kwargs):
+            # Exercise both shifted CE targets and real cross-tokenizer chunk IDs.
+            mask = data["token_mask"][0, 1 : logical_logits.shape[1]].bool()
+            ce = F.cross_entropy(
+                logical_logits[0, :-1],
+                data["input_ids"][0, 1 : logical_logits.shape[1]],
+                reduction="none",
+            )[mask].sum()
+            student_chunks = data["alignment_0_student_chunk_id"][
+                0, 1 : logical_logits.shape[1]
+            ]
+            teacher_chunks = data["alignment_0_teacher_chunk_id"][0, 1:]
+            student_probs = logical_logits[0, :-1].softmax(-1)
+            teacher_ids = data["teacher_0_input_ids"][0, 1:].to(torch.float64)
+            teacher_probs = (
+                (
+                    teacher_ids[:, None]
+                    * torch.arange(256, dtype=torch.float64)[None, :]
+                    / 4096
+                )
+                .sin()
+                .softmax(-1)
+            )
+            kd = ce.new_zeros(())
+            for chunk in torch.nonzero(data["alignment_0_pair_valid"][0]).flatten():
+                s_positions, t_positions = (
+                    student_chunks == chunk,
+                    teacher_chunks == chunk,
+                )
+                if s_positions.any() and t_positions.any():
+                    s = student_probs[s_positions].mean(0)
+                    t = teacher_probs[t_positions].mean(0)
+                    kd = kd + F.kl_div(s.log(), t, reduction="sum")
+            return ce + kd, {"ce": ce.detach(), "kd": kd.detach()}
+
+    def prepare_fn(*, logits, data, **_kwargs):
+        return {"logical_logits": logits}, data
+
+    wrapper = XTokenSequencePackingLossWrapper(
+        loss_fn=AlignedLoss(),
+        prepare_fn=prepare_fn,
+        cu_seqlens_q=torch.tensor(geometry.raw_cu_seqlens_by_bin[0], dtype=torch.int32),
+        cu_seqlens_q_padded=torch.tensor(padded, dtype=torch.int32),
+    )
+    packed_loss, packed_metrics = wrapper(packed_logits, data, None, None)
+    unpacked_losses, unpacked_metrics = [], []
+    for i, row_logits in enumerate(logits):
+        loss, metrics = AlignedLoss()(
+            logical_logits=row_logits, data=data.slice(i, i + 1)
+        )
+        unpacked_losses.append(loss)
+        unpacked_metrics.append(metrics)
+    unpacked_loss = sum(unpacked_losses)
+    packed_loss.backward()
+    unpacked_loss.backward()
+    torch.testing.assert_close(packed_loss, unpacked_loss)
+    for name in ("ce", "kd"):
+        torch.testing.assert_close(
+            torch.tensor(packed_metrics[name], dtype=torch.float64),
+            sum(metrics[name] for metrics in unpacked_metrics),
+        )
+    torch.testing.assert_close(
+        packed_logits.grad, torch.cat([value.grad for value in logits], dim=1)
+    )
+    for row, (start, width) in enumerate(zip(padded[:-1], widths)):
+        raw_length = int(data["input_lengths"][row])
+        assert not packed_logits.grad[:, start + raw_length - 1 : start + width].any()
