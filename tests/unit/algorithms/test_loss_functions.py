@@ -2455,11 +2455,11 @@ def test_distillation_loss_num_valid_samples_respects_sample_mask():
         "teacher_topk_indices": torch.empty(0, dtype=torch.long),
     }
     loss_fn = DistillationLossFn(
-        {
-            "kl_type": "forward",
-            "mixed_kl_weight": 0.5,
-            "zero_outside_topk": False,
-        }
+        DistillationLossConfig(
+            kl_type="forward",
+            mixed_kl_weight=0.5,
+            zero_outside_topk=False,
+        )
     )
 
     _, metrics = loss_fn(

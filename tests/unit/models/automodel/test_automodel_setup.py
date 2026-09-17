@@ -690,7 +690,7 @@ class TestValidateAndPrepareConfig:
     @patch("nemo_rl.models.automodel.setup.AutoConfig")
     @patch("nemo_rl.models.automodel.setup.resolve_model_class")
     @patch("nemo_rl.models.automodel.setup.configure_dynamo_cache")
-    def test_load_precision_passed_to_autoconfig_from_pretrained(
+    def test_autoconfig_uses_compute_precision_independently_of_load_precision(
         self,
         mock_dynamo,
         mock_resolve_class,
@@ -698,12 +698,13 @@ class TestValidateAndPrepareConfig:
         mock_config,
         mock_autoconfig,
     ):
-        """model_load_dtype is forwarded to AutoConfig.from_pretrained as torch_dtype."""
+        """Config inspection uses compute precision; loading retains its own dtype."""
         mock_autoconfig_class.from_pretrained.return_value = mock_autoconfig
         mock_resolve_class.return_value = Mock
+        mock_config["precision"] = "float16"
         mock_config["dtensor_cfg"]["load_precision"] = "bfloat16"
 
-        validate_and_prepare_config(
+        result = validate_and_prepare_config(
             config=mock_config,
             processor=None,
             rank=0,
@@ -711,7 +712,9 @@ class TestValidateAndPrepareConfig:
         )
         assert mock_autoconfig_class.from_pretrained.called
         kwargs = mock_autoconfig_class.from_pretrained.call_args.kwargs
-        assert kwargs["torch_dtype"] == torch.bfloat16
+        assert kwargs["torch_dtype"] == torch.float16
+        assert result.dtype == torch.float16
+        assert result.model_load_dtype == torch.bfloat16
 
 
 @pytest.mark.automodel
