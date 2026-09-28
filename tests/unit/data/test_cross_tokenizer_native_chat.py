@@ -16,12 +16,16 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 import torch
 import torch.nn.functional as F
 
+from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLossFn
+from nemo_rl.algorithms.loss.loss_input import prepare_loss_input
 from nemo_rl.algorithms.x_token.packing_loss import XTokenSequencePackingLossWrapper
 from nemo_rl.algorithms.x_token.token_aligner import TokenAligner
 from nemo_rl.data.cross_tokenizer_collate import (
@@ -1416,3 +1420,137 @@ def test_native_tool_conversations_keep_loss_and_gradients_under_lockstep_packin
     for row, (start, width) in enumerate(zip(padded[:-1], widths)):
         raw_length = int(data["input_lengths"][row])
         assert not packed_logits.grad[:, start + raw_length - 1 : start + width].any()
+
+
+@pytest.mark.parametrize("content", ["", None])
+def test_native_tool_calls_reach_v6_through_production_loss_adapter(
+    tmp_path: Path, content: str | None
+) -> None:
+    special = ("<|im_start|>", "<|im_end|>", "<think>", "</think>")
+    student = _XmlToolTokenizer("nano", special)
+    teacher = _XmlToolTokenizer("qwen", special)
+    collator = CrossTokenizerCollator(
+        student_tokenizer=student,
+        teacher_tokenizers=[teacher],
+        aligners=[TokenAligner(student, teacher, None)],
+        ctx_length_student=1024,
+        ctx_length_teachers=[1024],
+        make_seq_div_by_student=8,
+        make_seq_div_by_teachers=[8],
+        drop_first_assistant_chunk_kl_by_teacher=[False],
+        config=CrossTokenizerCollatorConfig(
+            mode="chat", include_thinking_in_loss=True, native_thinking_alignment=True
+        ),
+    )
+    batch = collator(
+        [
+            {
+                "sample_id": "native-tool-v6#0",
+                "idx": 0,
+                "loss_multiplier": 1.0,
+                "message_log": [
+                    {"role": "user", "content": "check"},
+                    {
+                        "role": "assistant",
+                        "content": content,
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "lookup",
+                                    "arguments": {"query": "status"},
+                                }
+                            }
+                        ],
+                    },
+                    {"role": "tool", "content": "private result"},
+                    {"role": "assistant", "content": "final answer"},
+                ],
+            }
+        ]
+    )
+    assert "alignment_0_num_chunks" not in batch
+    assert {region[0] for region in batch["student_semantic_regions"][0]} == {1, 3}
+    supervised = student.decode(
+        batch["input_ids"][0, batch["token_mask"][0].bool()].tolist()
+    )
+    assert (
+        "lookup" in supervised
+        and "status" in supervised
+        and "final answer" in supervised
+    )
+    assert "private result" not in supervised and "check" not in supervised
+    assert batch["input_lengths"].item() != batch["teacher_0_input_lengths"].item()
+
+    # Both stand-ins tokenize the same vocabulary pieces, but native template
+    # differences produce distinct sequence positions and vocabulary ID orders.
+    student_vocab_size = max(student._id_to_piece) + 1
+    teacher_vocab_size = max(teacher._id_to_piece) + 1
+    projection = torch.zeros((student_vocab_size, 1), dtype=torch.long)
+    for index, piece in student._id_to_piece.items():
+        projection[index, 0] = teacher._piece_to_id[piece]
+    projection_path = tmp_path / "native_tool_projection.pt"
+    torch.save(
+        {
+            "indices": projection,
+            "likelihoods": torch.ones_like(projection, dtype=torch.float32),
+        },
+        projection_path,
+    )
+    loss_fn = CrossTokenizerDistillationLossFn(
+        {
+            "temperature": 1.0,
+            "vocab_topk": teacher_vocab_size,
+            "reverse_kl": False,
+            "kl_loss_weight": 1.0,
+            "ce_loss_scale": 1.0,
+            "dynamic_loss_scaling": False,
+            "student_vocab_size": student_vocab_size,
+            "kd_loss_mode": "sum",
+            "normalize_teacher_by_vocab": False,
+            "alpha": 1.0,
+            "projection_matrix_paths": [str(projection_path)],
+            "teacher_vocab_sizes": [teacher_vocab_size],
+            "teacher_weights": [1.0],
+            "common_indices_from_subtoks": False,
+            "kl_chunk_shift": True,
+            "prefix_bidir_v3_loss_fn": "kl",
+            "teacher_topk_ipc_k": 0,
+        }
+    )
+    student_logits = torch.zeros(
+        (*batch["input_ids"].shape, student_vocab_size), requires_grad=True
+    )
+    teacher_logits = torch.zeros(
+        (*batch["teacher_0_input_ids"].shape, teacher_vocab_size)
+    )
+    teacher_logits[..., teacher._piece_to_id["s"]] = 2.0
+    batch["teacher_0_full_logits_ipc"] = [{}]
+    with (
+        patch("torch.cuda.current_device", return_value=0),
+        patch(
+            "nemo_rl.algorithms.x_token.loss_utils.rebuild_teacher_full_logits_from_ipc",
+            return_value=(teacher_logits, 0),
+        ),
+    ):
+        prepared, _ = prepare_loss_input(student_logits, batch, loss_fn)
+    localized = prepared["aligns_by_idx"][0]
+    pair_count = int(batch["alignment_0_pair_valid"].sum())
+    assert localized.num_chunks.tolist() == [pair_count]
+    loss, metrics = loss_fn._compute_prefix_bidir_partition_kl_v3(
+        0,
+        prepared["student_logits_contig"],
+        prepared["teacher_full_logits_by_idx"][0],
+        localized,
+        teacher_vocab_size=teacher_vocab_size,
+        global_valid_chunks=batch["alignment_0_pair_valid"].sum(),
+    )
+    assert torch.isfinite(loss) and loss.item() > 0
+    assert metrics["num_common_chunks"] == pair_count
+    assert metrics["num_mismatch_chunks"] == 0
+    loss.backward()
+    assert student_logits.grad is not None
+    expected_predictors = torch.zeros_like(batch["token_mask"], dtype=torch.bool)
+    expected_predictors[:, :-1] = batch["alignment_0_student_chunk_id"][:, 1:] >= 0
+    torch.testing.assert_close(
+        student_logits.grad.abs().sum(-1) > 0, expected_predictors
+    )

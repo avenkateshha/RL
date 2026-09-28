@@ -1650,9 +1650,17 @@ def prepare_xtoken_cross_tokenizer_loss_input(
             )
         align.student_spans = _chunk_ids_to_spans(student_chunk_id_global, max_pairs)
         align.teacher_spans = _chunk_ids_to_spans(teacher_chunk_id_global, max_pairs)
-        # Preserve the aligner's real per-sample chunk count rather than
-        # iterating every padded pair slot; pair_valid remains the final gate.
-        align.num_chunks = to_local_if_dtensor(data[f"{alignment_prefix}num_chunks"])
+        # AlignmentBatch carries chunk IDs rather than a separate row length.
+        # Use the global ID extent on both sides: counting valid pairs would
+        # drop later chunks after an invalid slot, and a CP-local maximum would
+        # miss chunks owned by another rank. The pair mask remains the gate.
+        align.num_chunks = (
+            torch.maximum(
+                student_chunk_id_global.amax(dim=1),
+                teacher_chunk_id_global.amax(dim=1),
+            )
+            + 1
+        ).clamp(min=0, max=max_pairs)
         # Teacher input ids for this CP rank's contiguous teacher window (matches
         # the teacher-logit / teacher_chunk_id slice).
         teacher_ids_full = to_local_if_dtensor(data[f"teacher_{i}_input_ids"])

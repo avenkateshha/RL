@@ -1029,6 +1029,7 @@ class TestSetupModelAndOptimizer:
         tokenizer.pad_token_id = 0
         return tokenizer
 
+    @pytest.mark.parametrize("explicit_load_precision", [None, "float32"])
     @pytest.mark.parametrize(
         "use_te, optimizer_kwargs, expected_dtype",
         [
@@ -1071,6 +1072,7 @@ class TestSetupModelAndOptimizer:
         use_te,
         optimizer_kwargs,
         expected_dtype,
+        explicit_load_precision,
     ):
         """Test model setup and the load dtype selected for optimizer precision."""
         mock_get_rank.return_value = 0
@@ -1089,6 +1091,9 @@ class TestSetupModelAndOptimizer:
         mock_get_class.return_value = MagicMock(return_value=mock_optimizer)
 
         mock_config["optimizer"]["kwargs"] = optimizer_kwargs
+        if explicit_load_precision is not None:
+            mock_config["dtensor_cfg"]["load_precision"] = explicit_load_precision
+            expected_dtype = torch.float32
         if use_te:
             mock_config["optimizer"]["name"] = (
                 "transformer_engine.pytorch.optimizers.FusedAdam"
@@ -1388,6 +1393,7 @@ class TestSetupModelAndOptimizer:
         assert call_kwargs["max_position_embeddings"] == 4096
         assert "config" not in call_kwargs
 
+    @pytest.mark.parametrize("load_precision", [None, "float32", "bfloat16", "float16"])
     @patch("nemo_rl.models.automodel.setup.torch.distributed.get_rank")
     @patch("nemo_rl.models.automodel.setup.get_class")
     def test_setup_model_and_optimizer_no_optimizer(
@@ -1399,6 +1405,7 @@ class TestSetupModelAndOptimizer:
         mock_distributed_context,
         mock_checkpoint_manager,
         mock_tokenizer,
+        load_precision,
     ):
         """Test model setup without optimizer initialization."""
         mock_get_rank.return_value = 0
@@ -1409,6 +1416,14 @@ class TestSetupModelAndOptimizer:
         mock_model.config.pad_token_id = 0
         mock_runtime_config.model_class.from_pretrained.return_value = mock_model
         mock_runtime_config.model_config.architectures = ["GPT2LMHeadModel"]
+
+        expected_dtype = mock_runtime_config.dtype
+        if load_precision is not None:
+            mock_config["dtensor_cfg"]["load_precision"] = load_precision
+            expected_dtype = getattr(torch, load_precision)
+            mock_runtime_config = mock_runtime_config._replace(
+                model_load_dtype=expected_dtype
+            )
 
         result = setup_model_and_optimizer(
             config=mock_config,
@@ -1422,7 +1437,7 @@ class TestSetupModelAndOptimizer:
         assert result.optimizer is None
         assert result.scheduler is None
         call_kwargs = mock_runtime_config.model_class.from_pretrained.call_args[1]
-        assert call_kwargs["torch_dtype"] == mock_runtime_config.dtype
+        assert call_kwargs["torch_dtype"] == expected_dtype
 
     @patch("nemo_rl.models.automodel.setup.torch.optim.lr_scheduler.LambdaLR")
     @patch("nemo_rl.models.automodel.setup.torch.distributed.get_rank")

@@ -591,7 +591,6 @@ class TestCollatorChatMode:
         out = collator(
             [
                 {
-                    "sample_id": f"fixture#{0}",
                     "loss_multiplier": 1.0,
                     "idx": 0,
                     "sample_id": "chat#same-tokenizer",
@@ -628,7 +627,6 @@ class TestCollatorChatMode:
             drop_first_assistant_chunk_kl_by_teacher=[False, False, True],
         )
         datum = {
-            "sample_id": f"fixture#{0}",
             "loss_multiplier": 1.0,
             "idx": 0,
             "sample_id": "chat#teacher-index",

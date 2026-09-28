@@ -94,9 +94,10 @@ teachers:
       eps: 1.0e-08
       foreach: false
       fused: false
+collator:
+  mode: chat
 data:
   max_input_seq_length: 4096
-  collator_mode: chat
   train:
     dataset_name: openai_format
     data_path: ${oc.env:XTOKEN_ROUTED_ROLLOUTS}

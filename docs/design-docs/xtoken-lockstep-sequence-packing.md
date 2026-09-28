@@ -1,10 +1,17 @@
 # Lockstep Sequence Packing for xToken Distillation
 
-Status: Proposed
+Status: Design reference; implementation integrated with PR #3286
 
 Target: xToken v6 loss and sequence-packing implementation
 
-Last updated: 2026-08-13
+Last updated: 2026-09-28
+
+This document records the original packing design and its acceptance criteria.
+Descriptions of pre-implementation gaps below refer to that original baseline.
+The rebased implementation preserves lockstep packing and includes PR #3286's
+native chat alignment. CPU regressions cover structured assistant tool requests
+with empty or null content, packed boundaries, and loss/gradient preservation;
+full GPU training qualification remains separate.
 
 ## Decision
 
@@ -74,7 +81,7 @@ keeps backend-specific tensor transformations behind `Policy`.
 - This proposal does not infer sentence boundaries inside a text field.
 - This proposal does not split oversized Arrow rows. Oversized rows require a
   separate document-chunking policy before xToken tokenization and alignment.
-- It does not make `data.num_packed_rows` greater than one. That collator option
+- It does not make `collator.num_packed_rows` greater than one. That collator option
   is a separate data-format feature and remains `1`.
 - It does not make dynamic batching compatible with sequence packing.
 - It does not introduce a fused xToken loss. The existing packed fused-loss path
@@ -116,8 +123,9 @@ preserves the constituent row boundaries. Accurate row-aware sequence packing
 therefore requires:
 
 ```yaml
-data:
+collator:
   num_packed_rows: 1
+data:
   train:
     characters_per_sample: null
 ```
@@ -201,41 +209,31 @@ logical-sample coordinates, pack all associated fields by `batch_item_id`, and
 restore the logical conversation before next-token shifting and the xToken
 loss. No packed-bin-global span or chunk-ID rebasing is required.
 
-The current xToken chat collator builds the student CE mask from raw assistant
-content only, while the ordinary SFT path masks the rendered assistant message
-chunk. Before claiming SFT parity, make this policy explicit and compare against
-the intended unpacked baseline. The recommended representation keeps two
-independent products: a template-derived student SFT mask for CE, and
-template-free semantic regions for cross-tokenizer KD. Model-specific role
-headers need not be cross-token aligned merely because the student trains them;
-semantically paired stop/EOT targets can be aligned explicitly.
+The rebased chat collator uses PR #3286's explicit assistant-content and EOT
+supervision policy for CE. Cross-tokenizer KD uses semantic alignment regions;
+model-specific role headers and tool-response context are not KD targets.
+With native alignment enabled, `collator.kd_alignment_regions` can select the
+semantic regions used for KD independently of the CE policy.
 
-The current chat collator tokenizes with `truncation=True`. The packed path must
-instead obtain exact untruncated post-template lengths for every side and fail
-or invoke an explicit upstream conversation-splitting policy when one side
-overflows. Tool-aware templates also require each sample's `tools` metadata to
-be preserved and passed to every side's `apply_chat_template`; the current
-xToken chat collator does not yet do that. Native-thinking region alignment is
-likewise a guarded follow-up rather than an implicit consequence of packing.
+The collator obtains exact untruncated post-template lengths for every side,
+including backend-required rounding, and rejects a sample that exceeds any
+side's capacity. The complete conversation remains one logical sample.
 
-Tool support is staged but must fail closed:
+Tool support preserves the following contracts:
 
-1. Extend `DatumSpec` with optional `tools` and preserve a defensive copy in
-   `kd_data_processor`, together with the structured messages and stable sample
-   identity.
-2. Pass the same canonical per-row tool schema to the student and every teacher
-   `apply_chat_template` call. Each side still uses its own configured template
-   and template arguments. Tool-schema/scaffold tokens count toward that side's
-   exact capacity and remain attention context, but are not automatically KD
-   targets.
-3. Preserve message-level `tool_calls` and `tool` responses. Introduce semantic
-   target regions for assistant text, tool name, tool arguments, and EOT, then
-   map each region into every side's rendered token coordinates before xToken
-   alignment.
-4. Until step 3 is implemented and tested, reject assistant turns whose target
-   exists only in `tool_calls` (for example `content=None`) instead of silently
-   producing no CE/KD target. Supplying `tools` only as prompt context remains a
-   valid earlier milestone.
+1. `kd_data_processor` defensively copies structured messages and optional
+   `tools`, while preserving the stable source identity and message loss mask.
+2. Student and teacher templates receive the same per-row tool schema. Each
+   side uses its own template and arguments. Tool-schema/scaffold tokens count
+   toward that side's exact capacity and remain attention context.
+3. With `collator.mode=chat` and `collator.native_thinking_alignment=true`,
+   supported native layouts locate serialized assistant tool requests as answer
+   regions, including turns with `content=""` or `content=None`. Selected turns
+   retain their original message indices across tokenizers and packing.
+4. External `role=tool` responses remain context. Their differing token lengths
+   contribute to each side's offsets and capacity; they are not CE/KD targets.
+   Unsupported native layouts fail during rendering rather than silently
+   dropping assistant tool-request targets.
 
 ### Identity
 
@@ -710,7 +708,7 @@ batch dimension.
 ## Configuration and Setup Guards
 
 The final feature reuses the existing per-policy `sequence_packing` blocks. No
-new `data.num_packed_rows` interpretation is introduced.
+new `collator.num_packed_rows` interpretation is introduced.
 
 When xToken packing is enabled:
 
@@ -718,7 +716,7 @@ When xToken packing is enabled:
    disabled policies are rejected.
 2. Dynamic batching must be disabled for every side.
 3. `characters_per_sample` must be null for the row-as-sample dataset contract.
-4. `data.num_packed_rows` must remain `1`.
+4. `collator.num_packed_rows` must remain `1`.
 5. Exact, pre-truncation token lengths must be available for every side.
 6. Every single logical sample must fit every side's individual context and
    packed capacity.
@@ -934,7 +932,7 @@ pass, run two sequential Slurm smokes with the same production-size model pair:
   train/export budgets unless measured memory requires a smaller explicitly
   documented common budget;
 - dynamic batching disabled;
-- `characters_per_sample=null` and `data.num_packed_rows=1`;
+- `characters_per_sample=null` and `collator.num_packed_rows=1`;
 - static v6 teacher aggregation and logical MBS=1 unless a later phase has
   separately qualified broader loss modes.
 
@@ -1025,9 +1023,9 @@ considering more complex routing.
 
 ### Long rows can be hidden by tokenizer truncation
 
-The current collator uses `truncation=True`. Compute exact lengths before the
-packing decision and fail or invoke an explicit upstream chunking policy. Do not
-silently accept independently truncated tails.
+Compute exact lengths before the packing decision and fail or invoke an
+explicit upstream chunking policy. The implementation rejects overflow; it must
+not silently accept independently truncated tails.
 
 ### Nonlinear loss modes can change semantics
 

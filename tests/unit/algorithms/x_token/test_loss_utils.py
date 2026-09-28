@@ -77,17 +77,16 @@ def test_automodel_cp_layout_localizes_xtoken_windows_after_global_shift():
         "sample_mask": torch.ones(1),
         "teacher_0_full_logits_ipc": teacher_ipc,
         "teacher_0_input_ids": torch.arange(20, 24).unsqueeze(0),
-        "alignment_0_student_chunk_id": torch.tensor([[0, 0, 0, 1, 1, 1]]),
-        "alignment_0_teacher_chunk_id": torch.tensor([[0, 0, 1, 1]]),
-        "alignment_0_pair_valid": torch.ones(1, 2, dtype=torch.bool),
-        "alignment_0_pair_is_correct": torch.ones(1, 2, dtype=torch.bool),
-        "alignment_0_num_chunks": torch.tensor([2]),
+        "alignment_0_student_chunk_id": torch.tensor([[0, 0, 0, -1, 2, 2]]),
+        "alignment_0_teacher_chunk_id": torch.tensor([[0, -1, -1, 2]]),
+        "alignment_0_pair_valid": torch.tensor([[True, False, True]]),
+        "alignment_0_pair_is_correct": torch.tensor([[True, False, True]]),
     }
 
     with (
         patch("torch.cuda.current_device", return_value=0),
         patch("torch.distributed.get_world_size", return_value=2),
-        patch("torch.distributed.get_rank", return_value=1),
+        patch("torch.distributed.get_rank", return_value=0),
         patch(
             "nemo_rl.algorithms.x_token.loss_utils."
             "rebuild_teacher_full_logits_from_ipc",
@@ -111,23 +110,26 @@ def test_automodel_cp_layout_localizes_xtoken_windows_after_global_shift():
             cp_sharder=cp_sharder,
         )
 
-    torch.testing.assert_close(student_logits, full_student_logits[:, 3:6])
+    torch.testing.assert_close(student_logits, full_student_logits[:, :3])
     assert teachers[0] is teacher_logits
     assert sparse_teachers == {}
     assert dense_reconstruction_fallbacks == {0: 0}
     assert tp_group is None
     assert returned_cp_group is cp_group
     assert dp_cp_group is None
-    torch.testing.assert_close(aligns[0].student_input_ids, data["input_ids"][:, 3:6])
-    torch.testing.assert_close(aligns[0].student_token_mask, data["token_mask"][:, 3:6])
-    torch.testing.assert_close(aligns[0].student_chunk_id, torch.tensor([[1, 1, -1]]))
-    torch.testing.assert_close(aligns[0].teacher_chunk_id, torch.tensor([[1, -1]]))
+    torch.testing.assert_close(aligns[0].student_input_ids, data["input_ids"][:, :3])
+    torch.testing.assert_close(aligns[0].student_token_mask, data["token_mask"][:, :3])
+    torch.testing.assert_close(aligns[0].student_chunk_id, torch.tensor([[0, 0, -1]]))
+    torch.testing.assert_close(aligns[0].teacher_chunk_id, torch.tensor([[-1, -1]]))
     torch.testing.assert_close(
-        aligns[0].student_spans, torch.tensor([[[0, 3], [3, 6]]])
+        aligns[0].student_spans, torch.tensor([[[0, 3], [0, 0], [4, 6]]])
     )
     torch.testing.assert_close(
-        aligns[0].teacher_spans, torch.tensor([[[0, 2], [2, 4]]])
+        aligns[0].teacher_spans, torch.tensor([[[0, 1], [0, 0], [3, 4]]])
     )
+    # The invalid middle pair and the final chunk on the other CP rank must
+    # neither shrink nor renumber this row's chunk extent.
+    torch.testing.assert_close(aligns[0].num_chunks, torch.tensor([3]))
     cp_sharder.gather_token_tensor.assert_called_once_with(
         local_logits, seq_dim=1, trim=True
     )

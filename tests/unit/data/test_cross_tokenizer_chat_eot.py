@@ -141,7 +141,7 @@ def test_same_tokenizer_mask_respects_truncation(length: int, expected_count: in
     assert sum(mask) == expected_count
 
 
-@pytest.mark.parametrize("student_length,teacher_length", [(5, 6), (6, 5)])
+@pytest.mark.parametrize("student_length,teacher_length", [(5, 8), (8, 5)])
 def test_one_sided_overflow_is_rejected(student_length: int, teacher_length: int):
     student = _tokenizer(suffix="<eot>")
     teacher = _tokenizer(suffix="\n<eot>", teacher=True)

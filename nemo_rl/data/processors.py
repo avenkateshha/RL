@@ -16,6 +16,7 @@
 
 import json
 import logging
+from copy import deepcopy
 from typing import Any, Dict, cast
 
 import torch

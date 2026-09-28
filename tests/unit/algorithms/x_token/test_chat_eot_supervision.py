@@ -15,6 +15,7 @@
 
 from dataclasses import fields
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -24,6 +25,7 @@ from tokenizers.pre_tokenizers import WhitespaceSplit
 from transformers import PreTrainedTokenizerFast
 
 from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLossFn
+from nemo_rl.algorithms.loss.loss_input import prepare_loss_input
 from nemo_rl.algorithms.x_token.loss_utils import LocalizedAlignment
 from nemo_rl.algorithms.x_token.token_aligner import TokenAligner
 from nemo_rl.data.cross_tokenizer_collate import (
@@ -31,7 +33,6 @@ from nemo_rl.data.cross_tokenizer_collate import (
     CrossTokenizerCollatorConfig,
 )
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
-from nemo_rl.distributed.model_utils import cp_shift_next
 
 _MESSAGES = [
     {"role": "user", "content": "prompt"},
@@ -182,15 +183,23 @@ def test_chat_loss_supervises_eot_predictor_only(
         assert torch.count_nonzero(logits.grad[0, 4:]) == 0
 
 
+@pytest.mark.parametrize(
+    ("loss_kind", "reverse_kl"), [("kl", False), ("kl", True), ("jsd", False)]
+)
 def test_eot_supervision_mask_does_not_change_cross_tokenizer_kd(
-    tmp_path: Path,
+    tmp_path: Path, loss_kind: str, reverse_kl: bool
 ) -> None:
     student, teacher = _tokenizer(), _tokenizer(reverse_vocab=True)
     projection_path = tmp_path / "projection.pt"
     torch.save(
         {
-            (s_id, teacher.convert_tokens_to_ids(word)): 1.0
-            for word, s_id in student.get_vocab().items()
+            "indices": torch.tensor(
+                [
+                    [teacher.convert_tokens_to_ids(student.convert_ids_to_tokens(s_id))]
+                    for s_id in range(len(student))
+                ]
+            ),
+            "likelihoods": torch.ones((len(student), 1)),
         },
         projection_path,
     )
@@ -217,7 +226,27 @@ def test_eot_supervision_mask_does_not_change_cross_tokenizer_kd(
     student_logits = torch.zeros((1, 16, len(student)), requires_grad=True)
     teacher_logits = torch.zeros((1, 16, len(teacher)))
     teacher_logits[..., teacher.eos_token_id] = 2.0
-    loss_fn = _loss_fn(len(student))
+    loss_fn = CrossTokenizerDistillationLossFn(
+        {
+            "temperature": 1.0,
+            "vocab_topk": len(teacher),
+            "reverse_kl": reverse_kl,
+            "kl_loss_weight": 1.0,
+            "ce_loss_scale": 1.0,
+            "dynamic_loss_scaling": False,
+            "student_vocab_size": len(student),
+            "kd_loss_mode": "sum",
+            "normalize_teacher_by_vocab": False,
+            "alpha": 1.0,
+            "projection_matrix_paths": [str(projection_path)],
+            "teacher_vocab_sizes": [len(teacher)],
+            "teacher_weights": [1.0],
+            "common_indices_from_subtoks": False,
+            "kl_chunk_shift": True,
+            "prefix_bidir_v3_loss_fn": loss_kind,
+            "teacher_topk_ipc_k": 0,
+        }
+    )
     alignments, losses, gradients = [], [], []
     for supervise_eot in (False, True):
         student_mask = batch["token_mask"].clone()
@@ -238,25 +267,41 @@ def test_eot_supervision_mask_does_not_change_cross_tokenizer_kd(
             student_eot_indices=[[5, 11]],
             teacher_eot_indices=[[5, 11]],
         )
-        localized = LocalizedAlignment(
-            sample_mask=batch["sample_mask"],
-            student_chunk_id=cp_shift_next(alignment.student_chunk_id, None, fill=-1),
-            teacher_chunk_id=cp_shift_next(alignment.teacher_chunk_id, None, fill=-1),
-            pair_valid=alignment.pair_valid,
-            pair_is_correct=alignment.pair_is_correct,
-            student_input_ids=batch["input_ids"],
-            student_token_mask=student_mask,
+        loss_data = BatchedDataDict(
+            {
+                **batch,
+                "token_mask": student_mask,
+                "teacher_0_token_mask": teacher_mask,
+                "teacher_0_full_logits_ipc": [{}],
+                **{
+                    f"alignment_0_{field.name}": getattr(alignment, field.name)
+                    for field in fields(alignment)
+                },
+            }
         )
-        loss, valid_pairs, _ = loss_fn._compute_p_kl(
-            student_logits,
-            teacher_logits,
+        # Exercise the real collator-to-loss adapter with only CUDA transport
+        # replaced. No retired alignment_num_chunks side-channel is injected.
+        with (
+            patch("torch.cuda.current_device", return_value=0),
+            patch(
+                "nemo_rl.algorithms.x_token.loss_utils.rebuild_teacher_full_logits_from_ipc",
+                return_value=(teacher_logits, 0),
+            ),
+        ):
+            prepared, _ = prepare_loss_input(student_logits, loss_data, loss_fn)
+        localized = prepared["aligns_by_idx"][0]
+        torch.testing.assert_close(localized.num_chunks, torch.tensor([4]))
+        loss, metrics = loss_fn._compute_prefix_bidir_partition_kl_v3(
+            0,
+            prepared["student_logits_contig"],
+            prepared["teacher_full_logits_by_idx"][0],
             localized,
-            projection_matrix_path=str(projection_path),
             teacher_vocab_size=len(teacher),
-            tp_group=None,
-            cp_group=None,
+            global_valid_chunks=alignment.pair_valid.sum(),
         )
-        assert valid_pairs.item() == 4  # Two content pairs and two EOT pairs.
+        assert metrics["num_common_chunks"] == 4  # Two content and two EOT pairs.
+        assert metrics["num_mismatch_chunks"] == 0
+        assert loss.item() > 0
         alignments.append(alignment)
         losses.append(loss.detach())
         gradients.append(torch.autograd.grad(loss, student_logits)[0])
@@ -269,5 +314,11 @@ def test_eot_supervision_mask_does_not_change_cross_tokenizer_kd(
         )
     torch.testing.assert_close(losses[0], losses[1])
     torch.testing.assert_close(gradients[0], gradients[1])
+    assert gradients[1].abs().sum(-1).nonzero(as_tuple=True)[1].tolist() == [
+        3,
+        4,
+        9,
+        10,
+    ]
     assert (gradients[1][0, [4, 10], student.eos_token_id] < 0).all()
     assert torch.count_nonzero(gradients[1][0, [5, 11]]) == 0

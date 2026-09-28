@@ -38,6 +38,7 @@ to KL/CE math runs here.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from copy import copy
 from dataclasses import fields as dataclass_fields
 from functools import partial
@@ -247,9 +248,14 @@ class CrossTokenizerCollator:
         # kd_data_processor carries the raw text as a single assistant
         # message; the collator tokenizes that content for the student and
         # each cross-tokenizer teacher.
-        texts = [datum["message_log"][0]["content"] for datum in batch]
-        if any(not isinstance(text, str) for text in texts):
-            raise TypeError("CrossTokenizerCollator text mode requires string content")
+        texts: list[str] = []
+        for datum in batch:
+            content = datum["message_log"][0]["content"]
+            if not isinstance(content, str):
+                raise TypeError(
+                    "CrossTokenizerCollator text mode requires string content"
+                )
+            texts.append(content)
         sample_ids = self._required_sample_ids(batch)
         student_input_ids, student_attention_mask, student_offsets = (
             self._tokenize_batch(
@@ -581,7 +587,7 @@ class CrossTokenizerCollator:
         ctx_length: int,
         make_seq_div_by: int,
         *,
-        sample_ids: Optional[List[str | int]] = None,
+        sample_ids: Optional[Sequence[object]] = None,
         side_id: str = "model",
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Tokenize a batch and pad to a multiple of ``make_seq_div_by``.
