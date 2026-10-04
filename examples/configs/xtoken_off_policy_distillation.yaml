@@ -502,6 +502,25 @@ data:
     split: "train"
     text_key: "text"
     characters_per_sample: 16384
+    # Cascade chat data can replace this arrow_text source. See the Cascade
+    # recipe and docs/guides/xtoken-off-policy-distillation.md for native-chat
+    # tokenizer/collator settings. CascadeDatasetConfig owns these defaults:
+    # cascade:
+    #   dataset_path: null            # release chosen by dataset_name; or local root
+    #   revision: null                # HuggingFace revision (prefer a commit SHA)
+    #   subset: math                  # single subset when subsets is null
+    #   subsets: null                 # list of {name, weight: 1.0}; unique names
+    #   cached_path: null             # optional prepared-cache root
+    #   map_num_proc: 1               # positive number of CPU preparation workers
+    #   strip_thinking: false         # remove inline assistant <think>...</think>
+    #   task_name_prefix: null        # optional override for subset task names
+    #   normalize_tool_calls: false   # extract schemas/calls/results from markup
+    #   tool_call_invalid_policy: drop # drop with counts/reasons, or error
+    #   max_samples_per_subset: null  # positive prepared-row cap before splitting
+    #   stopping_strategy: all_exhausted # or first_exhausted; affects training only
+    # Each subsets entry also accepts dataset_path, revision, max_samples,
+    # normalize_tool_calls, and tool_call_invalid_policy; null inherits the
+    # shared setting. Weights must be finite and nonnegative with positive total.
   validation: null
 
 logger:

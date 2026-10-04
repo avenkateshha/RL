@@ -331,6 +331,129 @@ The chat scenario is functional coverage, not a nightly convergence benchmark.
 DP alignment, native student-only SFT, sequence packing, and backend/loss changes
 are outside this port.
 
+### Cascade releases and weighted subsets
+
+The Cascade adapters prepare fixed conversation data for this off-policy
+distillation pipeline. `SFT` in the dataset name identifies the source corpus;
+the training entrypoint and loss configuration still select distillation.
+
+| `data.train.dataset_name` | Default source |
+|---|---|
+| `Nemotron-Cascade-2-SFT-Math` | `nvidia/Nemotron-Cascade-2-SFT-Data`, `math` subset (legacy behavior) |
+| `Nemotron-Cascade-2-SFT` | `nvidia/Nemotron-Cascade-2-SFT-Data` |
+| `Nemotron-Cascade-SFT-Stage-2` | `nvidia/Nemotron-Cascade-SFT-Stage-2` |
+
+The [Cascade example recipe](../../examples/configs/recipes/llm/distillation-off-policy-qwen3-4b-to-1.7b-1n8g-dtensor-tp1-cascade.yaml)
+inherits `xtoken_off_policy_distillation.yaml` and selects native chat, a
+history-preserving template on both tokenizers, and a math/tool mixture.
+It uses the same pinned tokenizer for its Qwen3-4B teacher and Qwen3-1.7B
+student, so no projection matrix is needed. Launch it with:
+
+```bash
+uv run python examples/run_xtoken_off_policy_distillation.py \
+  --config examples/configs/recipes/llm/distillation-off-policy-qwen3-4b-to-1.7b-1n8g-dtensor-tp1-cascade.yaml
+```
+
+For a cross-tokenizer pair, supply the pair's projection matrix as described
+above and retain compatible native templates. Set sequence limits for the
+selected conversations; the existing chat collator rejects overlength rows.
+The example is a configuration starting point, not a convergence benchmark.
+
+Cascade preparation settings live in the typed `cascade` block. This example
+replaces the exemplar's raw-text `data` block (the `_override_` marker prevents
+inherited raw-text fields from leaking into the chat adapter):
+
+```yaml
+data:
+  _override_: true
+  max_input_seq_length: 8192
+  shuffle: true
+  num_workers: 4
+  train:
+    dataset_name: Nemotron-Cascade-SFT-Stage-2
+    processor: chat_kd_processor
+    split: train
+    split_validation_size: 0.05
+    seed: 42
+    cascade:
+      dataset_path: null          # select the registered release, or a local root
+      revision: null              # pin a HuggingFace commit for reproducibility
+      cached_path: /tmp/cascade-prepared
+      map_num_proc: 4
+      max_samples_per_subset: 1000
+      strip_thinking: false
+      stopping_strategy: all_exhausted
+      subsets:
+        - name: math
+          weight: 3.0
+        - name: tool_calling
+          weight: 1.0
+          normalize_tool_calls: true
+          tool_call_invalid_policy: drop
+  validation: null
+```
+
+For one subset, omit `subsets` and set `cascade.subset` (default `math`). A
+local `dataset_path` uses subset-organized JSONL, such as
+`/data/cascade/math/*.jsonl` and `/data/cascade/tool_calling/*.jsonl`;
+`.jsonl.gz` is also accepted. Local sources support `split: train`; use
+`split_validation_size` for their held-out examples. Each mixture entry requires a unique `name` and may
+override `dataset_path`, `revision`, `max_samples`, `normalize_tool_calls`, and
+`tool_call_invalid_policy`. A null override inherits its parent setting.
+The default weight is `1.0`. Misspelled preparation fields, invalid policies,
+nonpositive worker/sample limits, and invalid weights fail validation.
+
+Weights are sampling probabilities after normalization, not exact per-batch
+quotas. They must be finite and nonnegative with a finite positive total.
+Zero-weight subsets are skipped without loading. Given fixed source contents,
+subset order, and `seed`, selection is deterministic. `all_exhausted` (default)
+restarts exhausted training subsets until every positive-weight subset has
+been exhausted at least once; it can repeat examples. `first_exhausted` ends
+the mixture when the first positive-weight training subset is exhausted.
+Empty positive-weight subsets fail explicitly.
+
+Stable `sample_id` values are attached to source rows before preparation,
+filtering, caching, or splitting. Each prepared subset is split into training
+and validation before weighted repetition, and the resulting source IDs must
+be disjoint. Validation concatenates held-out examples once without weighting
+or repetition. `split_validation_size` applies to each selected subset;
+`data.validation: null` uses those held-out rows. The common
+`max_samples_per_subset` and per-entry `max_samples` cap prepared-row selection
+before the split; preparation and caching still process the full source subset.
+Top-level `max_samples` retains the legacy pre-split cap for
+a single subset; for mixtures it caps the final training mixture only.
+Rows preserve subset provenance in `source_subset` and their task names, with
+optional `cascade.task_name_prefix` customization. The dataset declares its
+per-subset task names through `get_task_names()` for processor registration.
+
+`normalize_tool_calls` defaults to `false`; enable it for Cascade's embedded
+tool format. Preparation extracts tool definitions, normalizes assistant calls,
+and unwraps tool responses. It preserves structured messages, tools, and an
+optional `message_loss_mask`, removing corresponding mask entries whenever a
+definition-only message is removed. `tool_call_invalid_policy: drop` (default)
+reports rejected counts and reasons; `error` stops at the first invalid row.
+Assistant prose may precede embedded tool calls. Prose between or after calls
+is rejected with reason `interleaved_tool_call_content`, because native
+templates cannot preserve that ordering. Mixing embedded and structured calls
+in one message is also rejected. Tool arguments and schemas retain their
+original keys and values through preparation and cache round trips, including
+heterogeneous argument objects.
+The existing chat processor keeps its validation and deep-copy behavior, and
+the existing native renderer and collator consume the prepared conversations.
+`strip_thinking: true` removes inline assistant `<think>...</think>` sections;
+it defaults to `false` and does not remove a separate `reasoning_content` field.
+
+Disk caching is off by default (`cached_path: null`). When enabled, each
+prepared subset is published atomically with a manifest binding it to source
+identity, revision/fingerprint where available, and preparation settings.
+Reuse still requires access to the source so its identity can be checked.
+An incompatible or incomplete cache raises an error; select a fresh cache
+root or rebuild it after changing source/preparation settings. Cache contents
+precede train/validation splitting and weighted repetition, so changing the
+mixture weights does not duplicate cached data. `map_num_proc` controls CPU
+preparation workers (default `1`) independently of data-loader `num_workers`.
+The exemplar documents the complete defaults owned by `CascadeDatasetConfig`.
+
 ### Loss-mode knobs
 
 `loss_fn` has two flags that pick between three behaviors:

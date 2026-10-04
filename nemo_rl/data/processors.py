@@ -22,6 +22,7 @@ from typing import Any, Dict, cast
 import torch
 from transformers import AutoProcessor, PreTrainedTokenizerBase
 
+from nemo_rl.data.cascade_tool_normalization import CASCADE_TOOLS_JSON_KEY
 from nemo_rl.data.chat_utils import normalize_message_loss_mask
 from nemo_rl.data.interfaces import (
     DatumSpec,
@@ -1027,13 +1028,52 @@ def kd_data_processor(
             datum_dict["messages"], datum_dict["message_loss_mask"]
         )
     tools = datum_dict.get("tools")
-    if tools is not None:
-        if not isinstance(tools, list) or any(
-            not isinstance(tool, dict) for tool in tools
+    if tools is not None and (
+        not isinstance(tools, list) or any(not isinstance(tool, dict) for tool in tools)
+    ):
+        raise TypeError(
+            "kd_data_processor expected 'tools' to be a list of objects or None"
+        )
+    serialized_tools = datum_dict.get(CASCADE_TOOLS_JSON_KEY)
+    if serialized_tools is not None:
+        if not isinstance(serialized_tools, str):
+            raise TypeError("kd_data_processor expected 'tools_json' to be a string")
+        decoded_tools = json.loads(serialized_tools) if serialized_tools else None
+        if serialized_tools and (
+            not isinstance(decoded_tools, list)
+            or any(not isinstance(tool, dict) for tool in decoded_tools)
         ):
             raise TypeError(
-                "kd_data_processor expected 'tools' to be a list of objects or None"
+                "kd_data_processor expected 'tools_json' to encode a list of objects"
             )
+        if tools is None:
+            tools = decoded_tools
+        elif decoded_tools is not None and tools != decoded_tools:
+            raise ValueError(
+                "kd_data_processor received conflicting tools and tools_json"
+            )
+
+        # Cascade inputs may serialize argument maps as JSON. Restore logical
+        # calls only on the isolated message copy.
+        for message in output["message_log"]:
+            calls = message.get("tool_calls")
+            if calls is None:
+                continue
+            if not isinstance(calls, list) or any(
+                not isinstance(call, dict) for call in calls
+            ):
+                raise TypeError("Cascade tool_calls must be a list of objects")
+            for call in calls:
+                function = call.get("function", call)
+                if not isinstance(function, dict):
+                    raise TypeError("Cascade tool call function must be an object")
+                arguments = function.get("arguments", {})
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+                if not isinstance(arguments, dict):
+                    raise TypeError("Cascade tool call arguments must encode an object")
+                function["arguments"] = arguments
+    if tools is not None:
         output["tools"] = deepcopy(tools)
     return output
 

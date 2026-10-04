@@ -25,6 +25,7 @@ from nemo_rl.data.processors import PROCESSOR_REGISTRY
 
 
 class RawDataset:
+    task_name: str
     # change to ResponseDatasetConfig | PreferenceDatasetConfig once preference dataset is refactored
     data_config: ResponseDatasetConfig | PreferenceDatasetConfig
     dataset: Dataset
@@ -34,6 +35,15 @@ class RawDataset:
     processor: TaskDataProcessFnCallable
     task_spec: TaskDataSpec
     preprocessor: TaskDataPreProcessFnCallable | None = None
+
+    def get_task_names(self) -> tuple[str, ...]:
+        """Return the task names emitted by rows in either dataset split.
+
+        Adapters combining multiple sources override this method to expose their
+        per-source names. Data setup uses these names to register processors and
+        environments while preserving provenance in each processed row.
+        """
+        return (self.task_name,)
 
     def split_train_validation(self, test_size: float | int, seed: int):
         if test_size > 0:

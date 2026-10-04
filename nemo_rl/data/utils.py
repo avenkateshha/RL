@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from copy import copy
 from typing import Any, Callable, Optional, Union, cast
 
 import torch
@@ -28,6 +29,7 @@ from nemo_rl.data.datasets import (
     merge_datasets,
     update_single_dataset_config,
 )
+from nemo_rl.data.datasets.raw_dataset import RawDataset
 from nemo_rl.data.interfaces import (
     NemoGymSourceIdentity,
     PreferenceDatumSpec,
@@ -127,6 +129,15 @@ def _combine_agent_name_source_sets(
     )
 
 
+def _dataset_task_names(dataset: Any) -> tuple[str, ...]:
+    """Use the explicit task interface while preserving legacy external adapters."""
+    if isinstance(dataset, RawDataset):
+        return dataset.get_task_names()
+    # External adapters have historically only needed the single task_name
+    # attribute; inheriting RawDataset opts into the multiple-task interface.
+    return (dataset.task_name,)
+
+
 # TODO: @yukih: unify to setup_data after dataset refactored
 def setup_response_data(
     tokenizer: AutoProcessor | AutoTokenizer,
@@ -205,12 +216,14 @@ def setup_response_data(
             f"  - Loaded training dataset {data.task_name} with {len(data.dataset)} samples."
         )
         # bind task_name to task_data_processors and task_to_env
-        task_name = data.task_name
-        task_data_processors[task_name] = (data.task_spec, data.processor)
-        if hasattr(data, "preprocessor") and data.preprocessor is not None:
-            task_data_preprocessors[task_name] = data.preprocessor
-        if has_envs:
-            task_to_env[task_name] = envs[cfg["env_name"]]
+        for task_name in _dataset_task_names(data):
+            task_spec = copy(data.task_spec)
+            task_spec.task_name = task_name
+            task_data_processors[task_name] = (task_spec, data.processor)
+            if hasattr(data, "preprocessor") and data.preprocessor is not None:
+                task_data_preprocessors[task_name] = data.preprocessor
+            if has_envs:
+                task_to_env[task_name] = envs[cfg["env_name"]]
 
     # merge datasets
     if (
@@ -263,14 +276,14 @@ def setup_response_data(
                 f"  - Loaded validation dataset {data.task_name} with {len(data.val_dataset)} samples."
             )
             # bind task_name to task_data_processors and task_to_env
-            task_name = data.task_name
-            val_task_data_processors[task_name] = task_data_processors[task_name]
-            if task_name in task_data_preprocessors:
-                val_task_data_preprocessors[task_name] = task_data_preprocessors[
-                    task_name
-                ]
-            if has_envs:
-                val_task_to_env[task_name] = task_to_env[task_name]
+            for task_name in _dataset_task_names(data):
+                val_task_data_processors[task_name] = task_data_processors[task_name]
+                if task_name in task_data_preprocessors:
+                    val_task_data_preprocessors[task_name] = task_data_preprocessors[
+                        task_name
+                    ]
+                if has_envs:
+                    val_task_to_env[task_name] = task_to_env[task_name]
 
     # validation dataset from config
     if "validation" in data_config and data_config["validation"] is not None:
@@ -290,15 +303,17 @@ def setup_response_data(
                 f"  - Loaded validation dataset {val_data.task_name} with {len(val_data.dataset)} samples."
             )
             # bind task_name to task_data_processors and task_to_env
-            task_name = val_data.task_name
-            val_task_data_processors[task_name] = (
-                val_data.task_spec,
-                val_data.processor,
-            )
-            if hasattr(val_data, "preprocessor") and val_data.preprocessor is not None:
-                val_task_data_preprocessors[task_name] = val_data.preprocessor
-            if has_envs:
-                val_task_to_env[task_name] = envs[cfg["env_name"]]
+            for task_name in _dataset_task_names(val_data):
+                task_spec = copy(val_data.task_spec)
+                task_spec.task_name = task_name
+                val_task_data_processors[task_name] = (task_spec, val_data.processor)
+                if (
+                    hasattr(val_data, "preprocessor")
+                    and val_data.preprocessor is not None
+                ):
+                    val_task_data_preprocessors[task_name] = val_data.preprocessor
+                if has_envs:
+                    val_task_to_env[task_name] = envs[cfg["env_name"]]
 
     # merge datasets
     val_dataset = None

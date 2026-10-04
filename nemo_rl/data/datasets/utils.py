@@ -20,7 +20,7 @@ import io
 import os
 import warnings
 from pathlib import Path
-from typing import Any, Mapping, Optional, Union
+from typing import Any, Literal, Mapping, Optional, Union
 
 import numpy as np
 import torch
@@ -28,6 +28,7 @@ from datasets import (
     Dataset,
     DatasetDict,
     concatenate_datasets,
+    interleave_datasets,
     load_dataset,
     load_from_disk,
 )
@@ -286,6 +287,83 @@ def merge_datasets(datasets: list[Any]) -> Any:
         return concatenate_datasets(datasets)
 
     return ConcatDataset(datasets)
+
+
+def weighted_merge_datasets(
+    datasets: list[Dataset],
+    weights: list[float],
+    *,
+    seed: int,
+    stopping_strategy: Literal["first_exhausted", "all_exhausted"],
+) -> Dataset:
+    """Sample source datasets with deterministic, relative probabilities.
+
+    Each selected source contributes its next row in source order. Weights are
+    sampling probabilities, not exact quotas. Zero-weight sources are excluded,
+    including empty sources; positive-weight sources must be nonempty.
+
+    ``first_exhausted`` stops immediately after consuming the last row of any
+    included source, without repetition. ``all_exhausted`` cycles exhausted
+    sources in their original order until every included source has been consumed
+    at least once. Small probabilities can therefore produce large mixtures.
+    Split source rows into training and validation *before* calling this helper
+    to prevent repeated examples from leaking across splits.
+
+    Args:
+        datasets: Map-style Hugging Face datasets with compatible schemas.
+        weights: One finite, nonnegative relative weight per dataset, with a
+            positive total.
+        seed: Seed controlling source selection.
+        stopping_strategy: Whether to stop at the first or last source exhaustion.
+
+    Returns:
+        A dataset retaining all source columns, including IDs and provenance.
+    """
+    if not datasets:
+        raise ValueError("Expected at least one dataset for weighted composition.")
+    if len(weights) != len(datasets):
+        raise ValueError("Expected one weight per dataset.")
+    if stopping_strategy not in ("first_exhausted", "all_exhausted"):
+        raise ValueError(
+            "stopping_strategy must be 'first_exhausted' or 'all_exhausted'."
+        )
+
+    probabilities = np.asarray(weights, dtype=np.float64)
+    if probabilities.ndim != 1 or not np.all(np.isfinite(probabilities)):
+        raise ValueError("Dataset weights must be finite numbers.")
+    if np.any(probabilities < 0) or not np.any(probabilities > 0):
+        raise ValueError("Dataset weights must be nonnegative with a positive total.")
+
+    active_datasets = []
+    active_weights = []
+    for index, (dataset, weight) in enumerate(zip(datasets, probabilities)):
+        if weight == 0:
+            continue
+        if not isinstance(dataset, Dataset):
+            raise TypeError(f"Dataset {index} must be a Hugging Face Dataset.")
+        if len(dataset) == 0:
+            raise ValueError(f"Positive-weight dataset {index} is empty.")
+        active_datasets.append(dataset)
+        active_weights.append(weight)
+
+    if len(active_datasets) == 1:
+        return active_datasets[0]
+
+    # Scaling first keeps a sum of large but finite relative weights finite.
+    probabilities = np.asarray(active_weights) / max(active_weights)
+    probabilities /= probabilities.sum()
+    # NumPy samples from a cumulative distribution. Rounding can make a positive
+    # source unreachable even when its normalized weight has not underflowed.
+    cumulative_probabilities = np.cumsum(probabilities)
+    cumulative_probabilities /= cumulative_probabilities[-1]
+    if np.any(np.diff(cumulative_probabilities, prepend=0) == 0):
+        raise ValueError("Positive dataset weights are too small relative to others.")
+    return interleave_datasets(
+        active_datasets,
+        probabilities=probabilities.tolist(),
+        seed=seed,
+        stopping_strategy=stopping_strategy,
+    )
 
 
 def extract_necessary_env_names(data_config: dict) -> list[str]:

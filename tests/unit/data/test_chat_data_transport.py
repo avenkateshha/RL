@@ -234,3 +234,71 @@ def test_dataset_rejects_invalid_mask_before_system_insertion(tmp_path: Path) ->
         OpenAIFormatDataset(
             str(path), system_prompt="System", use_preserving_dataset=True
         )
+
+
+@pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
+def test_processors_restore_cascade_arrow_tool_transport(processor) -> None:
+    row = _row()
+    row["tools_json"] = json.dumps(row.pop("tools"), ensure_ascii=False)
+    function = row["messages"][3]["tool_calls"][0]["function"]
+    function["arguments"] = json.dumps(function["arguments"], ensure_ascii=False)
+    original = deepcopy(row)
+
+    result = processor(row, TaskDataSpec(), None, None, 0)
+
+    assert result["tools"] == _row()["tools"]
+    assert result["message_log"] == _row()["messages"]
+    assert result["message_loss_mask"] == row["message_loss_mask"]
+    result["message_log"][3]["tool_calls"][0]["function"]["arguments"]["query"] = (
+        "changed"
+    )
+    result["tools"][0]["function"]["parameters"].clear()
+    assert row == original
+
+
+@pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
+@pytest.mark.parametrize("tools_json", ["null", "{}", "[null]", "[1]", 12, []])
+def test_processors_reject_invalid_cascade_tools_transport(
+    processor, tools_json
+) -> None:
+    row = _row()
+    row.pop("tools")
+    with pytest.raises(TypeError, match="tools_json"):
+        processor({**row, "tools_json": tools_json}, TaskDataSpec(), None, None, 0)
+
+
+@pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
+def test_processors_reject_conflicting_tool_transports(processor) -> None:
+    with pytest.raises(ValueError, match="conflicting tools"):
+        processor({**_row(), "tools_json": "[]"}, TaskDataSpec(), None, None, 0)
+
+
+@pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
+@pytest.mark.parametrize("arguments", ["null", "[]", "12", "bad-json"])
+def test_processors_reject_invalid_cascade_argument_transport(
+    processor, arguments
+) -> None:
+    row = _row()
+    row["tools_json"] = json.dumps(row.pop("tools"))
+    row["messages"][3]["tool_calls"][0]["function"]["arguments"] = arguments
+    with pytest.raises((TypeError, ValueError)):
+        processor(row, TaskDataSpec(), None, None, 0)
+
+
+@pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
+def test_processors_keep_ordinary_native_string_arguments_unchanged(processor) -> None:
+    row = _row()
+    row["messages"][3]["tool_calls"][0]["function"]["arguments"] = '{"query": "status"}'
+    result = processor(row, TaskDataSpec(), None, None, 0)
+    assert result["message_log"] == row["messages"]
+
+
+@pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
+def test_processors_accept_empty_cascade_tools_transport(processor) -> None:
+    row = _row()
+    row.pop("tools")
+    row["messages"][3].pop("tool_calls")
+    row["tools_json"] = ""
+    result = processor(row, TaskDataSpec(), None, None, 0)
+    assert "tools" not in result
+    assert result["message_log"] == row["messages"]

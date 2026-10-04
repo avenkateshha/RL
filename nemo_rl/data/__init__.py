@@ -12,9 +12,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Literal, NotRequired, TypedDict, Union
+import math
+from collections.abc import Mapping
+from typing import Annotated, Literal, NotRequired, Self, TypedDict, Union
+
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
 from nemo_rl.data.energon.config import EnergonLoaderConfig, EnergonSourceConfig
+
+_CascadeString = Annotated[str, Field(min_length=1, pattern=r"\S")]
+
+
+class CascadeSubsetConfig(BaseModel, extra="forbid"):
+    """One Cascade subset and its relative sampling weight.
+
+    Optional source and preparation settings override the parent dataset's
+    settings. A zero weight excludes the subset without loading it.
+    """
+
+    name: _CascadeString
+    weight: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 1.0
+    dataset_path: _CascadeString | None = None
+    revision: _CascadeString | None = None
+    max_samples: Annotated[int, Field(ge=1)] | None = None
+    normalize_tool_calls: bool | None = None
+    tool_call_invalid_policy: Literal["drop", "error"] | None = None
+
+
+class CascadeDatasetConfig(BaseModel, extra="forbid"):
+    """Cascade source and CPU preparation settings shared across subsets.
+
+    ``dataset_path=None`` selects the release associated with the registered
+    dataset name. ``subsets=None`` loads ``subset`` without weighted repetition.
+    Prepared caches are optional and validated against the current source and
+    transformation settings before reuse.
+    """
+
+    dataset_path: _CascadeString | None = None
+    revision: _CascadeString | None = None
+    subset: _CascadeString = "math"
+    subsets: Annotated[list[CascadeSubsetConfig], Field(min_length=1)] | None = None
+    cached_path: _CascadeString | None = None
+    map_num_proc: Annotated[int, Field(ge=1)] = 1
+    strip_thinking: bool = False
+    task_name_prefix: _CascadeString | None = None
+    normalize_tool_calls: bool = False
+    tool_call_invalid_policy: Literal["drop", "error"] = "drop"
+    max_samples_per_subset: Annotated[int, Field(ge=1)] | None = None
+    stopping_strategy: Literal["first_exhausted", "all_exhausted"] = "all_exhausted"
+
+    @model_validator(mode="after")
+    def _validate_subsets(self) -> Self:
+        if self.subsets is not None:
+            names = [subset.name for subset in self.subsets]
+            if len(names) != len(set(names)):
+                raise ValueError("Cascade subset names must be unique")
+            total = sum(subset.weight for subset in self.subsets)
+            if not math.isfinite(total) or total <= 0:
+                raise ValueError(
+                    "Cascade subset weights must have a finite positive total"
+                )
+        return self
 
 
 class ResponseDatasetConfig(TypedDict):
@@ -51,6 +109,8 @@ class ResponseDatasetConfig(TypedDict):
     system_key: NotRequired[str | None]
     system_prompt: NotRequired[str | None]
     tool_key: NotRequired[str | None]
+    # Cascade releases, subset mixtures, and CPU preparation controls.
+    cascade: NotRequired[CascadeDatasetConfig]
 
 
 class PreferenceDatasetConfig(TypedDict):
@@ -75,6 +135,20 @@ class PreferenceDatasetConfig(TypedDict):
     seed: NotRequired[int]
     max_samples: NotRequired[int | None]
     cache_dir: NotRequired[str | None]
+
+
+def _validate_cascade_before_dataset_union(value: object) -> object:
+    """Reject invalid Cascade settings before a permissive TypedDict fallback.
+
+    A response config with invalid Cascade settings would otherwise match the
+    preference-config branch, silently discarding the entire Cascade block.
+    """
+    if isinstance(value, list):
+        for item in value:
+            _validate_cascade_before_dataset_union(item)
+    elif isinstance(value, Mapping) and "cascade" in value:
+        CascadeDatasetConfig.model_validate(value["cascade"])
+    return value
 
 
 class DataConfig(TypedDict):
@@ -104,21 +178,30 @@ class DataConfig(TypedDict):
     kd_alignment_regions: NotRequired[list[str] | None]
     num_packed_rows: NotRequired[int]
     # dataset configs
-    train: (
+    train: Annotated[
         ResponseDatasetConfig
         | PreferenceDatasetConfig
         | EnergonSourceConfig
-        | list[ResponseDatasetConfig]
-    )
+        | list[ResponseDatasetConfig],
+        BeforeValidator(_validate_cascade_before_dataset_union),
+    ]
     validation: NotRequired[
-        ResponseDatasetConfig
-        | PreferenceDatasetConfig
-        | EnergonSourceConfig
-        | list[ResponseDatasetConfig]
-        | None
+        Annotated[
+            ResponseDatasetConfig
+            | PreferenceDatasetConfig
+            | EnergonSourceConfig
+            | list[ResponseDatasetConfig]
+            | None,
+            BeforeValidator(_validate_cascade_before_dataset_union),
+        ]
     ]
     # default settings for all datasets, will be overridden by dataset-specific settings
-    default: NotRequired[ResponseDatasetConfig | PreferenceDatasetConfig | None]
+    default: NotRequired[
+        Annotated[
+            ResponseDatasetConfig | PreferenceDatasetConfig | None,
+            BeforeValidator(_validate_cascade_before_dataset_union),
+        ]
+    ]
 
 
 # ===============================================================================

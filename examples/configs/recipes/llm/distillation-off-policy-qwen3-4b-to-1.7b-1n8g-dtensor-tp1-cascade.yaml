@@ -1,0 +1,132 @@
+# Cascade Stage-2 native-chat preparation with the existing off-policy runner.
+# Both policies use the same pinned Qwen tokenizer, so direct KD needs no
+# projection matrix. Cross-tokenizer pairs require their own projection asset.
+defaults: ../../xtoken_off_policy_distillation.yaml
+
+distillation:
+  num_prompts_per_step: 8
+  max_num_steps: 20
+  val_period: 10
+  val_at_start: true
+
+collator:
+  mode: chat
+  include_thinking_in_loss: true
+  native_thinking_alignment: true
+
+policy:
+  model_name: Qwen/Qwen3-1.7B
+  tokenizer:
+    name: Qwen/Qwen3-4B
+    tokenizer_kwargs:
+      revision: 1cfa9a7208912126459214e8b04321603b3df60c
+    chat_template: examples/chat_templates/qwen3_history.jinja
+    chat_template_kwargs:
+      enable_thinking: true
+      preserve_thinking: true
+      truncate_history_thinking: false
+  train_global_batch_size: 8
+  max_total_sequence_length: 8192
+  scheduler:
+    - name: torch.optim.lr_scheduler.ConstantLR
+      kwargs:
+        factor: 1.0
+        total_iters: 20
+
+# Teacher lists replace their inherited value, so this entry restates the
+# DTensor settings needed by the existing teacher worker.
+teachers:
+  - model_name: Qwen/Qwen3-4B
+    aligner:
+      projection_matrix_path: null
+      drop_first_assistant_chunk_kl: false
+    weight: 1.0
+    tokenizer:
+      name: Qwen/Qwen3-4B
+      tokenizer_kwargs:
+        revision: 1cfa9a7208912126459214e8b04321603b3df60c
+      chat_template: examples/chat_templates/qwen3_history.jinja
+      chat_template_kwargs:
+        enable_thinking: true
+        preserve_thinking: true
+        truncate_history_thinking: false
+    train_global_batch_size: 8
+    train_micro_batch_size: 1
+    logprob_batch_size: 1
+    max_total_sequence_length: 8192
+    make_sequence_length_divisible_by: 1
+    precision: bfloat16
+    logprob_chunk_size: null
+    offload_optimizer_for_logprob: false
+    dtensor_cfg:
+      enabled: true
+      _v2: true
+      checkpoint:
+        model_save_format: safetensors
+        save_consolidated: "false"
+      cpu_offload: false
+      sequence_parallel: false
+      activation_checkpointing: true
+      tensor_parallel_size: 1
+      context_parallel_size: 1
+      custom_parallel_plan: null
+      load_precision: float32
+      shard_before_load: false
+    max_grad_norm: 1.0
+    dynamic_batching:
+      enabled: false
+      train_mb_tokens: 8192
+      logprob_mb_tokens: 8192
+      sequence_length_round: 64
+    sequence_packing:
+      enabled: false
+      train_mb_tokens: 8192
+      logprob_mb_tokens: 8192
+      algorithm: modified_first_fit_decreasing
+      microbatch_order: packer
+      sequence_length_round: 64
+      fuse_loss: false
+    optimizer:
+      name: torch.optim.AdamW
+      kwargs:
+        lr: 5.0e-5
+        weight_decay: 0.001
+        betas: [0.9, 0.95]
+        eps: 1.0e-8
+        foreach: false
+        fused: false
+
+data:
+  _override_: true
+  max_input_seq_length: 8192
+  shuffle: true
+  num_workers: 4
+  train:
+    dataset_name: Nemotron-Cascade-SFT-Stage-2
+    processor: chat_kd_processor
+    split: train
+    split_validation_size: 0.05
+    seed: 42
+    cascade:
+      # null selects the Stage-2 repository; set a local subset-organized root
+      # here to read <root>/math/*.jsonl and <root>/tool_calling/*.jsonl instead.
+      dataset_path: null
+      revision: null
+      cached_path: null
+      map_num_proc: 4
+      max_samples_per_subset: 1000
+      strip_thinking: false
+      stopping_strategy: all_exhausted
+      subsets:
+        - name: math
+          weight: 3.0
+        - name: tool_calling
+          weight: 1.0
+          normalize_tool_calls: true
+          tool_call_invalid_policy: drop
+  validation: null
+
+logger:
+  log_dir: logs/distillation-off-policy-qwen3-cascade
+  wandb:
+    name: distillation-off-policy-qwen3-cascade

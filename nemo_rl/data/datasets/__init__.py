@@ -21,6 +21,7 @@ from nemo_rl.data.datasets.utils import (
     extract_necessary_env_names,
     merge_datasets,
     update_single_dataset_config,
+    weighted_merge_datasets,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "extract_necessary_env_names",
     "merge_datasets",
     "update_single_dataset_config",
+    "weighted_merge_datasets",
 ]
