@@ -28,7 +28,7 @@ from nemo_rl.data.datasets.response_datasets.oai_format_dataset import (
     OpenAIFormatDataset,
     PreservingDataset,
 )
-from nemo_rl.data.interfaces import TaskDataSpec
+from nemo_rl.data.interfaces import TaskDataProcessFnCallable, TaskDataSpec
 from nemo_rl.data.processors import (
     PROCESSOR_REGISTRY,
     chat_kd_processor,
@@ -237,7 +237,9 @@ def test_dataset_rejects_invalid_mask_before_system_insertion(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
-def test_processors_restore_cascade_arrow_tool_transport(processor) -> None:
+def test_processors_restore_cascade_arrow_tool_transport(
+    processor: TaskDataProcessFnCallable,
+) -> None:
     row = _row()
     row["tools_json"] = json.dumps(row.pop("tools"), ensure_ascii=False)
     function = row["messages"][3]["tool_calls"][0]["function"]
@@ -259,7 +261,7 @@ def test_processors_restore_cascade_arrow_tool_transport(processor) -> None:
 @pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
 @pytest.mark.parametrize("tools_json", ["null", "{}", "[null]", "[1]", 12, []])
 def test_processors_reject_invalid_cascade_tools_transport(
-    processor, tools_json
+    processor: TaskDataProcessFnCallable, tools_json: str | int | list[Any]
 ) -> None:
     row = _row()
     row.pop("tools")
@@ -268,7 +270,9 @@ def test_processors_reject_invalid_cascade_tools_transport(
 
 
 @pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
-def test_processors_reject_conflicting_tool_transports(processor) -> None:
+def test_processors_reject_conflicting_tool_transports(
+    processor: TaskDataProcessFnCallable,
+) -> None:
     with pytest.raises(ValueError, match="conflicting tools"):
         processor({**_row(), "tools_json": "[]"}, TaskDataSpec(), None, None, 0)
 
@@ -276,7 +280,7 @@ def test_processors_reject_conflicting_tool_transports(processor) -> None:
 @pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
 @pytest.mark.parametrize("arguments", ["null", "[]", "12", "bad-json"])
 def test_processors_reject_invalid_cascade_argument_transport(
-    processor, arguments
+    processor: TaskDataProcessFnCallable, arguments: str
 ) -> None:
     row = _row()
     row["tools_json"] = json.dumps(row.pop("tools"))
@@ -286,7 +290,9 @@ def test_processors_reject_invalid_cascade_argument_transport(
 
 
 @pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
-def test_processors_keep_ordinary_native_string_arguments_unchanged(processor) -> None:
+def test_processors_keep_ordinary_native_string_arguments_unchanged(
+    processor: TaskDataProcessFnCallable,
+) -> None:
     row = _row()
     row["messages"][3]["tool_calls"][0]["function"]["arguments"] = '{"query": "status"}'
     result = processor(row, TaskDataSpec(), None, None, 0)
@@ -294,7 +300,9 @@ def test_processors_keep_ordinary_native_string_arguments_unchanged(processor) -
 
 
 @pytest.mark.parametrize("processor", [kd_data_processor, chat_kd_processor])
-def test_processors_accept_empty_cascade_tools_transport(processor) -> None:
+def test_processors_accept_empty_cascade_tools_transport(
+    processor: TaskDataProcessFnCallable,
+) -> None:
     row = _row()
     row.pop("tools")
     row["messages"][3].pop("tool_calls")

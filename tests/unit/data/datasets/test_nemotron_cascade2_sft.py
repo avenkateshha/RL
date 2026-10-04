@@ -4,6 +4,8 @@ import errno
 import json
 import os
 import shutil
+from pathlib import Path
+from typing import Any, NoReturn
 
 import pytest
 from datasets import Dataset
@@ -16,7 +18,7 @@ from nemo_rl.data.interfaces import TaskDataSpec
 from nemo_rl.data.processors import chat_kd_processor
 
 
-def _row(index=0):
+def _row(index: int = 0) -> dict[str, Any]:
     return {
         "messages": [
             {"role": "user", "content": f"question {index}"},
@@ -28,7 +30,7 @@ def _row(index=0):
     }
 
 
-def _tool_row(name="lookup", *, explicit_tools=False):
+def _tool_row(name: str = "lookup", *, explicit_tools: bool = False) -> dict[str, Any]:
     tool = {
         "type": "function",
         "function": {
@@ -41,7 +43,7 @@ def _tool_row(name="lookup", *, explicit_tools=False):
             },
         },
     }
-    row = {
+    row: dict[str, Any] = {
         "messages": [
             {"role": "system", "content": f"<tools>{json.dumps(tool)}</tools>"},
             {"role": "user", "content": "Check."},
@@ -62,7 +64,7 @@ def _tool_row(name="lookup", *, explicit_tools=False):
     return row
 
 
-def _write(root, subset, rows):
+def _write(root: Path, subset: str, rows: list[dict[str, Any]]) -> None:
     directory = root / subset
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "data.jsonl").write_text(
@@ -70,17 +72,17 @@ def _write(root, subset, rows):
     )
 
 
-def _load(root, **options):
+def _load(root: Path, **options: Any) -> cascade.NemotronCascade2SFTDataset:
     return cascade.NemotronCascade2SFTDataset(
         split_validation_size=0, cascade={"dataset_path": str(root), **options}
     )
 
 
-def test_legacy_math_defaults_and_stable_ids(monkeypatch):
+def test_legacy_math_defaults_and_stable_ids(monkeypatch: pytest.MonkeyPatch) -> None:
     raw = Dataset.from_list([_row(index) for index in range(40)])
     calls = []
 
-    def load(path, subset, **kwargs):
+    def load(path: str, subset: str, **kwargs: Any) -> Dataset:
         calls.append((path, subset, kwargs))
         return raw
 
@@ -103,10 +105,10 @@ def test_legacy_math_defaults_and_stable_ids(monkeypatch):
     ) | set(prepared.val_dataset["sample_id"])
 
 
-def test_stage2_alias_and_revision(monkeypatch):
+def test_stage2_alias_and_revision(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = []
 
-    def load(path, subset, **kwargs):
+    def load(path: str, subset: str, **kwargs: Any) -> Dataset:
         calls.append((path, subset, kwargs))
         return Dataset.from_list([_row()])
 
@@ -131,7 +133,7 @@ def test_stage2_alias_and_revision(monkeypatch):
 
 
 @pytest.mark.parametrize("explicit_tools", [False, True])
-def test_tools_ids_masks_and_thinking(tmp_path, explicit_tools):
+def test_tools_ids_masks_and_thinking(tmp_path: Path, explicit_tools: bool) -> None:
     row = _tool_row(explicit_tools=explicit_tools)
     row["id"] = "durable-source"
     _write(tmp_path, "tools", [row])
@@ -154,7 +156,9 @@ def test_tools_ids_masks_and_thinking(tmp_path, explicit_tools):
     assert json.loads(data["tools_json"])[0]["function"]["name"] == "lookup"
 
 
-def test_drop_counts_and_cache_round_trip(tmp_path, caplog, monkeypatch):
+def test_drop_counts_and_cache_round_trip(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source, cache = tmp_path / "source", tmp_path / "cache"
     _write(source, "tools", [_tool_row("undefined"), _tool_row()])
     kwargs = {
@@ -172,7 +176,7 @@ def test_drop_counts_and_cache_round_trip(tmp_path, caplog, monkeypatch):
     assert manifest["source_rows"] == 2 and manifest["accepted_rows"] == 1
     assert manifest["local_content_sha256"] and manifest["source_fingerprint"]
 
-    def fail(*args, **kwargs):
+    def fail(*args: Any, **kwargs: Any) -> NoReturn:
         raise AssertionError("Cache hit must not repeat preparation")
 
     monkeypatch.setattr(cascade, "_format_cascade_row", fail)
@@ -194,7 +198,9 @@ def test_drop_counts_and_cache_round_trip(tmp_path, caplog, monkeypatch):
         {"tool_call_invalid_policy": "error"},
     ],
 )
-def test_cache_rejects_transform_or_revision_mismatch(tmp_path, changed):
+def test_cache_rejects_transform_or_revision_mismatch(
+    tmp_path: Path, changed: dict[str, Any]
+) -> None:
     source, cache = tmp_path / "source", tmp_path / "cache"
     _write(source, "math", [_row()])
     _load(source, cached_path=str(cache))
@@ -202,7 +208,7 @@ def test_cache_rejects_transform_or_revision_mismatch(tmp_path, changed):
         _load(source, cached_path=str(cache), **changed)
 
 
-def test_cache_rejects_changed_source_and_missing_manifest(tmp_path):
+def test_cache_rejects_changed_source_and_missing_manifest(tmp_path: Path) -> None:
     source, cache = tmp_path / "source", tmp_path / "cache"
     _write(source, "math", [_row()])
     _load(source, cached_path=str(cache))
@@ -214,7 +220,9 @@ def test_cache_rejects_changed_source_and_missing_manifest(tmp_path):
         _load(source, cached_path=str(cache))
 
 
-def test_remote_fingerprint_mismatch(monkeypatch, tmp_path):
+def test_remote_fingerprint_mismatch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(
         cascade, "load_dataset", lambda *args, **kwargs: Dataset.from_list([_row()])
     )
@@ -230,12 +238,14 @@ def test_remote_fingerprint_mismatch(monkeypatch, tmp_path):
         )
 
 
-def test_concurrent_atomic_publication_and_cleanup(tmp_path, monkeypatch):
+def test_concurrent_atomic_publication_and_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source, cache = tmp_path / "source", tmp_path / "cache"
     _write(source, "math", [_row()])
     rename = os.rename
 
-    def publish_winner(first, second):
+    def publish_winner(first: Path, second: Path) -> None:
         if ".tmp-" in str(first):
             shutil.copytree(first, second)
             raise OSError(errno.ENOTEMPTY, "concurrent winner")
@@ -246,7 +256,7 @@ def test_concurrent_atomic_publication_and_cleanup(tmp_path, monkeypatch):
     assert not list(cache.rglob("*.tmp-*"))
 
 
-def test_error_policy_all_invalid_and_invalid_masks(tmp_path):
+def test_error_policy_all_invalid_and_invalid_masks(tmp_path: Path) -> None:
     _write(tmp_path, "tools", [_tool_row("undefined")])
     with pytest.raises(ValueError, match="undefined_tool_call"):
         _load(
@@ -264,7 +274,7 @@ def test_error_policy_all_invalid_and_invalid_masks(tmp_path):
         _load(tmp_path, subset="tools", normalize_tool_calls=True)
 
 
-def test_mixture_determinism_caps_provenance_and_disjoint_ids(tmp_path):
+def test_mixture_determinism_caps_provenance_and_disjoint_ids(tmp_path: Path) -> None:
     for subset in ("code", "math"):
         _write(tmp_path, subset, [_row(index) for index in range(20)])
     config = {
@@ -291,7 +301,7 @@ def test_mixture_determinism_caps_provenance_and_disjoint_ids(tmp_path):
     assert len(first.dataset) > 15  # Repeats remain confined to training.
 
 
-def test_duplicate_source_id_leakage_is_rejected(tmp_path):
+def test_duplicate_source_id_leakage_is_rejected(tmp_path: Path) -> None:
     _write(
         tmp_path, "math", [{**_row(index), "id": "duplicate"} for index in range(10)]
     )
@@ -301,14 +311,14 @@ def test_duplicate_source_id_leakage_is_rejected(tmp_path):
         )
 
 
-def test_parallel_preparation_preserves_ordinal_ids(tmp_path):
+def test_parallel_preparation_preserves_ordinal_ids(tmp_path: Path) -> None:
     _write(tmp_path, "math", [_row(index) for index in range(8)])
     serial = _load(tmp_path)
     parallel = _load(tmp_path, map_num_proc=2)
     assert parallel.dataset.to_list() == serial.dataset.to_list()
 
 
-def test_native_schemas_survive_local_arrow_transport(tmp_path):
+def test_native_schemas_survive_local_arrow_transport(tmp_path: Path) -> None:
     first, second = _tool_row(explicit_tools=True), _tool_row(explicit_tools=True)
     second["tools"][0]["function"]["parameters"]["properties"] = {
         "other": {"type": "integer"}
@@ -339,7 +349,7 @@ def test_native_schemas_survive_local_arrow_transport(tmp_path):
         )
 
 
-def test_math_and_tools_mix_aligns_message_schemas(tmp_path):
+def test_math_and_tools_mix_aligns_message_schemas(tmp_path: Path) -> None:
     _write(tmp_path, "math", [_row(index) for index in range(4)])
     _write(tmp_path, "tools", [_tool_row() for _ in range(4)])
     prepared = cascade.NemotronCascade2SFTDataset(
@@ -363,7 +373,9 @@ def test_math_and_tools_mix_aligns_message_schemas(tmp_path):
             ] == {"query": "status"}
 
 
-def test_malformed_native_tool_row_reaches_invalid_policy(tmp_path, caplog):
+def test_malformed_native_tool_row_reaches_invalid_policy(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     invalid = _tool_row(explicit_tools=True)
     invalid["messages"][2] = {"role": "assistant", "content": "", "tool_calls": [None]}
     _write(tmp_path, "tools", [invalid, _tool_row()])

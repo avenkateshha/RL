@@ -267,6 +267,7 @@ def _parse_call_event(event: Any, *, message_index: int) -> tuple[str, dict[str,
 
 
 def _definition_accepts_arguments(
+    *,
     definition: dict[str, Any],
     arguments: dict[str, Any],
 ) -> tuple[bool, set[str], set[str]]:
@@ -301,8 +302,8 @@ def _validate_call(
     failures: list[tuple[set[str], set[str]]] = []
     for definition in candidates:
         accepted, missing, extra = _definition_accepts_arguments(
-            definition,
-            arguments,
+            definition=definition,
+            arguments=arguments,
         )
         if accepted:
             return

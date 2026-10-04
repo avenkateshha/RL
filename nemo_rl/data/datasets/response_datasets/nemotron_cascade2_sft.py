@@ -128,7 +128,7 @@ def _read_local_rows(
                 }
 
 
-def _task_name(dataset_path: str, subset: str, prefix: str | None) -> str:
+def _task_name(*, dataset_path: str, subset: str, prefix: str | None) -> str:
     if prefix is None and dataset_path == _DEFAULT_DATASET_PATH and subset == "math":
         return "Nemotron-Cascade-2-SFT-Math"
     if prefix is None:
@@ -466,7 +466,9 @@ class NemotronCascade2SFTDataset(RawDataset):
             path = spec.dataset_path or dataset_path
             if os.path.isdir(path):
                 path = str(Path(path).resolve())
-            task_name = _task_name(path, spec.name, config.task_name_prefix)
+            task_name = _task_name(
+                dataset_path=path, subset=spec.name, prefix=config.task_name_prefix
+            )
             prepared = _load_subset(
                 dataset_path=path,
                 revision=spec.revision
