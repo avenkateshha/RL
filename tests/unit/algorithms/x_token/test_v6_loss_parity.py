@@ -194,6 +194,7 @@ def _run_this_branch(
     teacher_sparse_payload=None,
     sample_mask=None,
     global_valid_chunks=None,
+    dispatch=False,
 ):
     from nemo_rl.algorithms.loss.loss_functions import (
         CrossTokenizerDistillationLossFn,
@@ -215,7 +216,8 @@ def _run_this_branch(
         "sum_weights_metric": None,
         "student_vocab_size": v_s,
         "teacher_vocab_sizes": [v_t],
-        "projection_matrix_paths": ["dummy_proj.pt"],
+        "teacher_is_cross_tokenizer": [True],
+        "projection_matrix_paths": [None],
         "teacher_weights": [1.0],
         "common_indices_from_subtoks": knobs["common_indices_from_subtoks"],
         "pseudo_target_paths": [knobs["pseudo_target_path"]],
@@ -253,15 +255,37 @@ def _run_this_branch(
         teacher_spans=fx["t_spans"],
         num_chunks=fx["num_chunks"],
     )
-    loss, metrics = loss_fn._compute_prefix_bidir_partition_kl_v3(
-        0,
-        student_logits,
-        None if teacher_sparse_payload is not None else fx["teacher_logits"].clone(),
-        align,
-        teacher_sparse_payload=teacher_sparse_payload,
-        teacher_vocab_size=v_t,
-        global_valid_chunks=torch.as_tensor(global_valid_chunks, dtype=torch.float32),
-    )
+    if dispatch:
+        loss, metrics = loss_fn._compute_teacher_kd(
+            0,
+            student_logits,
+            {},
+            {} if teacher_sparse_payload is not None else {0: fx["teacher_logits"]},
+            {0: align},
+            torch.tensor(float(fx["student_ids"].numel())),
+            teacher_sparse_logits_by_idx=(
+                {} if teacher_sparse_payload is None else {0: teacher_sparse_payload}
+            ),
+            global_valid_chunks_by_idx={
+                0: torch.as_tensor(global_valid_chunks, dtype=torch.float32)
+            },
+            tp_group=None,
+            cp_group=None,
+        )
+    else:
+        loss, metrics = loss_fn._compute_prefix_bidir_partition_kl_v3(
+            0,
+            student_logits,
+            None
+            if teacher_sparse_payload is not None
+            else fx["teacher_logits"].clone(),
+            align,
+            teacher_sparse_payload=teacher_sparse_payload,
+            teacher_vocab_size=v_t,
+            global_valid_chunks=torch.as_tensor(
+                global_valid_chunks, dtype=torch.float32
+            ),
+        )
     loss.backward()
     return loss.detach(), metrics, student_logits.grad.detach()
 
@@ -429,6 +453,36 @@ def test_v6_sparse_full_support_matches_dense():
     torch.testing.assert_close(sparse_grad, dense_grad, rtol=1e-5, atol=1e-6)
     assert sparse_metrics["num_common_chunks"] == dense_metrics["num_common_chunks"]
     assert sparse_metrics["num_mismatch_chunks"] == dense_metrics["num_mismatch_chunks"]
+
+
+@pytest.mark.parametrize("sparse", [False, True])
+@pytest.mark.parametrize("case_name", ["common_only", "with_mismatch"])
+def test_v6_matrix_free_dispatch_preserves_loss_and_gradient(
+    tmp_path, case_name, sparse
+):
+    """Explicit cross-tokenizer mode uses table-based v6 for both transports."""
+    fx = _build_case(case_name, tmp_path)
+    expected_loss, expected_metrics, expected_grad = _run_this_branch(fx)
+    sparse_payload = None
+    if sparse:
+        teacher_logits = fx["teacher_logits"]
+        token_ids = torch.arange(fx["v_t"], dtype=torch.int32).view(1, 1, -1)
+        sparse_payload = (
+            teacher_logits,
+            token_ids.expand_as(teacher_logits).clone(),
+            torch.logsumexp(teacher_logits / fx["knobs"]["temperature"], dim=-1),
+            None,
+        )
+    loss, metrics, grad = _run_this_branch(
+        fx, teacher_sparse_payload=sparse_payload, dispatch=True
+    )
+
+    assert torch.isfinite(loss)
+    assert grad.abs().sum() > 0
+    torch.testing.assert_close(loss, expected_loss, rtol=1e-5, atol=1e-6)
+    torch.testing.assert_close(grad, expected_grad, rtol=1e-5, atol=1e-6)
+    assert metrics["num_common_chunks"] == expected_metrics["num_common_chunks"]
+    assert metrics["num_mismatch_chunks"] == expected_metrics["num_mismatch_chunks"]
 
 
 def test_v6_dense_teacher_stays_cp_local_and_slices_padded_vocab(monkeypatch):

@@ -2584,6 +2584,83 @@ def test_cross_tokenizer_mismatched_per_teacher_lists_raises(tmp_path):
         CrossTokenizerDistillationLossFn(cfg)
 
 
+@pytest.mark.parametrize("modes", [[True, False], ["true"]])
+def test_cross_tokenizer_invalid_mode_metadata_raises(modes):
+    cfg = _ct_loss_cfg(None)
+    cfg["teacher_is_cross_tokenizer"] = modes
+    with pytest.raises(ValueError, match="equal length|must be booleans"):
+        CrossTokenizerDistillationLossFn(cfg)
+
+
+def test_cross_tokenizer_explicit_mode_requires_common_map_source():
+    cfg = _ct_loss_cfg(None)
+    cfg["teacher_is_cross_tokenizer"] = [True]
+    with pytest.raises(ValueError, match="projection_matrix_paths.*required"):
+        CrossTokenizerDistillationLossFn(cfg)
+    cfg["common_indices_from_subtoks"] = True
+    with pytest.raises(ValueError, match="pseudo_target_paths.*required"):
+        CrossTokenizerDistillationLossFn(cfg)
+    cfg["prefix_bidir_v3_pure_alm"] = True
+    loss_fn = CrossTokenizerDistillationLossFn(cfg)
+    assert not loss_fn._teacher_is_same_vocab(0)
+
+
+@pytest.mark.parametrize(
+    "artifact_key",
+    ["projection_matrix_paths", "pseudo_target_paths", "reverse_pseudo_target_paths"],
+)
+def test_same_tokenizer_rejects_cross_tokenizer_artifacts(artifact_key):
+    cfg = _ct_loss_cfg(None)
+    cfg["teacher_is_cross_tokenizer"] = [False]
+    cfg[artifact_key] = ["unused.pt"]
+    with pytest.raises(ValueError, match="same-tokenizer mode cannot use"):
+        CrossTokenizerDistillationLossFn(cfg)
+
+
+def test_matrix_free_mixed_teachers_do_not_average_logits(monkeypatch):
+    """Matching logit shapes cannot bypass cross-tokenizer chunk alignment."""
+    cfg = _ct_loss_cfg(None)
+    cfg.update(
+        teacher_is_cross_tokenizer=[True, False],
+        projection_matrix_paths=[None, None],
+        teacher_vocab_sizes=[_CT_V_STUDENT, _CT_V_STUDENT],
+        teacher_weights=[0.25, 0.75],
+        common_indices_from_subtoks=True,
+        pseudo_target_paths=["forward.pt", None],
+        reverse_pseudo_target_paths=["reverse.pt", None],
+        kd_loss_mode="averaged_logits",
+    )
+    loss_fn = CrossTokenizerDistillationLossFn(cfg)
+    assert not loss_fn._teacher_is_same_vocab(0)
+    assert loss_fn._teacher_is_same_vocab(1)
+    student_logits = torch.ones(1, 3, _CT_V_STUDENT, requires_grad=True)
+    teacher_logits = torch.zeros_like(student_logits)
+    dispatched = []
+
+    def teacher_kd(i, student_logits_contig, *_args, **_kwargs):
+        dispatched.append(i)
+        return student_logits_contig.mean() * (i + 1), {}
+
+    monkeypatch.setattr(loss_fn, "_compute_teacher_kd", teacher_kd)
+    loss, _ = loss_fn._averaged_logits_kd(
+        student_logits,
+        {},
+        {0: teacher_logits, 1: teacher_logits},
+        {},
+        torch.tensor(2.0),
+        teacher_sparse_logits_by_idx={},
+        tp_group=None,
+        cp_group=None,
+    )
+    loss.backward()
+    assert dispatched == [0, 1]
+    torch.testing.assert_close(loss, torch.tensor(1.75))
+    torch.testing.assert_close(
+        student_logits.grad,
+        torch.full_like(student_logits, 1.75 / student_logits.numel()),
+    )
+
+
 def test_normalize_teacher_by_vocab_rejected_outside_sum_mode(tmp_path):
     """normalize_teacher_by_vocab is a no-op outside sum mode, so reject it there."""
     cfg = _ct_loss_cfg(_write_ct_projection(tmp_path))

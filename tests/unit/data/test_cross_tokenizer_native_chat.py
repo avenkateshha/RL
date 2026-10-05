@@ -1423,8 +1423,9 @@ def test_native_tool_conversations_keep_loss_and_gradients_under_lockstep_packin
 
 
 @pytest.mark.parametrize("content", ["", None])
+@pytest.mark.parametrize("matrix_free", [False, True])
 def test_native_tool_calls_reach_v6_through_production_loss_adapter(
-    tmp_path: Path, content: str | None
+    tmp_path: Path, content: str | None, matrix_free: bool
 ) -> None:
     special = ("<|im_start|>", "<|im_end|>", "<think>", "</think>")
     student = _XmlToolTokenizer("nano", special)
@@ -1489,13 +1490,20 @@ def test_native_tool_calls_reach_v6_through_production_loss_adapter(
     for index, piece in student._id_to_piece.items():
         projection[index, 0] = teacher._piece_to_id[piece]
     projection_path = tmp_path / "native_tool_projection.pt"
-    torch.save(
-        {
-            "indices": projection,
-            "likelihoods": torch.ones_like(projection, dtype=torch.float32),
-        },
-        projection_path,
-    )
+    subtoken_path = tmp_path / "native_tool_subtokens.pt"
+    if matrix_free:
+        torch.save(
+            {"subtoks": projection, "lengths": torch.ones(student_vocab_size)},
+            subtoken_path,
+        )
+    else:
+        torch.save(
+            {
+                "indices": projection,
+                "likelihoods": torch.ones_like(projection, dtype=torch.float32),
+            },
+            projection_path,
+        )
     loss_fn = CrossTokenizerDistillationLossFn(
         {
             "temperature": 1.0,
@@ -1508,10 +1516,12 @@ def test_native_tool_calls_reach_v6_through_production_loss_adapter(
             "kd_loss_mode": "sum",
             "normalize_teacher_by_vocab": False,
             "alpha": 1.0,
-            "projection_matrix_paths": [str(projection_path)],
+            "teacher_is_cross_tokenizer": [True],
+            "projection_matrix_paths": [None if matrix_free else str(projection_path)],
+            "pseudo_target_paths": [str(subtoken_path) if matrix_free else None],
             "teacher_vocab_sizes": [teacher_vocab_size],
             "teacher_weights": [1.0],
-            "common_indices_from_subtoks": False,
+            "common_indices_from_subtoks": matrix_free,
             "kl_chunk_shift": True,
             "prefix_bidir_v3_loss_fn": "kl",
             "teacher_topk_ipc_k": 0,

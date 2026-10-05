@@ -32,6 +32,7 @@ policy:
 # TP2xCP2.
 teachers:
   - model_name: "Qwen/Qwen3-4B"
+    is_cross_tokenizer: true
     aligner:
       # Set per run via teachers.0.aligner.projection_matrix_path.
       projection_matrix_path: null

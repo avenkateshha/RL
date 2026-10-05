@@ -105,7 +105,7 @@ def test_automodel_cp_layout_localizes_xtoken_windows_after_global_shift():
         ) = prepare_xtoken_cross_tokenizer_loss_input(
             local_logits,
             data,
-            projection_matrix_paths=["projection.pt"],
+            teacher_is_cross_tokenizer=[True],
             context_parallel_group=cp_group,
             cp_sharder=cp_sharder,
         )
@@ -136,6 +136,61 @@ def test_automodel_cp_layout_localizes_xtoken_windows_after_global_shift():
     rebuild_teacher.assert_called_once_with(teacher_ipc, cp_group=cp_group, device=0)
 
 
+@pytest.mark.parametrize("sparse", [False, True])
+def test_matrix_free_mixed_teacher_ipc_alignment(sparse):
+    """Explicit modes preserve chunks for a table-only teacher and direct KL for its peer."""
+    logits = torch.randn(1, 3, 4)
+    teacher_logits = torch.randn_like(logits)
+    sparse_payload = (
+        teacher_logits,
+        torch.arange(4, dtype=torch.int32).expand_as(teacher_logits),
+        torch.logsumexp(teacher_logits, dim=-1),
+        None,
+    )
+    data = {
+        "input_ids": torch.tensor([[0, 1, 2]]),
+        "token_mask": torch.ones(1, 3),
+        "sample_mask": torch.ones(1),
+        f"teacher_0_{'sparse' if sparse else 'full'}_logits_ipc": [None],
+        "teacher_1_full_logits_ipc": [None],
+        "teacher_0_input_ids": torch.tensor([[2, 1, 0]]),
+        "alignment_0_student_chunk_id": torch.tensor([[0, 1, 2]]),
+        "alignment_0_teacher_chunk_id": torch.tensor([[0, 1, 2]]),
+        "alignment_0_pair_valid": torch.ones(1, 3, dtype=torch.bool),
+        "alignment_0_pair_is_correct": torch.ones(1, 3, dtype=torch.bool),
+    }
+    cp_sharder = MagicMock()
+    cp_sharder.gather_token_tensor.return_value = logits
+    with (
+        patch("torch.cuda.current_device", return_value=0),
+        patch(
+            "nemo_rl.algorithms.x_token.loss_utils.rebuild_teacher_full_logits_from_ipc",
+            return_value=(teacher_logits, 0),
+        ),
+        patch(
+            "nemo_rl.algorithms.x_token.loss_utils.rebuild_teacher_sparse_logits_from_ipc",
+            return_value=sparse_payload,
+        ),
+    ):
+        _, dense_teachers, sparse_teachers, aligns, *_ = (
+            prepare_xtoken_cross_tokenizer_loss_input(
+                logits,
+                data,
+                teacher_is_cross_tokenizer=[True, False],
+                cp_sharder=cp_sharder,
+            )
+        )
+
+    assert 1 in dense_teachers
+    assert (0 in sparse_teachers) is sparse
+    assert (0 in dense_teachers) is not sparse
+    torch.testing.assert_close(
+        aligns[0].student_spans, torch.tensor([[[0, 1], [1, 2], [2, 3]]])
+    )
+    assert aligns[1].student_spans is None
+    torch.testing.assert_close(aligns[1].student_input_ids, data["input_ids"])
+
+
 def test_automodel_cp_layout_rejects_non_divisible_student_sequence():
     cp_group = object()
     local_logits = torch.randn(1, 3, 2)
@@ -156,7 +211,7 @@ def test_automodel_cp_layout_rejects_non_divisible_student_sequence():
         prepare_xtoken_cross_tokenizer_loss_input(
             local_logits,
             {},
-            projection_matrix_paths=[],
+            teacher_is_cross_tokenizer=[],
             context_parallel_group=cp_group,
             cp_sharder=cp_sharder,
         )

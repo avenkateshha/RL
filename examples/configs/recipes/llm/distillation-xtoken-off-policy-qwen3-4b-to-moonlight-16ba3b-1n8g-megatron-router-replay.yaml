@@ -42,6 +42,7 @@ policy:
       moe_backend: triton
 teachers:
 - model_name: Qwen/Qwen3-4B
+  is_cross_tokenizer: true
   aligner:
     projection_matrix_path: ${oc.env:XTOKEN_PROJECTION_PATH}
     pseudo_target_path: null

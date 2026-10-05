@@ -125,7 +125,7 @@ def xtoken_non_student_seq_keys(
     for i in range(loss_fn.num_teachers):
         keys.add(f"teacher_{i}_full_logits_ipc")
         keys.add(f"teacher_{i}_sparse_logits_ipc")
-        if loss_fn.projection_matrix_paths[i] is not None:  # cross-tokenizer
+        if loss_fn.teacher_is_cross_tokenizer[i]:
             keys.add(f"teacher_{i}_input_ids")
             keys.add(f"teacher_{i}_token_mask")
             keys.add(f"alignment_{i}_pair_valid")
@@ -495,8 +495,9 @@ class TeacherAlignerConfig(BaseModel, extra="allow"):
 
     Attributes:
         projection_matrix_path: Path to this teacher's student-to-teacher
-            projection matrix. ``None`` marks a same-tokenizer teacher, which
-            bypasses projection and alignment and uses direct per-position KL.
+            projection matrix. Optional for table-based v6 loss when
+            ``common_indices_from_subtoks`` is enabled, or for pure ALM.
+            Tokenizer mode is selected by ``TeacherConfig.is_cross_tokenizer``.
         drop_first_assistant_chunk_kl: Whether chat-mode alignment drops the
             first content pair in each assistant message for this teacher. The
             CE token mask is unaffected.
@@ -600,7 +601,7 @@ def _get_teacher_logits_ipc(
         raise ValueError(
             "xToken lockstep packing currently supports dense teacher IPC only."
         )
-    if topk_k > 0 and loss_fn.projection_matrix_paths[teacher_idx] is not None:
+    if topk_k > 0 and loss_fn.teacher_is_cross_tokenizer[teacher_idx]:
         noise_filter_topk = int(loss_fn.cfg["prefix_bidir_v3_noise_filter_topk"])
         if noise_filter_topk < 0:
             raise ValueError(
@@ -646,14 +647,26 @@ class TeacherConfig(BaseModel, extra="allow"):
     for ``Policy`` construction.
 
     Attributes:
+        is_cross_tokenizer: Explicit tokenizer-mode selector. ``True`` enables
+            alignment and cross-tokenizer loss independently of the projection
+            matrix path. ``False`` selects same-tokenizer direct KL. ``None``
+            preserves legacy inference from ``aligner.projection_matrix_path``.
         aligner: This teacher's projection and chat-alignment settings.
         weight: Static loss weight for this teacher when several teachers are
             aggregated (``kd_loss_mode="sum"`` / the convex ``"averaged_logits"``
             mix). Single-teacher runs leave it at ``1.0``.
     """
 
+    is_cross_tokenizer: Optional[bool] = None
     aligner: TeacherAlignerConfig = Field(default_factory=TeacherAlignerConfig)
     weight: float = 1.0
+
+    @property
+    def uses_cross_tokenizer(self) -> bool:
+        """Resolve tokenizer mode, retaining path inference for older configs."""
+        if self.is_cross_tokenizer is not None:
+            return self.is_cross_tokenizer
+        return self.aligner.projection_matrix_path is not None
 
     @model_validator(mode="before")
     @classmethod
@@ -684,7 +697,7 @@ class TeacherConfig(BaseModel, extra="allow"):
         """Recover the plain ``PolicyConfig`` dict (cross-tokenizer knobs stripped)."""
         return cast(
             PolicyConfig,
-            self.model_dump(exclude={"aligner", "weight"}),
+            self.model_dump(exclude={"is_cross_tokenizer", "aligner", "weight"}),
         )
 
 
@@ -1273,11 +1286,12 @@ def _assert_same_tokenizer_reuse_safe(
     )
     if differing_fields:
         raise ValueError(
-            f"teachers[{teacher_idx}].aligner.projection_matrix_path is null, "
+            f"teachers[{teacher_idx}] is configured for same-tokenizer reuse, "
             "but safe "
             "student-token reuse requires identical tokenizer mapping, backend, "
             "special-token configuration, chat template, and template kwargs; "
-            f"differing fields: {differing_fields}."
+            f"differing fields: {differing_fields}. Set "
+            f"teachers[{teacher_idx}].is_cross_tokenizer=true to enable alignment."
         )
 
 
@@ -1286,14 +1300,27 @@ def validate_xtoken_tokenizer_reuse(
     student_tokenizer: PreTrainedTokenizerBase,
     teacher_tokenizers: Sequence[PreTrainedTokenizerBase],
 ) -> None:
-    """Validate every null-projection teacher before any worker is created."""
+    """Validate tokenizer modes and safe token reuse before creating workers."""
     if len(teacher_tokenizers) != len(master_config.teachers):
         raise ValueError(
             f"expected one tokenizer per teacher; got {len(teacher_tokenizers)} "
             f"tokenizers for {len(master_config.teachers)} teachers."
         )
     for teacher_idx, teacher in enumerate(master_config.teachers):
-        if teacher.aligner.projection_matrix_path is None:
+        aligner = teacher.aligner
+        artifact_paths = (
+            aligner.projection_matrix_path,
+            aligner.pseudo_target_path,
+            aligner.reverse_pseudo_target_path,
+        )
+        if not teacher.uses_cross_tokenizer:
+            if any(path is not None for path in artifact_paths):
+                raise ValueError(
+                    f"teachers[{teacher_idx}] is configured for same-tokenizer "
+                    "reuse but also configures cross-tokenizer artifacts. "
+                    f"Set teachers[{teacher_idx}].is_cross_tokenizer=true or "
+                    "remove the artifact paths."
+                )
             _assert_same_tokenizer_reuse_safe(
                 student_tokenizer=student_tokenizer,
                 teacher_tokenizer=teacher_tokenizers[teacher_idx],
@@ -1301,6 +1328,22 @@ def validate_xtoken_tokenizer_reuse(
                 teacher_config=teacher.policy_config(),
                 teacher_idx=teacher_idx,
             )
+        elif aligner.projection_matrix_path is None:
+            loss_config = master_config.loss_fn
+            if loss_config.get("prefix_bidir_v3_pure_alm"):
+                continue
+            if not loss_config.get("common_indices_from_subtoks"):
+                raise ValueError(
+                    f"teachers[{teacher_idx}] requires "
+                    "aligner.projection_matrix_path unless "
+                    "loss_fn.common_indices_from_subtoks=true or "
+                    "loss_fn.prefix_bidir_v3_pure_alm=true."
+                )
+            if aligner.pseudo_target_path is None:
+                raise ValueError(
+                    "loss_fn.common_indices_from_subtoks=true requires "
+                    f"teachers[{teacher_idx}].aligner.pseudo_target_path."
+                )
 
 
 def setup(
@@ -1360,9 +1403,7 @@ def setup(
             f"'row_topk', got {teacher_topk_support_mode!r}"
         )
     if teacher_topk_ipc_k > 0:
-        has_sparse_teacher = any(
-            teacher.aligner.projection_matrix_path is not None for teacher in teachers
-        )
+        has_sparse_teacher = any(teacher.uses_cross_tokenizer for teacher in teachers)
         if has_sparse_teacher and loss_config["sum_weights_metric"] is not None:
             raise ValueError(
                 "Sparse teacher IPC cannot be combined with sum_weights_metric; "
@@ -1376,7 +1417,7 @@ def setup(
         for i, (teacher, teacher_config) in enumerate(
             zip(teachers, teacher_configs, strict=True)
         ):
-            if teacher.aligner.projection_matrix_path is None:
+            if not teacher.uses_cross_tokenizer:
                 continue
             dtensor_cfg = teacher_config["dtensor_cfg"]
             if not (dtensor_cfg["enabled"] and dtensor_cfg.get("_v2", False)):
@@ -1385,10 +1426,9 @@ def setup(
                     f"cross-tokenizer teacher; teachers[{i}] is not DTensor-V2."
                 )
 
-    # A null projection path marks a same-tokenizer teacher (direct KL, no
-    # projection/alignment). Reuse is safe only when the complete tokenizer
-    # semantics match; equal vocabulary size alone does not prove that token IDs
-    # or chat rendering have the same meaning.
+    # Same-tokenizer teachers use direct KL without alignment. Reuse is safe
+    # only when the complete tokenizer semantics match; equal vocabulary size
+    # alone does not prove that token IDs or chat rendering have the same meaning.
     validate_xtoken_tokenizer_reuse(
         master_config, student_tokenizer, teacher_tokenizers
     )
@@ -1421,7 +1461,7 @@ def setup(
     # no alignment — the loss does a direct per-position KL there).
     aligners: list[Optional[TokenAligner]] = [
         None
-        if teacher.aligner.projection_matrix_path is None
+        if not teacher.uses_cross_tokenizer
         else TokenAligner(
             student_tokenizer=student_tokenizer,
             teacher_tokenizer=teacher_tokenizers[i],
@@ -1645,6 +1685,7 @@ def setup(
         **loss_config,
         "student_vocab_size": len(student_tokenizer),
         "teacher_vocab_sizes": [len(tok) for tok in teacher_tokenizers],
+        "teacher_is_cross_tokenizer": [t.uses_cross_tokenizer for t in teachers],
         "projection_matrix_paths": [
             teacher.aligner.projection_matrix_path for teacher in teachers
         ],
@@ -1816,7 +1857,7 @@ def build_xtoken_lockstep_packing_plan(
     ]
     for teacher_idx, teacher in enumerate(master_config.teachers):
         teacher_config = teacher.policy_config()
-        if teacher.aligner.projection_matrix_path is None:
+        if not teacher.uses_cross_tokenizer:
             teacher_raw_lengths = student_raw_lengths
         else:
             teacher_raw_lengths = _batch_length_tuple(
@@ -1956,7 +1997,7 @@ def export_teacher_logits_and_pack(
         if "student_semantic_regions" in batch:
             train_data["student_semantic_regions"] = batch["student_semantic_regions"]
     for i, teacher_policy in enumerate(teacher_policies):
-        same_vocab = loss_fn.projection_matrix_paths[i] is None
+        same_vocab = not loss_fn.teacher_is_cross_tokenizer[i]
         semantic_key = f"teacher_{i}_semantic_regions"
         if packing_plan is not None and semantic_key in batch:
             train_data[semantic_key] = batch[semantic_key]

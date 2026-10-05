@@ -2,18 +2,17 @@
 
 NeMo RL supports off-policy distillation between a student and a teacher that
 **do not share a tokenizer** — for example, distilling a Qwen3-4B teacher into
-a Llama-3.2-1B student. Cross-tokenizer ("x-token") distillation handles the
-vocabulary mismatch by routing student logits through a precomputed
-**projection matrix** that maps each student token to the teacher tokens it
-most plausibly corresponds to, projecting the student into the teacher's
-vocab space so the two distributions can be compared.
+a Llama-3.2-1B student. Cross-tokenizer ("x-token") distillation aligns the
+student and teacher token sequences, then compares distributions over
+corresponding token events. V6 can derive those relationships entirely from
+forward and reverse **subtoken tables**, without a projection matrix.
+Matrix-derived common-vocabulary support remains supported.
 
-Tokenizer vocabularies overlap only partially, which is what makes the
-projection necessary. The table below reports the pairwise overlap
+Tokenizer vocabularies overlap only partially, so their token relationships
+must be mapped. The table below reports the pairwise overlap
 (intersection divided by the smaller vocabulary, on canonical token forms)
 across several model tokenizers; the off-diagonal entries sit well below
-`1.0` — that shared-vocabulary gap is exactly what the projection matrix
-bridges.
+`1.0`.
 
 | Model | Mistral-NeMo-Minitron-8B | Qwen3-8B-Base | Llama-3.2-1B | gemma-3-4b-it | OLMo2-8B-SuperBPE-t160k | gpt-oss-20b |
 |---|---:|---:|---:|---:|---:|---:|
@@ -27,11 +26,12 @@ bridges.
 This guide explains how to:
 
 1. Create the projection matrix from a (student, teacher) tokenizer pair.
-2. Launch a distillation with the projection matrix.
+2. Launch distillation with the projection matrix, or use existing subtoken
+   tables for [matrix-free v6](#matrix-free-v6-with-subtoken-tables).
 
 ## How it works
 
-A full run has two phases. The three prep steps are *offline data prep* —
+A run using a projection matrix has two phases. The three prep steps are *offline data prep* —
 small CLI tools you run once per (student, teacher) pair — and the result is a
 single `.pt` file. The final step is the actual distillation training loop.
 
@@ -199,8 +199,8 @@ uv run python -m tools.x_token.sort_and_cut_projection_matrix \
 
 The training entrypoint is `examples/run_xtoken_off_policy_distillation.py` with the
 exemplar config at `examples/configs/xtoken_off_policy_distillation.yaml`. The exemplar
-defaults to Llama-3.2-1B (student) ← Qwen3-4B (teacher) and the P-KL loss
-mode. For data it points `data.train.data_files` at the ungated, CC-BY-4.0
+defaults to Llama-3.2-1B (student) ← Qwen3-4B (teacher) and the v6
+prefix-bidir partition loss. For data it points `data.train.data_files` at the ungated, CC-BY-4.0
 NVIDIA **Nemotron-Pretraining-Specialized-v1.1** corpus
 (`Nemotron-Pretraining-Formal-Logic` subset) over `hf://`, so the recipe runs
 out of the box with no auth or extra setup. The `projection_matrix_path` below
@@ -216,12 +216,47 @@ uv run python examples/run_xtoken_off_policy_distillation.py \
     cluster.num_nodes=1
 ```
 
-The exemplar config keeps each teacher's `aligner.projection_matrix_path` as
-`null`, so the projection matrix must always be supplied at the CLI (per
-teacher, e.g. `teachers.0.aligner.projection_matrix_path=...`) — this keeps the
-config reusable across (student, teacher) pairs. `data.train.data_files`
+The exemplar explicitly sets `teachers[0].is_cross_tokenizer: true` and keeps
+`aligner.projection_matrix_path: null` so artifact paths can be supplied for
+each tokenizer pair. Its default `loss_fn.common_indices_from_subtoks: false`
+requires a projection path; the table-based configuration below does not.
+`data.train.data_files`
 already points at the default NVIDIA corpus described above; override it only
 to train on your own `.arrow`/`.parquet`/`.json`/`.txt` corpus.
+
+### Matrix-free v6 with subtoken tables
+
+Select tokenizer mode independently of the projection artifact with
+`teachers[i].is_cross_tokenizer`:
+
+| Value | Behavior |
+|---|---|
+| `true` | Align student and teacher token sequences and use cross-tokenizer v6 loss. |
+| `false` | Reuse matching token positions and use same-tokenizer direct KL. Cross-tokenizer artifact paths must be unset. |
+| Omitted or `null` | Preserve legacy inference: a configured projection path selects cross-tokenizer mode; no path selects same-tokenizer mode. |
+
+For table-based v6, set the selector to `true`, derive common-vocabulary
+indices from subtokens, and supply the forward and reverse tables. The forward
+table maps student tokens to teacher token chains; the reverse table maps
+teacher tokens to student token chains. Both use the `subtoks` and `lengths`
+fields. The following overrides keep the projection path unset:
+
+```bash
+uv run python examples/run_xtoken_off_policy_distillation.py \
+    --config examples/configs/xtoken_off_policy_distillation.yaml \
+    teachers.0.is_cross_tokenizer=true \
+    teachers.0.aligner.projection_matrix_path=null \
+    teachers.0.aligner.pseudo_target_path=/path/to/student_to_teacher_subtoks.pt \
+    teachers.0.aligner.reverse_pseudo_target_path=/path/to/teacher_to_student_subtoks.pt \
+    loss_fn.common_indices_from_subtoks=true \
+    cluster.gpus_per_node=8 \
+    cluster.num_nodes=1
+```
+
+The tables supply the common-token map and mismatch prefix support, so this
+configuration does not load a projection matrix. Each cross-tokenizer teacher
+needs tables for its own tokenizer pair. Same-tokenizer teachers in a mixed
+run keep `is_cross_tokenizer: false` and leave all artifact paths unset.
 
 ### Text and chat batches
 
@@ -354,8 +389,9 @@ uv run python examples/run_xtoken_off_policy_distillation.py \
   --config examples/configs/recipes/llm/distillation-off-policy-qwen3-4b-to-1.7b-1n8g-dtensor-tp1-cascade.yaml
 ```
 
-For a cross-tokenizer pair, supply the pair's projection matrix as described
-above and retain compatible native templates. Set sequence limits for the
+For a cross-tokenizer pair, set `is_cross_tokenizer: true`, supply the pair's
+projection matrix or subtoken tables as described above, and retain compatible
+native templates. Set sequence limits for the
 selected conversations; the existing chat collator rejects overlength rows.
 The example is a configuration starting point, not a convergence benchmark.
 

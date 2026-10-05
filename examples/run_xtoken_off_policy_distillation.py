@@ -85,9 +85,10 @@ def main() -> None:
         )
         print(f"Resolved config written to: {resolved_config_path}", flush=True)
 
-    # Per-teacher same-vocab vs cross-tokenizer is determined solely by
-    # `teachers[i].aligner.projection_matrix_path` (null => same-vocab direct
-    # KL; set => cross-tokenizer). Safe direct token reuse is checked using the
+    # `teachers[i].is_cross_tokenizer` selects alignment and cross-tokenizer
+    # loss independently of the projection artifact. An omitted flag retains
+    # legacy inference from `teachers[i].aligner.projection_matrix_path`.
+    # Safe direct token reuse is checked using the
     # full tokenizer mapping/backend, special-token state, chat template, and
     # template kwargs. Tokenizer names and vocabulary sizes alone are not
     # sufficient evidence of semantic identity.

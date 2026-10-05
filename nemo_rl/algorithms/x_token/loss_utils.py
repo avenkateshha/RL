@@ -1404,7 +1404,7 @@ def prepare_xtoken_cross_tokenizer_loss_input(
     logits: torch.Tensor,
     data: Mapping[str, Any],
     *,
-    projection_matrix_paths: list[Optional[str]],
+    teacher_is_cross_tokenizer: list[bool],
     vocab_parallel_group: Optional[torch.distributed.ProcessGroup] = None,
     context_parallel_group: Optional[torch.distributed.ProcessGroup] = None,
     cp_sharder: Optional["ContextParallelSharder"] = None,
@@ -1424,17 +1424,18 @@ def prepare_xtoken_cross_tokenizer_loss_input(
     its per-rank CUDA IPC handles and does the shared CP-resolution the loss
     needs. The contiguous student logits / input_ids / token_mask are relaid
     once and shared across teachers. Per teacher, a localized alignment is built: a
-    cross-tokenizer teacher (``projection_matrix_paths[i]`` set) gets the
+    cross-tokenizer teacher (``teacher_is_cross_tokenizer[i]`` true) gets the
     localized, next-token-shifted chunk alignment from its ``alignment_{i}_*``
-    keys; a same-tokenizer teacher (``None`` path) gets a thin alignment carrying
+    keys; a same-tokenizer teacher (false flag) gets a thin alignment carrying
     only the shared student fields (identity 1:1 token alignment, no chunks).
     TP/CP groups come from the student ``logits``' device mesh, falling back to
     the passed groups for non-DTensor logits.
 
     Args:
-        projection_matrix_paths: Per-teacher projection paths. Its length is the
-            teacher count and drives the ``teacher_{i}_*`` / ``alignment_{i}_*``
-            keys read here; a ``None`` entry marks a same-tokenizer teacher.
+        teacher_is_cross_tokenizer: Resolved per-teacher tokenizer modes. Its
+            length is the teacher count and drives the ``teacher_{i}_*`` /
+            ``alignment_{i}_*`` keys read here; a false entry marks a
+            same-tokenizer teacher.
         cp_sharder: Automodel's model-owned sequence layout. When provided, it
             replaces the legacy load-balanced CP relayout for student tensors.
 
@@ -1534,7 +1535,7 @@ def prepare_xtoken_cross_tokenizer_loss_input(
     student_cp_size = (
         torch.distributed.get_world_size(cp_group) if cp_group is not None else 1
     )
-    for i, proj_path in enumerate(projection_matrix_paths):
+    for i, is_cross_tokenizer in enumerate(teacher_is_cross_tokenizer):
         sparse_key = f"teacher_{i}_sparse_logits_ipc"
         full_key = f"teacher_{i}_full_logits_ipc"
         has_sparse_logits = sparse_key in data
@@ -1545,7 +1546,7 @@ def prepare_xtoken_cross_tokenizer_loss_input(
                 f"IPC payload; dense={has_full_logits}, sparse={has_sparse_logits}."
             )
         if has_sparse_logits:
-            if proj_path is None:
+            if not is_cross_tokenizer:
                 raise ValueError(
                     f"Same-vocab teacher {i} cannot use sparse xToken IPC."
                 )
@@ -1574,7 +1575,7 @@ def prepare_xtoken_cross_tokenizer_loss_input(
             teacher_full_logits_by_idx[i] = teacher_full_logits
             dense_reconstruction_fallbacks_by_idx[i] = dense_reconstruction_fallbacks
             teacher_seq_len = int(teacher_full_logits.shape[1])
-        if proj_path is None:
+        if not is_cross_tokenizer:
             # Same-tokenizer teacher: identity token alignment, no chunk
             # localization. Carry only the shared student fields.
             aligns_by_idx[i] = LocalizedAlignment(

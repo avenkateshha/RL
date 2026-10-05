@@ -20,9 +20,13 @@ import torch
 from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLossFn
 
 
-def test_cross_token_teacher_receives_its_global_chunk_count():
+@pytest.mark.parametrize("projection_path", ["projection.pt", None])
+def test_cross_token_teacher_receives_its_global_chunk_count(
+    projection_path: str | None,
+) -> None:
     loss_fn = object.__new__(CrossTokenizerDistillationLossFn)
-    loss_fn.projection_matrix_paths = [None, None, "projection.pt"]
+    loss_fn.projection_matrix_paths = [None, None, projection_path]
+    loss_fn.teacher_is_cross_tokenizer = [False, False, True]
     loss_fn.teacher_vocab_sizes = [16, 16, 32]
     loss_fn._compute_prefix_bidir_partition_kl_v3 = MagicMock(
         return_value=(torch.tensor(1.5), {})
@@ -53,6 +57,7 @@ def test_cross_token_teacher_receives_its_global_chunk_count():
 def test_missing_cross_token_teacher_count_does_not_fall_back_to_microbatch():
     loss_fn = object.__new__(CrossTokenizerDistillationLossFn)
     loss_fn.projection_matrix_paths = ["projection.pt"]
+    loss_fn.teacher_is_cross_tokenizer = [True]
     loss_fn.teacher_vocab_sizes = [32]
 
     with pytest.raises(KeyError):

@@ -287,18 +287,16 @@ class TokenAligner:
         student_tokenizer: HF tokenizer for the student model. Must be a fast
             tokenizer so the collator can emit ``offset_mapping``.
         teacher_tokenizer: HF tokenizer for the teacher model.
-        projection_matrix_path: Path retained on the aligner for downstream
-            callers (e.g. the loss fn) that materialize the projection on
-            their training device via
-            :func:`nemo_rl.algorithms.x_token.loss_utils.get_sparse_projection_matrix`
-            or :func:`nemo_rl.algorithms.x_token.loss_utils.get_topk_projection`.
+        projection_matrix_path: Optional projection artifact metadata retained
+            for callers. Alignment uses tokenizer offsets and does not consume
+            a projection matrix; table-based v6 runs may pass ``None``.
     """
 
     def __init__(
         self,
         student_tokenizer,
         teacher_tokenizer,
-        projection_matrix_path: str,
+        projection_matrix_path: str | None = None,
     ):
         self.student_tokenizer = student_tokenizer
         self.teacher_tokenizer = teacher_tokenizer

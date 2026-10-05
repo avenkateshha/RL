@@ -1,6 +1,6 @@
 # Cascade Stage-2 native-chat preparation with the existing off-policy runner.
 # Both policies use the same pinned Qwen tokenizer, so direct KD needs no
-# projection matrix. Cross-tokenizer pairs require their own projection asset.
+# projection matrix. Cross-tokenizer pairs use a projection asset or subtoken tables.
 defaults: ../../xtoken_off_policy_distillation.yaml
 
 distillation:
@@ -37,6 +37,7 @@ policy:
 # DTensor settings needed by the existing teacher worker.
 teachers:
   - model_name: Qwen/Qwen3-4B
+    is_cross_tokenizer: false
     aligner:
       projection_matrix_path: null
       drop_first_assistant_chunk_kl: false

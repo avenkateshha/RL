@@ -2165,10 +2165,13 @@ class CrossTokenizerDistillationLossConfig(TypedDict):
     """Config for cross-tokenizer distillation loss.
 
     Attributes:
+        teacher_is_cross_tokenizer: Resolved per-teacher tokenizer-mode flags.
+            ``True`` selects alignment-aware v6 loss; ``False`` selects direct
+            same-tokenizer KL. Runtime-injected by
+            ``xtoken_off_policy_distillation.setup``.
         projection_matrix_paths: Per-teacher list of filesystem paths to the
-            .pt projection file (``None`` marks a same-tokenizer teacher: direct
-            KL, no projection). Each .pt holds either the dense top-k projection
-            (dict with 'indices' and 'likelihoods' tensors of shape
+            optional .pt projection file. Each .pt holds either the dense top-k
+            projection (dict with 'indices' and 'likelihoods' tensors of shape
             [V_student, top_k]) or the sparse multi-token format
             (dict[(student_id, teacher_id)] -> count), loaded lazily on first
             call by each worker process. Runtime-injected by
@@ -2222,6 +2225,7 @@ class CrossTokenizerDistillationLossConfig(TypedDict):
     # per-teacher lists + the student vocab size); not user loss_fn keys.
     student_vocab_size: NotRequired[int]
     teacher_vocab_sizes: NotRequired[list[int]]
+    teacher_is_cross_tokenizer: NotRequired[list[bool]]
     projection_matrix_paths: NotRequired[list[Optional[str]]]
     teacher_weights: NotRequired[list[float]]
     # ------------------------------------------------------------------ #
@@ -2430,12 +2434,23 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # full-vocab logits (the loss derives the top-k subset student-side), so
         # there is no per-teacher ``send_full_logits`` flag.
         self.projection_matrix_paths = list(cfg["projection_matrix_paths"])
+        if "teacher_is_cross_tokenizer" in cfg:
+            self.teacher_is_cross_tokenizer = list(cfg["teacher_is_cross_tokenizer"])
+        else:
+            # Compatibility for direct callers predating the explicit mode
+            # list. Runtime setup always injects the resolved classification.
+            self.teacher_is_cross_tokenizer = [
+                path is not None for path in self.projection_matrix_paths
+            ]
+        if any(type(mode) is not bool for mode in self.teacher_is_cross_tokenizer):
+            raise ValueError("teacher_is_cross_tokenizer entries must be booleans")
         self.teacher_vocab_sizes = list(cfg["teacher_vocab_sizes"])
         self.teacher_weights = list(cfg["teacher_weights"])
         # Every per-teacher list must have the same length (one entry per
         # teacher); a mismatch would otherwise surface as a deep IndexError
         # mid-training instead of a clear error here.
         per_teacher_lens = {
+            "teacher_is_cross_tokenizer": len(self.teacher_is_cross_tokenizer),
             "projection_matrix_paths": len(self.projection_matrix_paths),
             "teacher_vocab_sizes": len(self.teacher_vocab_sizes),
             "teacher_weights": len(self.teacher_weights),
@@ -2444,7 +2459,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             raise ValueError(
                 f"per-teacher lists must be equal length, got {per_teacher_lens}"
             )
-        self.num_teachers = len(self.projection_matrix_paths)
+        self.num_teachers = len(self.teacher_is_cross_tokenizer)
         # ------------------------------------------------------------------
         # v6 (prefix_bidir_partition_kl_v3) state. Each cross-tokenizer teacher's
         # KD term is the prefix-bidir partition KL; same-vocab teachers keep the
@@ -2464,6 +2479,47 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         self.reverse_pseudo_target_paths: list[Optional[str]] = list(
             cfg.get("reverse_pseudo_target_paths", [None] * self.num_teachers)
         )
+        per_teacher_lens.update(
+            pseudo_target_paths=len(self.pseudo_target_paths),
+            reverse_pseudo_target_paths=len(self.reverse_pseudo_target_paths),
+        )
+        if len(set(per_teacher_lens.values())) != 1:
+            raise ValueError(
+                f"per-teacher lists must be equal length, got {per_teacher_lens}"
+            )
+        for i, is_cross_tokenizer in enumerate(self.teacher_is_cross_tokenizer):
+            if not is_cross_tokenizer and any(
+                (
+                    self.projection_matrix_paths[i],
+                    self.pseudo_target_paths[i],
+                    self.reverse_pseudo_target_paths[i],
+                )
+            ):
+                raise ValueError(
+                    f"Teacher {i}: same-tokenizer mode cannot use projection or "
+                    "pseudo-target artifacts. Set teacher_is_cross_tokenizer "
+                    "to true for this teacher."
+                )
+            if (
+                is_cross_tokenizer
+                and self.common_indices_from_subtoks
+                and not cfg.get("prefix_bidir_v3_pure_alm")
+                and not self.pseudo_target_paths[i]
+            ):
+                raise ValueError(
+                    f"Teacher {i}: pseudo_target_paths[{i}] is required when "
+                    "common_indices_from_subtoks=true."
+                )
+        if not self.common_indices_from_subtoks and not cfg.get(
+            "prefix_bidir_v3_pure_alm"
+        ):
+            for i, is_cross_tokenizer in enumerate(self.teacher_is_cross_tokenizer):
+                if is_cross_tokenizer and not self.projection_matrix_paths[i]:
+                    raise ValueError(
+                        f"Teacher {i}: projection_matrix_paths[{i}] is required "
+                        "unless common_indices_from_subtoks=true or "
+                        "prefix_bidir_v3_pure_alm=true."
+                    )
         # Optional per-microbatch loss dump for parity comparison
         # (NRL_XTOKEN_LOSS_DUMP_DIR). Raw floats from the loss-compute site.
         self._loss_dump_dir = os.environ.get("NRL_XTOKEN_LOSS_DUMP_DIR")
@@ -2501,8 +2557,8 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         # the same worker share one load.
 
     def _teacher_is_same_vocab(self, i: int) -> bool:
-        """A teacher is same-vocab (direct KL, no projection) iff its path is None."""
-        return self.projection_matrix_paths[i] is None
+        """Whether teacher ``i`` uses direct KL on the student's tokenization."""
+        return not self.teacher_is_cross_tokenizer[i]
 
     @staticmethod
     def _student_kd_mask(align: LocalizedAlignment) -> torch.Tensor:
@@ -3021,17 +3077,17 @@ class CrossTokenizerDistillationLossFn(LossFunction):
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Convex-weighted average of teacher logits, then one direct KL.
 
-        Valid only when all teachers are same-tokenizer (no projection) and ship
+        Valid only when all teachers are classified as same-tokenizer and ship
         full logits of identical shape. Otherwise falls back to a plain
         static-weight sum (no dynamic weights, no ``normalize_teacher_by_vocab``).
         """
         full = [teacher_full_logits_by_idx.get(i) for i in range(self.num_teachers)]
         # Direct per-position KL is only valid when every teacher shares the
-        # student's tokenizer (no projection matrix) *and* ships full logits of
-        # identical shape. Two cross-tokenizer teachers can have matching shapes
+        # student's tokenizer and ships full logits of identical shape. Two
+        # cross-tokenizer teachers can have matching shapes
         # yet still need the projection/alignment path, so the shape check alone
         # is insufficient.
-        same_tokenizer = all(p is None for p in self.projection_matrix_paths)
+        same_tokenizer = not any(self.teacher_is_cross_tokenizer)
         same_shape = all(f is not None for f in full) and (
             len({tuple(f.shape) for f in full if f is not None}) == 1
         )

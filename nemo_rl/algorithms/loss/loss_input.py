@@ -333,8 +333,8 @@ def prepare_loss_input(
         # Rebuild each teacher's full-vocab logits from its per-rank CUDA IPC
         # handles and do the shared CP-resolution the loss needs; the loss fn
         # does the per-teacher projection / chunk-average / KL reductions and
-        # aggregates them by ``kd_loss_mode``. ``projection_matrix_paths`` drives
-        # the teacher count and which teachers are same-tokenizer (``None``). The
+        # aggregates them by ``kd_loss_mode``. ``teacher_is_cross_tokenizer`` drives
+        # the teacher count and which teachers are same-tokenizer (``False``). The
         # TP/CP groups are derived from the student logits' own device mesh.
         (
             student_logits_contig,
@@ -348,7 +348,7 @@ def prepare_loss_input(
         ) = prepare_xtoken_cross_tokenizer_loss_input(
             logits,
             data,
-            projection_matrix_paths=loss_fn.projection_matrix_paths,
+            teacher_is_cross_tokenizer=loss_fn.teacher_is_cross_tokenizer,
             vocab_parallel_group=vocab_parallel_group,
             context_parallel_group=context_parallel_group,
             cp_sharder=cp_sharder,

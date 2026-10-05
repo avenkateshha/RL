@@ -275,6 +275,7 @@ def _enable_lockstep_packing(
         enable_policy_config(teacher_config)
         cfg.teachers[teacher_idx] = TeacherConfig(
             **teacher_config,
+            is_cross_tokenizer=teacher.is_cross_tokenizer,
             aligner=teacher.aligner.model_dump(),
             weight=teacher.weight,
         )
@@ -315,6 +316,7 @@ def mock_xtoken_components():
     loss_fn = MagicMock()
     loss_fn.num_teachers = 1
     loss_fn.projection_matrix_paths = ["/tmp/dummy-projection.pt"]
+    loss_fn.teacher_is_cross_tokenizer = [True]
     loss_fn.teacher_vocab_sizes = [24]
     loss_fn.cfg = {
         "temperature": 1.0,
@@ -374,9 +376,7 @@ def _patched_setup_call(
     student_tok = _make_tokenizer(student_vocab)
     teacher_tokenizers = [
         _make_tokenizer(
-            student_vocab
-            if teacher.aligner.projection_matrix_path is None
-            else teacher_vocab
+            student_vocab if not teacher.uses_cross_tokenizer else teacher_vocab
         )
         for teacher in master_config.teachers
     ]
@@ -390,7 +390,7 @@ def _patched_setup_call(
         patch.object(xt_mod, "Policy") as mock_policy_cls,
         patch.object(xt_mod, "Logger"),
         patch.object(xt_mod, "CheckpointManager") as mock_cp_cls,
-        patch.object(xt_mod, "TokenAligner"),
+        patch.object(xt_mod, "TokenAligner") as mock_aligner_cls,
         patch.object(
             xt_mod, "CrossTokenizerCollator", wraps=CrossTokenizerCollator
         ) as mock_collator_cls,
@@ -420,6 +420,7 @@ def _patched_setup_call(
             "cluster": mock_cluster,
             "policy": mock_policy_cls,
             "loss": mock_loss_cls,
+            "aligner": mock_aligner_cls,
             "collator": mock_collator_cls,
             "dataloader": mock_dl_cls,
             "checkpointer": mock_cp_cls,
@@ -451,6 +452,9 @@ def test_collator_cli_overrides_reach_setup(config_name: str) -> None:
     config = MasterConfig.model_validate(
         OmegaConf.to_container(overridden, resolve=True)
     )
+    for teacher in config.teachers:
+        if teacher.uses_cross_tokenizer:
+            teacher.aligner.projection_matrix_path = "/tmp/projection.pt"
 
     _, mocks = _patched_setup_call(config)
 
@@ -478,6 +482,9 @@ def test_collator_schema_defaults_when_block_is_omitted() -> None:
     loaded = load_config(config_path)
     del loaded["collator"]
     config = MasterConfig.model_validate(OmegaConf.to_container(loaded, resolve=True))
+    for teacher in config.teachers:
+        if teacher.uses_cross_tokenizer:
+            teacher.aligner.projection_matrix_path = "/tmp/projection.pt"
 
     _, mocks = _patched_setup_call(config)
 
@@ -554,6 +561,33 @@ def test_teacher_aligner_config_defaults():
     assert teacher.aligner.drop_first_assistant_chunk_kl is False
     assert teacher.aligner.pseudo_target_path is None
     assert teacher.aligner.reverse_pseudo_target_path is None
+    assert teacher.is_cross_tokenizer is None
+    assert teacher.uses_cross_tokenizer is False
+
+
+@pytest.mark.parametrize(
+    "explicit_mode,projection_path,expected",
+    [
+        (None, None, False),
+        (None, "/tmp/projection.pt", True),
+        (True, None, True),
+        (True, "/tmp/projection.pt", True),
+        (False, None, False),
+        (False, "/tmp/projection.pt", False),
+    ],
+)
+def test_teacher_tokenizer_mode_preserves_legacy_inference_and_explicit_flag(
+    explicit_mode: bool | None, projection_path: str | None, expected: bool
+) -> None:
+    teacher = TeacherConfig(
+        model_name="teacher",
+        is_cross_tokenizer=explicit_mode,
+        aligner={"projection_matrix_path": projection_path},
+    )
+
+    assert teacher.uses_cross_tokenizer is expected
+    assert teacher.model_dump()["is_cross_tokenizer"] is explicit_mode
+    assert "is_cross_tokenizer" not in teacher.policy_config()
 
 
 def test_teacher_aligner_config_explicit_values_serialize_and_stay_out_of_policy():
@@ -750,6 +784,7 @@ def test_setup_injects_vocab_sizes_into_loss_config():
     # Per-teacher metadata is injected as parallel lists (one teacher here).
     assert injected_cfg["teacher_vocab_sizes"] == [256]
     assert injected_cfg["projection_matrix_paths"] == ["/tmp/dummy-projection.pt"]
+    assert injected_cfg["teacher_is_cross_tokenizer"] == [True]
     assert injected_cfg["teacher_weights"] == [1.0]
     assert injected_cfg["pseudo_target_paths"] == ["/tmp/forward.pt"]
     assert injected_cfg["reverse_pseudo_target_paths"] == ["/tmp/reverse.pt"]
@@ -758,6 +793,99 @@ def test_setup_injects_vocab_sizes_into_loss_config():
     ] == [False]
     # Original master_config not mutated by the injection.
     assert cfg.loss_fn == original_loss_cfg
+
+
+def test_setup_table_only_cross_tokenizer_builds_aligner_and_injects_mode() -> None:
+    cfg = _make_master_config()
+    cfg.teachers[0].is_cross_tokenizer = True
+    cfg.teachers[0].aligner.projection_matrix_path = None
+    cfg.teachers[0].aligner.pseudo_target_path = "/tmp/forward.pt"
+    cfg.teachers[0].aligner.reverse_pseudo_target_path = "/tmp/reverse.pt"
+    cfg.loss_fn["common_indices_from_subtoks"] = True
+
+    _, mocks = _patched_setup_call(cfg, student_vocab=32, teacher_vocab=24)
+
+    mocks["aligner"].assert_called_once()
+    assert mocks["aligner"].call_args.kwargs["projection_matrix_path"] is None
+    assert mocks["collator"].call_args.kwargs["aligners"] == [
+        mocks["aligner"].return_value
+    ]
+    injected_cfg = mocks["loss"].call_args.args[0]
+    assert injected_cfg["teacher_is_cross_tokenizer"] == [True]
+    assert injected_cfg["projection_matrix_paths"] == [None]
+    assert injected_cfg["teacher_vocab_sizes"] == [24]
+    assert injected_cfg["pseudo_target_paths"] == ["/tmp/forward.pt"]
+    assert injected_cfg["reverse_pseudo_target_paths"] == ["/tmp/reverse.pt"]
+
+
+def test_setup_matrix_based_cross_tokenizer_rejects_missing_projection() -> None:
+    cfg = _make_master_config()
+    cfg.teachers[0].is_cross_tokenizer = True
+    cfg.teachers[0].aligner.projection_matrix_path = None
+
+    with pytest.raises(ValueError, match="projection_matrix_path"):
+        _patched_setup_call(cfg)
+
+
+def test_setup_table_only_cross_tokenizer_requires_forward_table() -> None:
+    cfg = _make_master_config()
+    cfg.teachers[0].is_cross_tokenizer = True
+    cfg.teachers[0].aligner.projection_matrix_path = None
+    cfg.loss_fn["common_indices_from_subtoks"] = True
+
+    with pytest.raises(ValueError, match="aligner.pseudo_target_path"):
+        _patched_setup_call(cfg)
+
+
+def test_setup_pure_alm_cross_tokenizer_accepts_no_artifacts() -> None:
+    cfg = _make_master_config()
+    cfg.teachers[0].is_cross_tokenizer = True
+    cfg.teachers[0].aligner.projection_matrix_path = None
+    cfg.loss_fn["prefix_bidir_v3_pure_alm"] = True
+
+    _, mocks = _patched_setup_call(cfg)
+
+    mocks["aligner"].assert_called_once()
+    injected_cfg = mocks["loss"].call_args.args[0]
+    assert injected_cfg["teacher_is_cross_tokenizer"] == [True]
+    assert injected_cfg["projection_matrix_paths"] == [None]
+    assert injected_cfg["pseudo_target_paths"] == [None]
+
+
+@pytest.mark.parametrize(
+    "artifact",
+    ["projection_matrix_path", "pseudo_target_path", "reverse_pseudo_target_path"],
+)
+def test_same_tokenizer_mode_rejects_cross_tokenizer_artifacts(artifact: str) -> None:
+    cfg = _make_master_config()
+    cfg.teachers[0].is_cross_tokenizer = False
+    cfg.teachers[0].aligner.projection_matrix_path = None
+    setattr(cfg.teachers[0].aligner, artifact, "/tmp/artifact.pt")
+
+    with pytest.raises(ValueError, match="cross-tokenizer artifacts"):
+        _patched_setup_call(cfg)
+
+
+@pytest.mark.parametrize(
+    "loss_overrides,error",
+    [
+        ({"sum_weights_metric": "teacher_prob"}, "dynamic teacher scoring"),
+        ({"kd_loss_mode": "select_teacher"}, "teacher selection"),
+    ],
+)
+def test_setup_table_only_sparse_teacher_preserves_scoring_guards(
+    loss_overrides: dict[str, object], error: str
+) -> None:
+    cfg = _make_master_config()
+    cfg.teachers[0].is_cross_tokenizer = True
+    cfg.teachers[0].aligner.projection_matrix_path = None
+    cfg.teachers[0].aligner.pseudo_target_path = "/tmp/forward.pt"
+    cfg.loss_fn["common_indices_from_subtoks"] = True
+    cfg.loss_fn["teacher_topk_ipc_k"] = 8
+    cfg.loss_fn.update(loss_overrides)
+
+    with pytest.raises(ValueError, match=error):
+        _patched_setup_call(cfg)
 
 
 def test_setup_sets_derived_train_iters_on_megatron_teacher_and_student():
@@ -1254,6 +1382,7 @@ def test_ipc_buffer_released_for_every_teacher_on_train_failure(
         t.get_full_logits_ipc.return_value = [{"payload_ipc": (4, 32)}]
     c.loss_fn.num_teachers = num_teachers
     c.loss_fn.projection_matrix_paths = [None] * num_teachers
+    c.loss_fn.teacher_is_cross_tokenizer = [False] * num_teachers
     # teacher_mbs is derived per entry in master_config.teachers, so it must
     # have one entry per teacher policy.
     c.master_config.teachers = [
@@ -1295,11 +1424,17 @@ class _FakeLossFn:
         self,
         projection_matrix_paths,
         *,
+        teacher_is_cross_tokenizer: list[bool] | None = None,
         teacher_topk_ipc_k=0,
         teacher_vocab_sizes=None,
     ):
         self.num_teachers = len(projection_matrix_paths)
         self.projection_matrix_paths = projection_matrix_paths
+        self.teacher_is_cross_tokenizer = (
+            teacher_is_cross_tokenizer
+            if teacher_is_cross_tokenizer is not None
+            else [path is not None for path in projection_matrix_paths]
+        )
         self.teacher_vocab_sizes = teacher_vocab_sizes or [32] * self.num_teachers
         self.cfg = {
             "temperature": 1.0,
@@ -1311,9 +1446,13 @@ class _FakeLossFn:
         }
 
 
-def test_skip_keys_builder_cross_and_same_vocab():
+@pytest.mark.parametrize("projection_path", ["/p0.pt", None])
+def test_skip_keys_builder_cross_and_same_vocab(projection_path: str | None) -> None:
     # teacher 0 cross-tokenizer (full logits); teacher 1 same-vocab.
-    loss_fn = _FakeLossFn(projection_matrix_paths=["/p0.pt", None])
+    loss_fn = _FakeLossFn(
+        projection_matrix_paths=[projection_path, None],
+        teacher_is_cross_tokenizer=[True, False],
+    )
     keys = xtoken_non_student_seq_keys(loss_fn)
     # Cross-tokenizer teacher 0: IPC handle list + teacher tokens + the
     # teacher-seq / max_pairs alignment keys are skipped.
@@ -1401,10 +1540,16 @@ def test_skip_keys_builder_same_vocab_full_logits():
     )
 
 
-def test_export_teacher_logits_packs_indexed_keys_and_runs_serially():
+@pytest.mark.parametrize("projection_path", ["/p0.pt", None])
+def test_export_teacher_logits_packs_indexed_keys_and_runs_serially(
+    projection_path: str | None,
+) -> None:
     # teacher 0 cross-tokenizer; teacher 1 same-vocab. Both ship full-vocab
     # logits over the unified get_full_logits_ipc producer (always-full).
-    loss_fn = _FakeLossFn(projection_matrix_paths=["/p0.pt", None])
+    loss_fn = _FakeLossFn(
+        projection_matrix_paths=[projection_path, None],
+        teacher_is_cross_tokenizer=[True, False],
+    )
     # Attach both teacher mocks to one parent so their calls land in a single
     # ordered list (lets us assert the serial interleaving below). Configure
     # the child return values after attaching.
@@ -1465,8 +1610,13 @@ def test_export_teacher_logits_preserves_student_routed_experts():
     assert train_data["routed_experts"] is routed_experts
 
 
-def test_export_teacher_logits_threads_lockstep_plan_and_occurrence_ids():
+@pytest.mark.parametrize("projection_path", ["/projection.pt", None])
+def test_export_teacher_logits_threads_lockstep_plan_and_occurrence_ids(
+    projection_path: str | None,
+) -> None:
     cfg = _make_master_config()
+    cfg.teachers[0].is_cross_tokenizer = True
+    cfg.teachers[0].aligner.projection_matrix_path = projection_path
     _enable_lockstep_packing(cfg, global_batch_size=2, capacity=64)
     batch = _make_batch(batch_size=2, t_student=4, t_teacher=6)
     batch["student_semantic_regions"] = [
@@ -1481,12 +1631,16 @@ def test_export_teacher_logits_threads_lockstep_plan_and_occurrence_ids():
         batch, cfg, batch_uid=17, data_parallel_size=1
     )
     assert plan is not None
+    assert plan.sides["student"].raw_lengths == (4, 4)
+    assert plan.sides["teacher_0"].raw_lengths == (6, 6)
     teacher = MagicMock()
     teacher.get_full_logits_ipc.return_value = [
         {"batch_item_id": item_id, "teacher_shards": []}
         for item_id in plan.canonical_batch_item_ids
     ]
-    loss_fn = _FakeLossFn(projection_matrix_paths=["/projection.pt"])
+    loss_fn = _FakeLossFn(
+        projection_matrix_paths=[projection_path], teacher_is_cross_tokenizer=[True]
+    )
 
     train_data = export_teacher_logits_and_pack(
         [teacher],
@@ -1542,9 +1696,13 @@ def test_build_teacher_force_ids_respects_position_zero_and_shift():
     assert torch.equal(force_ids, torch.tensor([[10, 12, 13, -1, -1]]))
 
 
-def test_export_teacher_logits_mixes_sparse_cross_and_dense_same_vocab():
+@pytest.mark.parametrize("projection_path", ["/p0.pt", None])
+def test_export_teacher_logits_mixes_sparse_cross_and_dense_same_vocab(
+    projection_path: str | None,
+) -> None:
     loss_fn = _FakeLossFn(
-        projection_matrix_paths=["/p0.pt", None],
+        projection_matrix_paths=[projection_path, None],
+        teacher_is_cross_tokenizer=[True, False],
         teacher_topk_ipc_k=8192,
         teacher_vocab_sizes=[151669, 128256],
     )
@@ -1578,8 +1736,16 @@ def test_export_teacher_logits_mixes_sparse_cross_and_dense_same_vocab():
     assert t1.get_full_logits_ipc.call_args.kwargs["micro_batch_size"] == 2
 
 
-def test_setup_preserves_aligner_config_across_interleaved_teacher_types():
+@pytest.mark.parametrize("projection_path", ["/tmp/dummy-projection.pt", None])
+def test_setup_preserves_aligner_config_across_interleaved_teacher_types(
+    projection_path: str | None,
+) -> None:
     cfg = _make_master_config()
+    cfg.teachers[0].is_cross_tokenizer = True
+    cfg.teachers[0].aligner.projection_matrix_path = projection_path
+    cfg.teachers[0].aligner.pseudo_target_path = "/tmp/forward.pt"
+    cfg.teachers[0].aligner.reverse_pseudo_target_path = "/tmp/reverse.pt"
+    cfg.loss_fn["common_indices_from_subtoks"] = True
     # Interleave a same-vocab teacher between two cross-tokenizer teachers.
     cfg.teachers.append(
         TeacherConfig(
@@ -1606,6 +1772,8 @@ def test_setup_preserves_aligner_config_across_interleaved_teacher_types():
                 "aligner": {
                     "projection_matrix_path": "/tmp/dummy-projection-2.pt",
                     "drop_first_assistant_chunk_kl": True,
+                    "pseudo_target_path": "/tmp/forward-2.pt",
+                    "reverse_pseudo_target_path": "/tmp/reverse-2.pt",
                 },
                 "weight": 0.25,
                 "dtensor_cfg": {
@@ -1667,9 +1835,20 @@ def test_setup_preserves_aligner_config_across_interleaved_teacher_types():
     # Per-teacher metadata injected as parallel lists.
     injected_cfg = mock_loss_cls.call_args.args[0]
     assert injected_cfg["projection_matrix_paths"] == [
-        "/tmp/dummy-projection.pt",
+        projection_path,
         None,
         "/tmp/dummy-projection-2.pt",
+    ]
+    assert injected_cfg["teacher_is_cross_tokenizer"] == [True, False, True]
+    assert injected_cfg["pseudo_target_paths"] == [
+        "/tmp/forward.pt",
+        None,
+        "/tmp/forward-2.pt",
+    ]
+    assert injected_cfg["reverse_pseudo_target_paths"] == [
+        "/tmp/reverse.pt",
+        None,
+        "/tmp/reverse-2.pt",
     ]
     assert injected_cfg["teacher_weights"] == [1.0, 0.5, 0.25]
     assert injected_cfg["teacher_vocab_sizes"] == [24, 32, 28]
@@ -1980,23 +2159,39 @@ def test_dense_ipc_telemetry_counts_logical_shard_bytes():
 # ---------------------------------------------------------------------------
 
 
-def _bare_averaged_logits_loss_fn(projection_matrix_paths):
+def _bare_averaged_logits_loss_fn(
+    projection_matrix_paths: list[str | None],
+    *,
+    teacher_is_cross_tokenizer: list[bool] | None = None,
+) -> CrossTokenizerDistillationLossFn:
     """A ``CrossTokenizerDistillationLossFn`` carrying only the attrs the
     ``averaged_logits`` guard reads, built via ``__new__`` to skip the heavy
     config-driven ``__init__``."""
     fn = CrossTokenizerDistillationLossFn.__new__(CrossTokenizerDistillationLossFn)
     fn.num_teachers = len(projection_matrix_paths)
     fn.projection_matrix_paths = list(projection_matrix_paths)
+    fn.teacher_is_cross_tokenizer = (
+        teacher_is_cross_tokenizer
+        if teacher_is_cross_tokenizer is not None
+        else [path is not None for path in projection_matrix_paths]
+    )
     fn.teacher_weights = [1.0] * fn.num_teachers
     return fn
 
 
-def test_averaged_logits_cross_tokenizer_skips_direct_kl_fast_path():
-    # Two cross-tokenizer teachers (non-null projection paths) whose logits
+@pytest.mark.parametrize(
+    "projection_paths", [["t0_proj.pt", "t1_proj.pt"], [None, None]]
+)
+def test_averaged_logits_cross_tokenizer_skips_direct_kl_fast_path(
+    projection_paths: list[str | None],
+) -> None:
+    # Two cross-tokenizer teachers whose logits
     # happen to share a shape must NOT take the direct per-position KL fast
     # path: it assumes the student's tokenizer and would mismatch the
     # student's token_mask when the teacher length differs (T_t != T_s).
-    fn = _bare_averaged_logits_loss_fn(["t0_proj.pt", "t1_proj.pt"])
+    fn = _bare_averaged_logits_loss_fn(
+        projection_paths, teacher_is_cross_tokenizer=[True, True]
+    )
     fn.teacher_weights = [2.0, 3.0]  # distinct weights so weighting is exercised
 
     fallback_calls = []
@@ -2039,8 +2234,7 @@ def test_averaged_logits_cross_tokenizer_skips_direct_kl_fast_path():
 
 
 def test_averaged_logits_same_tokenizer_takes_direct_kl_fast_path():
-    # All-null projection paths => genuine same-tokenizer teachers, so the
-    # averaging + single direct-KL fast path is the correct branch.
+    # Same-tokenizer teachers use the averaging + single direct-KL fast path.
     fn = _bare_averaged_logits_loss_fn([None, None])
 
     fast_calls = []
@@ -2263,6 +2457,7 @@ def test_select_teacher_picks_lowest_ce_teacher(better):
     fn = CrossTokenizerDistillationLossFn.__new__(CrossTokenizerDistillationLossFn)
     fn.num_teachers = 2
     fn.projection_matrix_paths = [None, None]  # same-vocab: scored on student ids
+    fn.teacher_is_cross_tokenizer = [False, False]
 
     vocab, seqlen = 8, 4
     input_ids = torch.tensor([[1, 2, 3, 0]])
@@ -2405,11 +2600,15 @@ def test_sum_kd_normalize_teacher_by_vocab_rescales_by_log_ratio():
     assert per_metrics["teacher_1/weighted_kl"] == pytest.approx(2.0 * s1)
 
 
-def test_teacher_routing_metrics_use_each_teachers_tokenization():
+@pytest.mark.parametrize("projection_path", ["/tmp/projection.pt", None])
+def test_teacher_routing_metrics_use_each_teachers_tokenization(
+    projection_path: str | None,
+) -> None:
     """Routing counts exclude padded rows and use each teacher's token axis."""
     fn = CrossTokenizerDistillationLossFn.__new__(CrossTokenizerDistillationLossFn)
     fn.num_teachers = 2
-    fn.projection_matrix_paths = ["/tmp/projection.pt", None]
+    fn.projection_matrix_paths = [projection_path, None]
+    fn.teacher_is_cross_tokenizer = [True, False]
     data = BatchedDataDict(
         {
             "sample_mask": torch.tensor([1, 0]),
