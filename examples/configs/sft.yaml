@@ -164,6 +164,9 @@ policy:
     freeze_moe_router: false
     moe_router_dtype: null
     moe_router_load_balancing_type: "aux_loss"
+    # Optional overrides: omit to retain model-provider/checkpoint values.
+    # moe_router_enable_expert_bias: true # bool; false disables expert bias
+    # moe_aux_loss_coeff: 0.0001 # float or per-balancing-mode list; 0 disables loss
     moe_router_bias_update_rate: 1e-3
     moe_permute_fusion: true
     #gives ~20% training perf speedup with sequence packing 

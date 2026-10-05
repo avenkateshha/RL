@@ -14,6 +14,7 @@
 
 import copy
 import hashlib
+import inspect
 import json
 import os
 import threading
@@ -92,6 +93,58 @@ from nemo_rl.models.megatron.draft.optimizer import (
 _HF_CONFIG_PATCHED = False
 
 _NEMOTRON_OMNI_EXPANDED_SEQUENCE_CONTRACT = "expanded_sequence_v1"
+
+
+def _apply_expert_bias_with_padding_mask(
+    router: Any,
+    routing_map: torch.Tensor,
+    padding_mask: Optional[torch.Tensor] = None,
+) -> None:
+    """Accumulate expert counts without counting physical padding tokens."""
+    if router.enable_expert_bias and torch.is_grad_enabled():
+        with torch.no_grad():
+            if padding_mask is not None:
+                routing_map = routing_map & (~padding_mask).unsqueeze(-1)
+            router.local_tokens_per_expert += routing_map.sum(dim=0)
+
+
+def _patch_moe_expert_bias_padding_mask_broadcast() -> bool:
+    """Fix the affected MCore router's flattened padding-mask broadcast.
+
+    The router combines a ``[tokens, experts]`` routing map with a ``[tokens]``
+    padding mask. Only patch the known faulty expression; leave fixed or unknown
+    upstream implementations untouched.
+
+    Returns:
+        True when this call installed the compatibility patch, otherwise False.
+    """
+    # Keep the optional router dependency out of setup paths without expert bias.
+    from megatron.core.jit import jit_fuser
+    from megatron.core.transformer.moe.router import TopKRouter
+
+    patch_marker = "_nemo_rl_padding_mask_broadcast_fixed"
+    if getattr(TopKRouter, patch_marker, False):
+        return False
+
+    original = inspect.unwrap(TopKRouter._apply_expert_bias)
+    try:
+        source = inspect.getsource(original)
+    except (OSError, TypeError) as exc:
+        warnings.warn(
+            "Could not inspect MCore TopKRouter._apply_expert_bias; leaving it "
+            f"unchanged: {exc}",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return False
+
+    buggy_expression = "routing_map = routing_map & (~padding_mask)"
+    if buggy_expression not in {line.strip() for line in source.splitlines()}:
+        return False
+
+    TopKRouter._apply_expert_bias = jit_fuser(_apply_expert_bias_with_padding_mask)
+    setattr(TopKRouter, patch_marker, True)
+    return True
 
 
 def _patch_hf_config_double_instantiation():
@@ -1311,6 +1364,16 @@ def _apply_moe_config(model_cfg: Any, config: PolicyConfig) -> None:
     model_cfg.moe_router_load_balancing_type = config["megatron_cfg"][
         "moe_router_load_balancing_type"
     ]
+    # Preserve model-provider/checkpoint values unless explicitly overridden.
+    megatron_cfg = cast(MegatronConfig, config["megatron_cfg"])
+    if "moe_aux_loss_coeff" in megatron_cfg:
+        model_cfg.moe_aux_loss_coeff = megatron_cfg["moe_aux_loss_coeff"]
+    if "moe_router_enable_expert_bias" in megatron_cfg:
+        model_cfg.moe_router_enable_expert_bias = megatron_cfg[
+            "moe_router_enable_expert_bias"
+        ]
+    if getattr(model_cfg, "moe_router_enable_expert_bias", False) is True:
+        _patch_moe_expert_bias_padding_mask_broadcast()
     # Set this to 0.0 to disable updates to the moe router expert bias
     model_cfg.moe_router_bias_update_rate = config["megatron_cfg"][
         "moe_router_bias_update_rate"

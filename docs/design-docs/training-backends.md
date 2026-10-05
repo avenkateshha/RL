@@ -57,6 +57,33 @@ dictionaries follow the hierarchy of nested model-config objects. NeMo
 RL-specific settings such as optimizer, scheduler, checkpointing, and
 environment variables remain under their existing `megatron_cfg` sections.
 
+#### MoE router balancing
+
+Configure expert-selection bias and the auxiliary load-balancing loss directly
+under `policy.megatron_cfg`:
+
+```yaml
+policy:
+  megatron_cfg:
+    moe_router_load_balancing_type: aux_loss
+    moe_router_enable_expert_bias: true
+    moe_aux_loss_coeff: 0.0001
+```
+
+`moe_router_enable_expert_bias` is an optional boolean controlling dynamic
+expert-selection bias. `moe_aux_loss_coeff` is an optional float, or a list of
+floats matching `moe_router_load_balancing_type` when multiple modes are enabled.
+The auxiliary-loss modes are `aux_loss`, `seq_aux_loss`, and `global_aux_loss`;
+`none` and `sinkhorn` do not enable an auxiliary loss. Omit either optional key
+to retain that field's model-provider or checkpoint value. Explicit `false` and
+`0.0` override those retained values. These first-class keys are rejected inside
+`model_overrides`.
+
+Router padding masks exclude padded tokens from expert-bias counts and active
+auxiliary losses. For unpacked batches, the mask follows each input length and
+the final padded sequence width; for packed batches, it follows the existing
+packing boundaries. Masks preserve the token order under context parallelism.
+
 #### Fine-grained activation CPU offload
 
 Fine-grained activation offloading asynchronously moves selected module-input

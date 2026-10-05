@@ -24,6 +24,7 @@ nemo_rl.models.megatron.setup, focusing on:
 - Model path validation
 """
 
+import inspect
 import os
 import warnings
 from dataclasses import dataclass, field, fields
@@ -689,7 +690,15 @@ class TestApplyModelOverrides:
         with pytest.raises(AttributeError, match=expected_path):
             _merge_model_overrides(model_cfg, overrides)
 
-    def test_rejects_first_class_megatron_config_conflict(self):
+    @pytest.mark.parametrize(
+        ("field_name", "value"),
+        [
+            ("tensor_model_parallel_size", 2),
+            ("moe_router_enable_expert_bias", True),
+            ("moe_aux_loss_coeff", 0.0001),
+        ],
+    )
+    def test_rejects_first_class_megatron_config_conflict(self, field_name, value):
         """A first-class field cannot also be supplied through model_overrides."""
         from nemo_rl.models.megatron.setup import (
             _validate_model_override_conflicts,
@@ -698,13 +707,13 @@ class TestApplyModelOverrides:
         with pytest.raises(
             ValueError,
             match=(
-                "policy.megatron_cfg.model_overrides.tensor_model_parallel_size "
-                "conflicts with policy.megatron_cfg.tensor_model_parallel_size"
+                f"policy.megatron_cfg.model_overrides.{field_name} "
+                f"conflicts with policy.megatron_cfg.{field_name}"
             ),
         ):
             _validate_model_override_conflicts(
-                {"model_overrides": {"tensor_model_parallel_size": 2}},
-                {"tensor_model_parallel_size": 2},
+                {"model_overrides": {field_name: value}},
+                {field_name: value},
             )
 
 
@@ -815,17 +824,29 @@ class TestApplyMultimodalConfig:
 class TestApplyMoeConfig:
     """Tests for _apply_moe_config function."""
 
-    def test_moe_configuration(self):
+    @pytest.mark.parametrize(
+        ("expert_bias", "balancing_type", "aux_loss_coeff"),
+        [
+            (True, "aux_loss", 1.0e-4),
+            (False, "aux_loss", 0.0),
+            (False, ["aux_loss", "seq_aux_loss"], [0.0, 1.0e-4]),
+        ],
+    )
+    def test_moe_configuration(self, expert_bias, balancing_type, aux_loss_coeff):
         """Test applying MoE configuration."""
         from nemo_rl.models.megatron.setup import _apply_moe_config
 
         model_cfg = MagicMock()
+        model_cfg.moe_router_enable_expert_bias = not expert_bias
+        model_cfg.moe_aux_loss_coeff = 0.25
         config = {
             "megatron_cfg": {
                 "expert_tensor_parallel_size": 2,
                 "expert_model_parallel_size": 4,
                 "moe_router_dtype": "float32",
-                "moe_router_load_balancing_type": "none",
+                "moe_router_load_balancing_type": balancing_type,
+                "moe_aux_loss_coeff": aux_loss_coeff,
+                "moe_router_enable_expert_bias": expert_bias,
                 "moe_router_bias_update_rate": 0.0,
                 "moe_permute_fusion": True,
                 "moe_enable_deepep": False,
@@ -834,17 +855,131 @@ class TestApplyMoeConfig:
             }
         }
 
-        _apply_moe_config(model_cfg, config)
+        with patch(
+            "nemo_rl.models.megatron.setup._patch_moe_expert_bias_padding_mask_broadcast"
+        ) as patch_padding:
+            _apply_moe_config(model_cfg, config)
+
+        assert patch_padding.call_count == int(expert_bias)
 
         assert model_cfg.expert_tensor_parallel_size == 2
         assert model_cfg.expert_model_parallel_size == 4
         assert model_cfg.moe_router_dtype == "float32"
-        assert model_cfg.moe_router_load_balancing_type == "none"
+        assert model_cfg.moe_router_load_balancing_type == balancing_type
+        assert model_cfg.moe_aux_loss_coeff == aux_loss_coeff
+        assert model_cfg.moe_router_enable_expert_bias is expert_bias
         assert model_cfg.moe_router_bias_update_rate == 0.0
         assert model_cfg.moe_permute_fusion is True
         assert model_cfg.moe_enable_deepep is False
         assert model_cfg.moe_token_dispatcher_type == "alltoall"
         assert model_cfg.moe_shared_expert_overlap is True
+
+    @pytest.mark.parametrize("expert_bias", [False, True])
+    @pytest.mark.parametrize("aux_loss_coeff", [0.25, [0.25, 0.0]])
+    def test_model_dependent_moe_defaults_are_retained_when_overrides_absent(
+        self, expert_bias, aux_loss_coeff
+    ):
+        """Provider values remain unchanged when optional overrides are omitted."""
+        from nemo_rl.models.megatron.setup import _apply_moe_config
+
+        model_cfg = SimpleNamespace(
+            moe_aux_loss_coeff=aux_loss_coeff,
+            moe_router_enable_expert_bias=expert_bias,
+        )
+        config = {"megatron_cfg": self._base_moe_megatron_cfg()}
+
+        with patch(
+            "nemo_rl.models.megatron.setup._patch_moe_expert_bias_padding_mask_broadcast"
+        ) as patch_padding:
+            _apply_moe_config(model_cfg, config)
+
+        assert model_cfg.moe_aux_loss_coeff == aux_loss_coeff
+        assert model_cfg.moe_router_enable_expert_bias is expert_bias
+        assert patch_padding.call_count == int(expert_bias)
+
+    @pytest.mark.parametrize(
+        ("expert_bias", "grad_enabled", "padding_mask", "expected_counts"),
+        [
+            (True, True, [False, True, False, True], [3, 3, 4]),
+            (True, True, None, [3, 5, 5]),
+            (False, True, [False, True, False, True], [1, 2, 3]),
+            (True, False, [False, True, False, True], [1, 2, 3]),
+        ],
+    )
+    def test_padding_safe_expert_bias_excludes_masked_tokens(
+        self, expert_bias, grad_enabled, padding_mask, expected_counts
+    ):
+        """The broadcast fix preserves upstream's expert-count update conditions."""
+        from nemo_rl.models.megatron.setup import _apply_expert_bias_with_padding_mask
+
+        router = SimpleNamespace(
+            enable_expert_bias=expert_bias,
+            local_tokens_per_expert=torch.tensor([1, 2, 3]),
+        )
+        routing_map = torch.tensor(
+            [
+                [True, False, True],
+                [False, True, True],
+                [True, True, False],
+                [False, True, False],
+            ]
+        )
+        mask = torch.tensor(padding_mask) if padding_mask is not None else None
+
+        with torch.set_grad_enabled(grad_enabled):
+            _apply_expert_bias_with_padding_mask(router, routing_map, mask)
+
+        assert torch.equal(
+            router.local_tokens_per_expert, torch.tensor(expected_counts)
+        )
+
+    def test_padding_patch_is_idempotent(self):
+        """Install the fix once, without depending on the test environment's version."""
+        from megatron.core.transformer.moe.router import TopKRouter
+
+        from nemo_rl.models.megatron.setup import (
+            _apply_expert_bias_with_padding_mask,
+            _patch_moe_expert_bias_padding_mask_broadcast,
+        )
+
+        marker = "_nemo_rl_padding_mask_broadcast_fixed"
+        buggy_source = "routing_map = routing_map & (~padding_mask)"
+        with (
+            patch.object(TopKRouter, marker, False, create=True),
+            patch.object(
+                TopKRouter, "_apply_expert_bias", TopKRouter._apply_expert_bias
+            ),
+            patch(
+                "nemo_rl.models.megatron.setup.inspect.getsource",
+                return_value=buggy_source,
+            ),
+        ):
+            assert _patch_moe_expert_bias_padding_mask_broadcast() is True
+            installed = TopKRouter._apply_expert_bias
+            assert inspect.unwrap(installed) is _apply_expert_bias_with_padding_mask
+            assert _patch_moe_expert_bias_padding_mask_broadcast() is False
+            assert TopKRouter._apply_expert_bias is installed
+
+    def test_padding_patch_guard_leaves_fixed_upstream_unchanged(self):
+        """The source guard must not replace an already-fixed MCore method."""
+        from megatron.core.transformer.moe.router import TopKRouter
+
+        from nemo_rl.models.megatron.setup import (
+            _patch_moe_expert_bias_padding_mask_broadcast,
+        )
+
+        marker = "_nemo_rl_padding_mask_broadcast_fixed"
+        fixed_source = "routing_map = routing_map & (~padding_mask).unsqueeze(-1)"
+        with (
+            patch.object(TopKRouter, marker, False, create=True),
+            patch(
+                "nemo_rl.models.megatron.setup.inspect.getsource",
+                return_value=fixed_source,
+            ),
+        ):
+            original = TopKRouter._apply_expert_bias
+            assert _patch_moe_expert_bias_padding_mask_broadcast() is False
+            assert TopKRouter._apply_expert_bias is original
 
     @staticmethod
     def _base_moe_megatron_cfg() -> dict:

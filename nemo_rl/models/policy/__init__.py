@@ -442,6 +442,11 @@ class MegatronConfig(TypedDict):
     freeze_audio_projector: NotRequired[bool]
     moe_router_dtype: str | None
     moe_router_load_balancing_type: str | list[str]
+    # Optional provider/checkpoint overrides. Omit to retain the model's values.
+    # A coefficient list corresponds to the load-balancing modes in order.
+    moe_aux_loss_coeff: NotRequired[float | list[float]]
+    # Dynamic expert-selection bias; explicit False disables it.
+    moe_router_enable_expert_bias: NotRequired[bool]
     moe_router_bias_update_rate: float
     moe_permute_fusion: bool
     expert_tensor_parallel_size: int

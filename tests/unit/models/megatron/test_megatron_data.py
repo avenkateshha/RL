@@ -23,6 +23,7 @@ focusing on:
 - Sequence dimension validation
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -201,6 +202,111 @@ class TestGetAndValidateSeqlen:
 
 
 @pytest.mark.mcore
+class TestMoEPaddingMasks:
+    """Tests for padding masks passed to MCore MoE routers."""
+
+    def test_unpacked_padding_mask_cp1(self):
+        """Right padding is True while every real token remains False."""
+        from nemo_rl.models.megatron.data import _make_unpacked_padding_mask
+
+        input_ids = torch.tensor([[1, 2, 3, 0, 0], [4, 5, 6, 7, 8]])
+        input_lengths = torch.tensor([3, 5])
+
+        result = _make_unpacked_padding_mask(
+            input_ids,
+            input_lengths,
+            cp_rank=0,
+            cp_size=1,
+        )
+
+        assert result is not None
+        assert torch.equal(
+            result,
+            torch.tensor(
+                [[False, False, False, True, True], [False] * 5],
+                dtype=torch.bool,
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        ("cp_rank", "expected"),
+        [
+            (0, [[False, False, True, True]]),
+            (1, [[False, False, False, True]]),
+        ],
+    )
+    def test_unpacked_padding_mask_uses_token_zigzag(self, cp_rank, expected):
+        """The mask selects the same two CP chunks as unpacked input tokens."""
+        from nemo_rl.models.megatron.data import _make_unpacked_padding_mask
+
+        result = _make_unpacked_padding_mask(
+            torch.tensor([[1, 2, 3, 4, 5, 0, 0, 0]]),
+            torch.tensor([5]),
+            cp_rank=cp_rank,
+            cp_size=2,
+        )
+
+        assert result is not None
+        assert torch.equal(result, torch.tensor(expected, dtype=torch.bool))
+
+    def test_padding_mask_is_omitted_when_batch_has_no_padding(self):
+        """Dense batches retain the previous model call with no mask keyword."""
+        from nemo_rl.models.megatron.data import _make_unpacked_padding_mask
+
+        result = _make_unpacked_padding_mask(
+            torch.tensor([[1, 2, 3], [4, 5, 6]]),
+            torch.tensor([3, 3]),
+            cp_rank=0,
+            cp_size=1,
+        )
+
+        assert result is None
+
+    @pytest.mark.parametrize("cp_size", [1, 2])
+    def test_unpacked_padding_mask_excludes_masked_samples(self, cp_size):
+        from nemo_rl.models.megatron.data import _make_unpacked_padding_mask
+
+        result = _make_unpacked_padding_mask(
+            torch.ones(2, 8, dtype=torch.long),
+            torch.tensor([8, 8]),
+            sample_mask=torch.tensor([1, 0]),
+            cp_rank=0,
+            cp_size=cp_size,
+        )
+
+        assert result.tolist() == [[False] * (8 // cp_size), [True] * (8 // cp_size)]
+
+    @pytest.mark.parametrize(
+        "lengths",
+        [
+            torch.tensor([3]),
+            torch.tensor([-1, 3]),
+            torch.tensor([3, 9]),
+            torch.tensor([2.5, 3.0]),
+        ],
+        ids=["row-count", "negative", "past-width", "fractional"],
+    )
+    def test_unpacked_padding_mask_rejects_invalid_lengths(self, lengths):
+        from nemo_rl.models.megatron.data import _make_unpacked_padding_mask
+
+        with pytest.raises(ValueError, match="input_lengths"):
+            _make_unpacked_padding_mask(
+                torch.ones(2, 8, dtype=torch.long), lengths, cp_rank=0, cp_size=1
+            )
+
+    def test_unpacked_padding_mask_rejects_invalid_cp_width(self):
+        from nemo_rl.models.megatron.data import _make_unpacked_padding_mask
+
+        with pytest.raises(ValueError, match="divisible by 2\\*cp_size"):
+            _make_unpacked_padding_mask(
+                torch.ones(1, 6, dtype=torch.long),
+                torch.tensor([5]),
+                cp_rank=0,
+                cp_size=2,
+            )
+
+
+@pytest.mark.mcore
 class TestProcessMicrobatch:
     """Tests for process_microbatch function."""
 
@@ -348,9 +454,57 @@ class TestProcessMicrobatch:
 
         assert result.original_seq_length == 72
         assert result.input_ids.shape == (1, 96)
+        assert result.padding_mask.tolist() == [[False] * 72 + [True] * 24]
         assert data_dict["token_mask"].shape == (1, 96)
         assert torch.count_nonzero(data_dict["token_mask"][:, 72:]) == 0
         assert data_dict["pixel_values"].shape == (1, 3, 8, 8)
+
+    @pytest.mark.parametrize(
+        "model_slices,delegate_pack", [(False, False), (True, False), (False, True)]
+    )
+    @pytest.mark.parametrize("cp_rank", [0, 1])
+    def test_process_microbatch_unpacked_router_mask_cp_layout(
+        self, cp_rank, model_slices, delegate_pack
+    ):
+        from nemo_rl.models.megatron.data import process_microbatch
+
+        data = BatchedDataDict(
+            {
+                "input_ids": torch.tensor(
+                    [[1, 2, 3, 4, 5, 0, 0, 0], [6, 7, 8, 9, 10, 11, 12, 13]]
+                ),
+                "input_lengths": torch.tensor([5, 8]),
+                "sample_mask": torch.tensor([1, 0]),
+            }
+        )
+        with (
+            patch(
+                "nemo_rl.models.megatron.data.get_context_parallel_world_size",
+                return_value=2,
+            ),
+            patch(
+                "nemo_rl.models.megatron.data.get_context_parallel_rank",
+                return_value=cp_rank,
+            ),
+            patch(
+                "nemo_rl.models.megatron.data.get_ltor_masks_and_position_ids",
+                return_value=(None, None, torch.arange(8).expand(2, -1)),
+            ),
+        ):
+            result = process_microbatch(
+                data,
+                model_slices_context_parallel_inputs=model_slices,
+                delegate_pack_to_model=delegate_pack,
+            )
+
+        if model_slices or delegate_pack:
+            assert result.padding_mask is None
+        else:
+            assert result.padding_mask.shape == result.input_ids_cp_sharded.shape
+            assert torch.equal(
+                result.padding_mask[0], result.input_ids_cp_sharded[0] == 0
+            )
+            assert result.padding_mask[1].all()
 
     @patch("nemo_rl.models.megatron.data.get_ltor_masks_and_position_ids")
     def test_process_microbatch_repairs_routed_experts_padding_without_packing(
@@ -1670,10 +1824,121 @@ class TestProcessGlobalBatch:
 class TestGetMicrobatchIterator:
     """Tests for get_microbatch_iterator function."""
 
+    @pytest.mark.parametrize(
+        "megatron_cfg,effective_model,expected",
+        [
+            ({"moe_router_enable_expert_bias": True}, None, True),
+            *[
+                (
+                    {
+                        "moe_router_enable_expert_bias": False,
+                        "moe_router_load_balancing_type": mode,
+                        "moe_aux_loss_coeff": 0.0001,
+                    },
+                    None,
+                    True,
+                )
+                for mode in ("aux_loss", "seq_aux_loss", "global_aux_loss")
+            ],
+            (
+                {
+                    "moe_router_enable_expert_bias": False,
+                    "moe_router_load_balancing_type": "aux_loss",
+                    "moe_aux_loss_coeff": 0.0,
+                },
+                None,
+                False,
+            ),
+            (
+                {"moe_router_load_balancing_type": "none", "moe_aux_loss_coeff": 0.1},
+                None,
+                False,
+            ),
+            (
+                {
+                    "moe_router_load_balancing_type": "sinkhorn",
+                    "moe_aux_loss_coeff": 0.0,
+                },
+                None,
+                False,
+            ),
+            (
+                {
+                    "moe_router_load_balancing_type": ["aux_loss", "seq_aux_loss"],
+                    "moe_aux_loss_coeff": [0.0, 0.001],
+                },
+                None,
+                True,
+            ),
+            (
+                {
+                    "moe_router_load_balancing_type": ["aux_loss", "global_aux_loss"],
+                    "moe_aux_loss_coeff": [0.0, 0.0],
+                },
+                None,
+                False,
+            ),
+            (
+                {
+                    "moe_router_load_balancing_type": ["none", "aux_loss"],
+                    "moe_aux_loss_coeff": [0.001, 0.0],
+                },
+                None,
+                False,
+            ),
+            (
+                {},
+                SimpleNamespace(
+                    moe_router_enable_expert_bias=True,
+                    moe_router_load_balancing_type="none",
+                    moe_aux_loss_coeff=0.0,
+                ),
+                True,
+            ),
+            (
+                {"moe_router_enable_expert_bias": False},
+                SimpleNamespace(
+                    moe_router_enable_expert_bias=False,
+                    moe_router_load_balancing_type="aux_loss",
+                    moe_aux_loss_coeff=0.001,
+                ),
+                True,
+            ),
+            (
+                {"moe_router_enable_expert_bias": True},
+                SimpleNamespace(
+                    moe_router_enable_expert_bias=False,
+                    moe_router_load_balancing_type="aux_loss",
+                    moe_aux_loss_coeff=0.0,
+                ),
+                False,
+            ),
+        ],
+        ids=[
+            "expert-bias",
+            "aux-loss",
+            "seq-aux-loss",
+            "global-aux-loss",
+            "zero",
+            "none",
+            "sinkhorn",
+            "list-active",
+            "list-zero",
+            "list-inactive-mode",
+            "provider-bias",
+            "provider-aux",
+            "effective-settings",
+        ],
+    )
     @patch("nemo_rl.models.megatron.data.get_and_validate_seqlen")
     @patch("nemo_rl.models.megatron.data.make_processed_microbatch_iterator")
     def test_get_microbatch_iterator_prepacked_expert_bias_creates_padding_mask(
-        self, mock_make_iterator, mock_get_and_validate_seqlen
+        self,
+        mock_make_iterator,
+        mock_get_and_validate_seqlen,
+        megatron_cfg,
+        effective_model,
+        expected,
     ):
         from nemo_rl.models.megatron.data import get_microbatch_iterator
 
@@ -1691,7 +1956,7 @@ class TestGetMicrobatchIterator:
         cfg = {
             "dynamic_batching": {"enabled": False},
             "sequence_packing": {"enabled": True, "fuse_loss": True},
-            "megatron_cfg": {"moe_router_enable_expert_bias": True},
+            "megatron_cfg": megatron_cfg,
             "make_sequence_length_divisible_by": 1,
         }
 
@@ -1700,6 +1965,7 @@ class TestGetMicrobatchIterator:
             cfg=cfg,
             mbs=4,
             straggler_timer=MagicMock(),
+            model_config=effective_model,
         )
 
         mock_data.make_microbatch_iterator.assert_called_once_with(1)
@@ -1707,7 +1973,7 @@ class TestGetMicrobatchIterator:
         assert micro_batch_size == 1
         assert (
             mock_make_iterator.call_args.kwargs["create_packed_seq_padding_mask"]
-            is True
+            is expected
         )
 
     @patch("nemo_rl.models.megatron.data.get_and_validate_seqlen")

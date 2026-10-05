@@ -26,6 +26,7 @@ from megatron.core.parallel_state import (
     get_context_parallel_rank,
     get_context_parallel_world_size,
 )
+from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import StragglerDetector
 
 from nemo_rl.algorithms.loss.interfaces import LossFunction, LossType
@@ -89,7 +90,7 @@ class ProcessedMicrobatch:
         cu_seqlens_padded: Padded cumulative sequence lengths (None if not packing)
         mtp_loss_mask: Pre-computed MTP loss mask (token_mask × sample_mask).
             None when MTP is disabled or token/sample masks are absent.
-        padding_mask: Packed-sequence padding mask for MoE routing.
+        padding_mask: Token padding/excluded-sample mask for MoE routing.
         routed_experts: Optional token-aligned routed expert ids
         routed_experts_cp_sharded: Context-parallel sharded routed expert ids
         media_token_validity_mask: Which media-token positions actually anchor a
@@ -243,6 +244,7 @@ def get_microbatch_iterator(
     model_slices_context_parallel_inputs: bool = False,
     mtp_enabled: bool = False,
     skip_keys: Optional[Iterable[str]] = None,
+    model_config: Optional[TransformerConfig] = None,
 ) -> Tuple[Iterator[ProcessedMicrobatch], int, int, int, int]:
     """Create a processed microbatch iterator from a batch of data.
 
@@ -256,6 +258,8 @@ def get_microbatch_iterator(
         mbs: Microbatch size
         seq_length_key: Key for sequence lengths in data dict (auto-detected if None)
         mtp_enabled: Whether the model uses multi-token prediction layers.
+        model_config: Effective model settings, including retained provider defaults,
+            used to decide whether prepacked MoE inputs need a router mask.
         skip_keys: Keys whose dim 1 is NOT the sequence axis and must be exempt
             from the sequence-dim validation (e.g. cross-tokenizer ride-along
             tensors). Forwarded to ``get_and_validate_seqlen``.
@@ -296,8 +300,23 @@ def get_microbatch_iterator(
         pad_factor = _get_non_packed_sequence_pad_factor(cfg)
 
     if prepacked:
-        create_packed_seq_padding_mask = bool(
-            cfg["megatron_cfg"].get("moe_router_enable_expert_bias", False)
+        megatron_cfg = cfg["megatron_cfg"]
+        create_packed_seq_padding_mask = _moe_router_requires_padding_mask(
+            expert_bias=(
+                model_config.moe_router_enable_expert_bias
+                if model_config is not None
+                else megatron_cfg.get("moe_router_enable_expert_bias")
+            ),
+            balancing_type=(
+                model_config.moe_router_load_balancing_type
+                if model_config is not None
+                else megatron_cfg.get("moe_router_load_balancing_type")
+            ),
+            aux_loss_coeff=(
+                model_config.moe_aux_loss_coeff
+                if model_config is not None
+                else megatron_cfg.get("moe_aux_loss_coeff")
+            ),
         )
         raw_iterator = data.make_microbatch_iterator(1)
         data_iterator_len = data.size
@@ -361,6 +380,38 @@ def get_microbatch_iterator(
         seq_dim_size,
         padded_seq_length,
     )
+
+
+def _moe_router_requires_padding_mask(
+    *,
+    expert_bias: Optional[bool],
+    balancing_type: str | list[str] | None,
+    aux_loss_coeff: float | list[float] | None,
+) -> bool:
+    """Mirror TopKRouter's expert-bias and active auxiliary-loss conditions."""
+    if expert_bias:
+        return True
+    if balancing_type is None or aux_loss_coeff is None:
+        return False
+    aux_loss_types = ("aux_loss", "seq_aux_loss", "global_aux_loss")
+    if isinstance(balancing_type, list):
+        if not isinstance(aux_loss_coeff, list) or len(aux_loss_coeff) != len(
+            balancing_type
+        ):
+            raise ValueError(
+                "moe_aux_loss_coeff must be a list matching "
+                "moe_router_load_balancing_type."
+            )
+        return any(
+            aux_loss_coeff[balancing_type.index(mode)] > 0
+            for mode in aux_loss_types
+            if mode in balancing_type
+        )
+    if isinstance(aux_loss_coeff, list):
+        raise ValueError(
+            "moe_aux_loss_coeff must be a scalar for a single balancing type."
+        )
+    return balancing_type in aux_loss_types and aux_loss_coeff > 0
 
 
 def get_ltor_masks_and_position_ids(*args: Any, **kwargs: Any) -> Any:
@@ -1080,6 +1131,20 @@ def process_microbatch(
                 attention_mask = None
             else:
                 input_ids_cp_sharded = input_ids
+            # Match the packed GPT contract: exclude physical padding and masked
+            # samples. Model-owned sharding wrappers do not accept this kwarg.
+            if (
+                "input_lengths" in data_dict
+                and not model_slices_context_parallel_inputs
+                and not delegate_pack_to_model
+            ):
+                padding_mask = _make_unpacked_padding_mask(
+                    input_ids,
+                    data_dict["input_lengths"],
+                    sample_mask=data_dict.get("sample_mask"),
+                    cp_rank=get_context_parallel_rank(),
+                    cp_size=cp_size,
+                )
             verified_token_count = _verify_r3_trace_cp_token_alignment(
                 source_input_ids=data_dict["input_ids"],
                 source_routed_experts=data_dict.get("routed_experts"),
@@ -1126,6 +1191,50 @@ def process_microbatch(
         original_seq_length=original_seq_length,
         media_token_validity_mask=media_token_validity_mask,
     )
+
+
+def _make_unpacked_padding_mask(
+    input_ids: torch.Tensor,
+    input_lengths: torch.Tensor,
+    *,
+    cp_rank: int,
+    cp_size: int,
+    sample_mask: Optional[torch.Tensor] = None,
+) -> Optional[torch.Tensor]:
+    """Build a CP-local mask whose True entries are padding or excluded samples."""
+    batch_size, seq_length = input_ids.shape[:2]
+    if input_lengths.shape != (batch_size,):
+        raise ValueError("input_lengths must have one entry per input_ids row.")
+    lengths = input_lengths.to(device=input_ids.device)
+    if (
+        lengths.dtype == torch.bool
+        or lengths.is_floating_point()
+        or lengths.is_complex()
+    ):
+        raise ValueError("input_lengths must contain integers.")
+    if bool(((lengths < 0) | (lengths > seq_length)).any()):
+        raise ValueError(f"input_lengths entries must be between 0 and {seq_length}.")
+    if cp_size > 1 and seq_length % (cp_size * 2) != 0:
+        raise ValueError(
+            "Context-parallel padding masks require the sequence length to be "
+            f"divisible by 2*cp_size={cp_size * 2}; got {seq_length}."
+        )
+
+    positions = torch.arange(seq_length, device=input_ids.device).unsqueeze(0)
+    padding_mask = positions >= lengths.unsqueeze(1)
+    if sample_mask is not None:
+        if sample_mask.shape != (batch_size,):
+            raise ValueError("sample_mask must have one entry per input_ids row.")
+        padding_mask |= ~sample_mask.to(
+            device=input_ids.device, dtype=torch.bool
+        ).unsqueeze(1)
+    if not bool(padding_mask.any()):
+        return None
+    if cp_size > 1:
+        padding_mask = _get_tokens_on_this_cp_rank(
+            padding_mask, cp_rank, cp_size, seq_dim=1
+        )
+    return padding_mask.contiguous()
 
 
 def _make_r3_trace_token_identity(
