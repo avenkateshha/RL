@@ -2056,6 +2056,38 @@ def _dense_ipc_logical_bytes(handles: Sequence[Mapping[str, Any]]) -> int:
 # ===============================================================================
 
 
+def _supports_native_xtoken_rows(policy: Policy) -> bool:
+    """Whether this policy uses the native MCore static/unpacked PP1 layout."""
+    megatron = policy.cfg["megatron_cfg"]
+    return (
+        megatron["enabled"] is True
+        and cast(MegatronConfig, megatron)["pipeline_model_parallel_size"] == 1
+        and not policy.use_dynamic_batches
+        and not policy.use_sequence_packing
+    )
+
+
+def _use_reusable_dense_teacher_ipc(
+    student_policy: Policy,
+    teacher_policies: list[Policy],
+    loss_fn: CrossTokenizerDistillationLossFn,
+) -> bool:
+    """Enable native dense consumers while preserving true logit averaging.
+
+    A same-tokenizer averaged-logits objective needs every teacher in the same
+    student row order. A mixed MCore/legacy teacher set stays on its existing
+    contiguous route; cross-tokenizer averaged-logits already falls back to
+    independent weighted losses and can mix native and legacy consumers.
+    """
+    if not _supports_native_xtoken_rows(student_policy):
+        return False
+    if loss_fn.kd_loss_mode == "averaged_logits" and not any(
+        loss_fn.teacher_is_cross_tokenizer
+    ):
+        return all(_supports_native_xtoken_rows(p) for p in teacher_policies)
+    return True
+
+
 def export_teacher_logits_and_pack(
     teacher_policies: list[Policy],
     loss_fn: CrossTokenizerDistillationLossFn,
@@ -2174,13 +2206,7 @@ def export_teacher_logits_and_pack(
                 reusable_dense_ipc
                 and same_vocab
                 and packing_plan is None
-                and teacher_policy.cfg["megatron_cfg"]["enabled"] is True
-                and cast(MegatronConfig, teacher_policy.cfg["megatron_cfg"])[
-                    "pipeline_model_parallel_size"
-                ]
-                == 1
-                and not teacher_policy.use_dynamic_batches
-                and not teacher_policy.use_sequence_packing
+                and _supports_native_xtoken_rows(teacher_policy)
             ),
         )
         train_data[f"teacher_{i}_{ipc_suffix}"] = handles
@@ -2431,6 +2457,9 @@ def xtoken_off_policy_distillation_train(
                             timer=timer,
                             packing_plan=packing_plan,
                             batch_uid=batch_uid,
+                            reusable_dense_ipc=_use_reusable_dense_teacher_ipc(
+                                student_policy, teacher_policies, loss_fn
+                            ),
                         )
 
                     with timer.time("training_prep"):
@@ -2759,6 +2788,9 @@ def validate(
                     timer=timer,
                     packing_plan=packing_plan,
                     batch_uid=batch_uid,
+                    reusable_dense_ipc=_use_reusable_dense_teacher_ipc(
+                        student_policy, teacher_policies, loss_fn
+                    ),
                 )
                 student_policy.prepare_for_training()
                 packing_kwargs: dict[str, Any] = {}

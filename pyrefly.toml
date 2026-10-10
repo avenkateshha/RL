@@ -76,6 +76,7 @@ project-includes = [
   "nemo_rl/algorithms/x_token/dense_teacher.py",
   "nemo_rl/algorithms/x_token/native_student.py",
   "nemo_rl/algorithms/x_token/native_sparse_loss.py",
+  "nemo_rl/algorithms/x_token/native_same_tokenizer.py",
   "nemo_rl/algorithms/x_token/sparse_teacher.py",
   "nemo_rl/algorithms/x_token/token_aligner.py",
   "nemo_rl/algorithms/x_token/utils.py",

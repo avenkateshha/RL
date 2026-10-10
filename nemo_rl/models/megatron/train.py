@@ -716,6 +716,7 @@ class LossPostProcessor:
                         and get_pipeline_model_parallel_world_size() == 1
                     ),
                     native_sparse_enabled=True,
+                    native_same_tokenizer_enabled=True,
                 )
 
         # wrap loss function with loss input preparation

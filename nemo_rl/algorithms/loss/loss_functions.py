@@ -15,7 +15,7 @@
 import collections
 import os
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, NotRequired, Optional, TypedDict, TypeVar
 
 import numpy as np
@@ -39,7 +39,10 @@ from nemo_rl.algorithms.utils import (
     compute_seq_logprob_errors,
     masked_mean,
 )
-from nemo_rl.algorithms.x_token.dense_teacher import DenseTeacherIPC
+from nemo_rl.algorithms.x_token.dense_teacher import (
+    DenseTeacherIPC,
+    DenseTeacherRowReader,
+)
 from nemo_rl.algorithms.x_token.loss_utils import (
     LocalizedAlignment,
     NativeStudentContext,
@@ -52,6 +55,9 @@ from nemo_rl.algorithms.x_token.loss_utils import (
 )
 from nemo_rl.algorithms.x_token.native_sparse_loss import (
     compute_native_sparse_teacher_loss,
+)
+from nemo_rl.algorithms.x_token.native_same_tokenizer import (
+    compute_native_same_tokenizer_kl,
 )
 from nemo_rl.algorithms.x_token.native_student import (
     native_next_token_accuracy,
@@ -2343,6 +2349,8 @@ class _NativeXTokenLossContext:
 
     student: NativeStudentContext
     sparse_teachers: dict[int, SparseTeacherRowReader]
+    dense_teachers: dict[int, DenseTeacherRowReader] = field(default_factory=dict)
+    dense_rows: dict[int, torch.Tensor] = field(default_factory=dict)
 
 
 class CrossTokenizerDistillationLossFn(LossFunction):
@@ -2609,11 +2617,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     "Native teacher descriptors require a native student context"
                 )
             return None
-        if native_dense_teachers:
-            raise NotImplementedError(
-                "Native same-tokenizer loss consumer is not enabled"
-            )
-        if not native_sparse_teachers:
+        if not native_sparse_teachers and not native_dense_teachers:
             raise ValueError(
                 "Native student context requires a native teacher descriptor"
             )
@@ -2624,7 +2628,9 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             raise ValueError(
                 "Native student context disagrees with the loss logits or real vocabulary"
             )
-        if self.sum_weights_metric is not None or self.kd_loss_mode == "select_teacher":
+        if (native_sparse_teachers or teacher_sparse_logits_by_idx) and (
+            self.sum_weights_metric is not None or self.kd_loss_mode == "select_teacher"
+        ):
             raise ValueError(
                 "Sparse teacher IPC requires static teacher weights and cannot select a teacher"
             )
@@ -2632,6 +2638,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             teacher_full_logits_by_idx,
             teacher_sparse_logits_by_idx,
             native_sparse_teachers,
+            native_dense_teachers,
         )
         if set().union(*payloads) != set(range(self.num_teachers)) or any(
             sum(i in payload for payload in payloads) != 1
@@ -2681,7 +2688,74 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     f"Native sparse teacher {i} sequence metadata disagrees with its rows"
                 )
             readers[i] = reader
-        return _NativeXTokenLossContext(native_student, readers)
+        dense_readers: dict[int, DenseTeacherRowReader] = {}
+        for i, payload in sorted(native_dense_teachers.items()):
+            if not self._teacher_is_same_vocab(i):
+                raise ValueError(
+                    f"Native dense teacher {i} must use the student tokenizer"
+                )
+            if self.teacher_vocab_sizes[i] != self.student_vocab_size:
+                raise ValueError(
+                    f"Native dense teacher {i} real vocabulary differs from the student"
+                )
+            if len(payload.samples) != logits.shape[0]:
+                raise ValueError(
+                    f"Native dense teacher {i} sample count disagrees with the student"
+                )
+            reader = DenseTeacherRowReader(payload, device=logits.device)
+            if reader.full_vocab_size < self.student_vocab_size:
+                raise ValueError(
+                    f"Native dense teacher {i} storage does not cover the real vocabulary"
+                )
+            align = aligns_by_idx[i]
+            if align.student_input_ids is None or tuple(
+                align.student_input_ids.shape
+            ) != tuple(native_student.input_ids.shape):
+                raise ValueError(
+                    f"Native dense teacher {i} requires full global student metadata"
+                )
+            if tuple(self._student_kd_mask(align).shape) != tuple(
+                native_student.input_ids.shape
+            ):
+                raise ValueError(
+                    f"Native dense teacher {i} requires a full global KD mask"
+                )
+            dense_readers[i] = reader
+        if (
+            self.kd_loss_mode == "averaged_logits"
+            and not any(self.teacher_is_cross_tokenizer)
+            and len(dense_readers) != self.num_teachers
+        ):
+            raise ValueError(
+                "True averaged-logits KL requires all same-tokenizer teachers to use "
+                "one native or legacy dense route"
+            )
+        return _NativeXTokenLossContext(native_student, readers, dense_readers)
+
+    def _native_dense_rows(
+        self,
+        i: int,
+        native_context: _NativeXTokenLossContext,
+        align: LocalizedAlignment,
+    ) -> torch.Tensor:
+        """Read a frozen teacher's native rows once for this loss invocation."""
+        rows = native_context.dense_rows.get(i)
+        if rows is None:
+            student = native_context.student
+            active = student.next_kd_token_mask.bool()
+            if self.sum_weights_metric in ("entropy", "max_prob"):
+                active = (
+                    active
+                    | self._student_kd_mask(align)[:, student.global_positions].bool()
+                )
+            active = active & student.sample_mask.bool().unsqueeze(-1)
+            rows = native_context.dense_teachers[i].gather_native_positions(
+                student.global_positions,
+                active_mask=active,
+                vocab_end=student.real_vocab_size,
+            )
+            native_context.dense_rows[i] = rows
+        return rows
 
     def __call__(
         self,
@@ -2966,8 +3040,9 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
         Dispatches on tokenizer kind: same-vocab -> direct top-k per-position KL;
         cross-tokenizer -> the v6 prefix-bidir partition KL over teacher ``i``'s
-        localized alignment. Both consume the shared CP-relaid student logits and
-        route TP/CP through the parameterized loss-mode helpers.
+        alignment. Native readers use the raw student CP rows; legacy consumers
+        share one contiguous compatibility view. Each helper retains its own
+        TP/CP routing and objective-normalization contract.
         """
         if native_context is not None and i in native_context.sparse_teachers:
             assert global_valid_chunks_by_idx is not None
@@ -2981,6 +3056,16 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 tp_group=tp_group,
                 cp_group=cp_group,
             )
+        if native_context is not None and i in native_context.dense_teachers:
+            kd = compute_native_same_tokenizer_kl(
+                self,
+                native_context.student,
+                self._native_dense_rows(i, native_context, aligns_by_idx[i]),
+                global_valid_toks=global_valid_toks,
+                tp_group=tp_group,
+                cp_group=cp_group,
+            )
+            return kd, {"kl_loss": kd.item()}
         if student_logits_contig is None:
             raise ValueError(f"Legacy teacher {i} requires contiguous student logits")
         has_full_logits = i in teacher_full_logits_by_idx
@@ -3231,7 +3316,10 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     "be used with sparse teacher IPC."
                 )
             weights = self._compute_dynamic_weights(
-                data, teacher_full_logits_by_idx, aligns_by_idx
+                data,
+                teacher_full_logits_by_idx,
+                aligns_by_idx,
+                native_context=native_context,
             )
         else:
             weights = [
@@ -3309,6 +3397,33 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         full logits of identical shape. Otherwise falls back to a plain
         static-weight sum (no dynamic weights, no ``normalize_teacher_by_vocab``).
         """
+        if (
+            native_context is not None
+            and len(native_context.dense_teachers) == self.num_teachers
+        ):
+            total_w = sum(self.teacher_weights)
+            avg: Optional[torch.Tensor] = None
+            for i, weight in enumerate(self.teacher_weights):
+                rows = self._native_dense_rows(i, native_context, aligns_by_idx[i])
+                contribution = rows * (weight / total_w)
+                avg = contribution if avg is None else avg + contribution
+            assert avg is not None
+            kd = compute_native_same_tokenizer_kl(
+                self,
+                native_context.student,
+                avg,
+                global_valid_toks=global_valid_toks,
+                tp_group=tp_group,
+                cp_group=cp_group,
+                full_vocab=True,
+            )
+            return kd, {
+                "kl_loss": kd.item(),
+                **{
+                    f"teacher_{i}/weighted_kl": float(kd.item() * weight / total_w)
+                    for i, weight in enumerate(self.teacher_weights)
+                },
+            }
         full = [teacher_full_logits_by_idx.get(i) for i in range(self.num_teachers)]
         # Direct per-position KL is only valid when every teacher shares the
         # student's tokenizer and ships full logits of identical shape. Two
@@ -3420,6 +3535,13 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         with torch.no_grad():
             ces: list[float] = []
             for i in range(self.num_teachers):
+                if native_context is not None and i in native_context.dense_teachers:
+                    ces.append(
+                        -self._native_teacher_weight_score(
+                            i, "ce", native_context, aligns_by_idx[i]
+                        ).item()
+                    )
+                    continue
                 t_logits, t_ids, t_mask = self._teacher_score_inputs(
                     i, data, teacher_full_logits_by_idx, aligns_by_idx
                 )
@@ -3483,6 +3605,8 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         data: BatchedDataDict[CrossTokenizerDistillationLossDataDict],
         teacher_full_logits_by_idx: dict[int, torch.Tensor],
         aligns_by_idx: dict[int, LocalizedAlignment],
+        *,
+        native_context: Optional[_NativeXTokenLossContext] = None,
     ) -> list[torch.Tensor]:
         """Sequence-level dynamic teacher weights via ``sum_weights_metric``.
 
@@ -3498,12 +3622,18 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             )
         scores: list[torch.Tensor] = []
         for i in range(self.num_teachers):
-            t_logits, t_ids, t_mask = self._teacher_score_inputs(
-                i, data, teacher_full_logits_by_idx, aligns_by_idx
-            )
-            score = self._teacher_weight_score(
-                t_logits, t_ids, t_mask, data["sample_mask"]
-            )
+            if native_context is not None and i in native_context.dense_teachers:
+                assert self.sum_weights_metric is not None
+                score = self._native_teacher_weight_score(
+                    i, self.sum_weights_metric, native_context, aligns_by_idx[i]
+                )
+            else:
+                t_logits, t_ids, t_mask = self._teacher_score_inputs(
+                    i, data, teacher_full_logits_by_idx, aligns_by_idx
+                )
+                score = self._teacher_weight_score(
+                    t_logits, t_ids, t_mask, data["sample_mask"]
+                )
             if self.normalize_teacher_by_vocab:
                 v_log = torch.log(
                     torch.tensor(float(self.teacher_vocab_sizes[i]), device=device)
@@ -3512,6 +3642,52 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             scores.append(score)
         weights = torch.softmax(self.alpha * torch.stack(scores), dim=0)
         return [weights[i] for i in range(self.num_teachers)]
+
+    @torch.no_grad()
+    def _native_teacher_weight_score(
+        self,
+        i: int,
+        metric: str,
+        native_context: _NativeXTokenLossContext,
+        align: LocalizedAlignment,
+    ) -> torch.Tensor:
+        """Score matching frozen teacher rows, preserving each metric's mask.
+
+        CE uses the global next label and shifted KD mask; entropy/max-prob use
+        the predictor's unshifted KD mask, including a valid final position.
+        Scores are reduced over the established DP/CP group before selecting or
+        weighting teachers. Bounded row tiles avoid a full softmax temporary.
+        """
+        student = native_context.student
+        rows = self._native_dense_rows(i, native_context, align)
+        token_mask = (
+            student.next_kd_token_mask
+            if metric == "ce"
+            else self._student_kd_mask(align)[:, student.global_positions]
+        )
+        mask = (token_mask.float() * student.sample_mask.float().unsqueeze(-1)).reshape(
+            -1
+        )
+        active = torch.nonzero(mask != 0, as_tuple=True)[0]
+        values = rows.new_zeros(mask.shape)
+        flat_rows = rows.reshape(-1, rows.shape[-1])
+        next_ids = student.next_token_ids.reshape(-1)
+        if metric not in ("ce", "entropy", "max_prob"):
+            raise ValueError(f"Unknown sum_weights_metric: {metric!r}")
+        for indices in active.split(64):
+            tile = flat_rows[indices]
+            if metric == "ce":
+                values[indices] = -torch.nn.functional.cross_entropy(
+                    tile, next_ids[indices], reduction="none"
+                )
+            else:
+                probs = torch.softmax(tile, dim=-1)
+                values[indices] = (
+                    (probs * torch.log(probs + 1e-10)).sum(dim=-1)
+                    if metric == "entropy"
+                    else probs.max(dim=-1).values
+                )
+        return self._dp_global_masked_mean(values, mask)
 
     def _teacher_weight_score(
         self,

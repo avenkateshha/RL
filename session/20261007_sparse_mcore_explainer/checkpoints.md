@@ -193,6 +193,53 @@ type errors. Changed-file Ruff/format checks pass. Real-model loss, optimizer,
 pre-clip parameter-gradient and native CUDA acceptance remain for checkpoint 5.
 No larger memory test or production-capacity claim is included.
 
+Publication: signed-off commit `6bf7cb1c616ba026db808d6808158bedd55ed80f`
+pushed to `myfork/avenkateshha/xtoken-v6-loss`; remote tip verified.
+
+## Checkpoint 4b — native same-tokenizer KL
+
+Implemented after checkpoint 4a's verified push. Same-tokenizer KL uses the
+student's native CP owners and local TP vocabulary. Common-K support preserves
+the valid-predictor microbatch/CP maximum; true averaged logits combine frozen
+teacher rows before full-real-vocabulary KL. Bounded FP32 forward/backward tiles
+avoid a full student vocabulary gather, including when a TP shard is entirely
+padding. Both KL directions, temperature squared, separate CE/KD full-step
+normalizers and corrected no-extra-CP normalization are retained.
+
+Dense readers and copied rows are local to one loss invocation and reused for
+frozen teacher scoring and KD. CE/selection use global next labels and shifted
+KD masks; entropy/max-prob preserve unshifted masks, including a valid final
+predictor. Training and validation opt eligible same-tokenizer teachers into
+reusable dense IPC independently of sparse K. Mixed native/legacy same-tokenizer
+true averaging stays entirely on the retained dense route. Native sparse plus
+native same, and native same plus legacy dense cross-tokenizer, share one native
+CE/accuracy calculation; only the legacy consumer requests a compatibility view.
+
+CPU validation: same-only suite **16 passed**, including **156** actual
+adapter/dispatcher comparisons against an independent dense oracle and corrected
+contiguous baseline across TP/CP `(1,1)`, `(2,1)`, `(1,2)`, `(2,2)` (100.04 s).
+The four CUDA grids are reserved for checkpoint 5. Mixed native same/sparse and
+native same/legacy-dense suites **8 passed**, **432** combined loss/gradient
+comparisons (183.83 s), with both teacher orders, fixed/dynamic scaling,
+common-K/full-vocabulary KL, reverse KL, vocabulary scaling, fallback semantics,
+zero weights and empty masks. Each microbatch is compared with its own support
+and dynamic ratio; no unsupported common-K partition invariance is claimed.
+
+Controller regressions **200 passed**; twelve selector checks were rerun after
+correcting a test mode label. Dense contract/scoring/cache tests **9 passed**,
+including CP2 global-score/weight/selected-KL gradient checks. Existing
+adapter/contract regressions **45 passed**. These overlapping suites are not a
+unique-test total. FP32 loss/gradient checks use rtol 1e-4/atol 1e-5 or tighter;
+BF16 same-only gradients require relative L2 and norm error <= 0.02.
+
+Final same helper/test hashes are frozen, and eight source/test hashes were
+rechecked unchanged after the mixed run. Changed-file Ruff/format and diff
+checks pass; the new helper has zero Pyrefly errors, while loss_functions keeps
+its 63 pre-existing errors. Independent code reviews found no actionable issue.
+CPU harness fixes only adapt the retained legacy CUDA allocation/gather to Gloo;
+production legacy code remains unchanged. Actual MCore optimizer/pre-clip model
+gradient acceptance and real CUDA native losses remain for checkpoint 5.
+
 ## Runtime and fixture preparation
 
 - Historical submission reference: job `19467093`, with new run-owned Slurm

@@ -1914,6 +1914,89 @@ def test_reusable_dense_export_is_native_same_teacher_specific(
     )
 
 
+def _native_policy(*, enabled=True, pp=1, dynamic=False, packed=False):
+    policy = MagicMock()
+    policy.cfg = {
+        "megatron_cfg": {"enabled": enabled, "pipeline_model_parallel_size": pp}
+    }
+    policy.use_dynamic_batches = dynamic
+    policy.use_sequence_packing = packed
+    return policy
+
+
+@pytest.mark.parametrize(
+    "student_kwargs",
+    [{"enabled": False}, {"pp": 2}, {"dynamic": True}, {"packed": True}],
+)
+def test_dense_native_export_requires_supported_student(student_kwargs):
+    loss_fn = SimpleNamespace(kd_loss_mode="sum", teacher_is_cross_tokenizer=[False])
+    assert not xt_mod._use_reusable_dense_teacher_ipc(
+        _native_policy(**student_kwargs), [_native_policy()], loss_fn
+    )
+
+
+@pytest.mark.parametrize(
+    "mode,cross_tokenizer,second_teacher_kwargs,expected",
+    [
+        ("sum", [False, False], {"enabled": False}, True),
+        ("select_teacher", [False, False], {"enabled": False}, True),
+        ("averaged_logits", [False, False], {}, True),
+        ("averaged_logits", [False, False], {"enabled": False}, False),
+        ("averaged_logits", [False, False], {"pp": 2}, False),
+        ("averaged_logits", [False, False], {"dynamic": True}, False),
+        ("averaged_logits", [False, False], {"packed": True}, False),
+        ("averaged_logits", [True, False], {"enabled": False}, True),
+    ],
+)
+def test_dense_native_export_preserves_true_logit_average(
+    mode, cross_tokenizer, second_teacher_kwargs, expected
+):
+    loss_fn = SimpleNamespace(
+        kd_loss_mode=mode, teacher_is_cross_tokenizer=cross_tokenizer
+    )
+    assert (
+        xt_mod._use_reusable_dense_teacher_ipc(
+            _native_policy(),
+            [_native_policy(), _native_policy(**second_teacher_kwargs)],
+            loss_fn,
+        )
+        is expected
+    )
+
+
+@pytest.mark.parametrize("validation", [False, True])
+@pytest.mark.parametrize("sparse_k", [0, 4])
+def test_controller_enables_native_dense_teacher_export(
+    mock_xtoken_components, validation, sparse_k
+):
+    c = mock_xtoken_components
+    c.master_config.distillation.update(max_num_steps=1, max_num_epochs=1)
+    for policy in (c.student_policy, c.teacher_policy):
+        policy.cfg = _native_policy().cfg
+        policy.use_dynamic_batches = False
+        policy.use_sequence_packing = False
+    c.loss_fn.teacher_is_cross_tokenizer = [False]
+    c.loss_fn.kd_loss_mode = "sum"
+    c.loss_fn.cfg["teacher_topk_ipc_k"] = sparse_k
+    if validation:
+        validate(
+            c.student_policy,
+            [c.teacher_policy],
+            c.val_dataloader,
+            c.loss_fn,
+            c.master_config,
+            skip_keys=xtoken_non_student_seq_keys(c.loss_fn),
+        )
+    else:
+        _run_train(c)
+    assert c.teacher_policy.get_full_logits_ipc.call_count > 0
+    assert all(
+        call.kwargs["reusable_ipc"] is True
+        for call in c.teacher_policy.get_full_logits_ipc.call_args_list
+    )
+    c.teacher_policy.get_topk_logits_ipc.assert_not_called()
+
+
 @pytest.mark.parametrize("projection_path", ["/projection.pt", None])
 def test_export_teacher_logits_threads_lockstep_plan_and_occurrence_ids(
     projection_path: str | None,

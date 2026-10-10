@@ -122,10 +122,11 @@ def test_native_consumer_rejects_inconsistent_payloads(tmp_path, invalid):
         fn._prepare_native_loss_context(**kwargs)
 
 
-def test_native_dense_consumer_stays_disabled_until_same_tokenizer_checkpoint(tmp_path):
+def test_native_dense_consumer_requires_same_tokenizer(tmp_path):
     fn, kwargs = _inputs(tmp_path)
+    del kwargs["native_sparse_teachers"][0]
     kwargs["native_dense_teachers"] = {0: DenseTeacherIPC([])}
-    with pytest.raises(NotImplementedError, match="same-tokenizer"):
+    with pytest.raises(ValueError, match="student tokenizer"):
         fn._prepare_native_loss_context(**kwargs)
 
 
