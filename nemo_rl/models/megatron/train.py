@@ -715,6 +715,7 @@ class LossPostProcessor:
                         and packed_seq_params is None
                         and get_pipeline_model_parallel_world_size() == 1
                     ),
+                    native_sparse_enabled=True,
                 )
 
         # wrap loss function with loss input preparation

@@ -15,6 +15,7 @@
 import collections
 import os
 import warnings
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NotRequired, Optional, TypedDict, TypeVar
 
 import numpy as np
@@ -38,14 +39,27 @@ from nemo_rl.algorithms.utils import (
     compute_seq_logprob_errors,
     masked_mean,
 )
+from nemo_rl.algorithms.x_token.dense_teacher import DenseTeacherIPC
 from nemo_rl.algorithms.x_token.loss_utils import (
     LocalizedAlignment,
+    NativeStudentContext,
     SparseTeacherLogits,
     build_exact_token_map,
     ce_label_mask,
     next_token_accuracy,
     select_teacher_topk_indices,
     student_next_token_ce,
+)
+from nemo_rl.algorithms.x_token.native_sparse_loss import (
+    compute_native_sparse_teacher_loss,
+)
+from nemo_rl.algorithms.x_token.native_student import (
+    native_next_token_accuracy,
+    native_next_token_ce,
+)
+from nemo_rl.algorithms.x_token.sparse_teacher import (
+    SparseTeacherIPC,
+    SparseTeacherRowReader,
 )
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.model_utils import (
@@ -2323,6 +2337,14 @@ class CrossTokenizerDistillationLossDataDict(TypedDict):
     sample_mask: torch.Tensor
 
 
+@dataclass(frozen=True)
+class _NativeXTokenLossContext:
+    """Readers and raw student rows belonging only to the current loss call."""
+
+    student: NativeStudentContext
+    sparse_teachers: dict[int, SparseTeacherRowReader]
+
+
 class CrossTokenizerDistillationLossFn(LossFunction):
     """Cross-tokenizer distillation loss.
 
@@ -2570,13 +2592,104 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             raise ValueError("localized alignment is missing a student KD token mask")
         return to_local_if_dtensor(mask)
 
+    def _prepare_native_loss_context(
+        self,
+        logits: torch.Tensor,
+        native_student: Optional[NativeStudentContext],
+        native_sparse_teachers: dict[int, SparseTeacherIPC],
+        native_dense_teachers: dict[int, DenseTeacherIPC],
+        teacher_full_logits_by_idx: dict[int, torch.Tensor],
+        teacher_sparse_logits_by_idx: dict[int, SparseTeacherLogits],
+        aligns_by_idx: dict[int, LocalizedAlignment],
+        global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]],
+    ) -> Optional[_NativeXTokenLossContext]:
+        if native_student is None:
+            if native_sparse_teachers or native_dense_teachers:
+                raise ValueError(
+                    "Native teacher descriptors require a native student context"
+                )
+            return None
+        if native_dense_teachers:
+            raise NotImplementedError(
+                "Native same-tokenizer loss consumer is not enabled"
+            )
+        if not native_sparse_teachers:
+            raise ValueError(
+                "Native student context requires a native teacher descriptor"
+            )
+        if (
+            native_student.logits is not logits
+            or native_student.real_vocab_size != self.student_vocab_size
+        ):
+            raise ValueError(
+                "Native student context disagrees with the loss logits or real vocabulary"
+            )
+        if self.sum_weights_metric is not None or self.kd_loss_mode == "select_teacher":
+            raise ValueError(
+                "Sparse teacher IPC requires static teacher weights and cannot select a teacher"
+            )
+        payloads = (
+            teacher_full_logits_by_idx,
+            teacher_sparse_logits_by_idx,
+            native_sparse_teachers,
+        )
+        if set().union(*payloads) != set(range(self.num_teachers)) or any(
+            sum(i in payload for payload in payloads) != 1
+            for i in range(self.num_teachers)
+        ):
+            raise ValueError(
+                "Every teacher must provide exactly one legacy or native logits payload"
+            )
+        if set(aligns_by_idx) != set(range(self.num_teachers)):
+            raise ValueError(
+                "Native xToken requires alignment metadata for every teacher"
+            )
+        readers: dict[int, SparseTeacherRowReader] = {}
+        for i, payload in sorted(native_sparse_teachers.items()):
+            if self._teacher_is_same_vocab(i):
+                raise ValueError(f"Same-vocab teacher {i} requires full teacher logits")
+            if (
+                global_valid_chunks_by_idx is None
+                or i not in global_valid_chunks_by_idx
+            ):
+                raise ValueError(
+                    f"Native sparse teacher {i} requires a full-step global valid-chunk denominator"
+                )
+            denominator = global_valid_chunks_by_idx[i]
+            if denominator.numel() != 1 or not bool(
+                torch.isfinite(denominator).all() & (denominator >= 0).all()
+            ):
+                raise ValueError(
+                    "Native sparse valid-chunk denominator must be finite, nonnegative and scalar"
+                )
+            reader = SparseTeacherRowReader(payload, device=logits.device)
+            k = int(self.cfg["teacher_topk_ipc_k"])
+            noise_k = int(self.cfg["prefix_bidir_v3_noise_filter_topk"])
+            reader.validate_contract(
+                k=k,
+                temperature=float(self.temperature),
+                real_vocab_size=self.teacher_vocab_sizes[i],
+                membership_k=noise_k if noise_k > 0 else k,
+                sample_count=logits.shape[0],
+            )
+            teacher_ids = aligns_by_idx[i].teacher_input_ids
+            if teacher_ids is None or tuple(teacher_ids.shape) != (
+                logits.shape[0],
+                reader.full_seq_len,
+            ):
+                raise ValueError(
+                    f"Native sparse teacher {i} sequence metadata disagrees with its rows"
+                )
+            readers[i] = reader
+        return _NativeXTokenLossContext(native_student, readers)
+
     def __call__(
         self,
         data: BatchedDataDict[CrossTokenizerDistillationLossDataDict],
         global_valid_seqs: torch.Tensor,
         global_valid_toks: torch.Tensor,
         logits: torch.Tensor,
-        student_logits_contig: torch.Tensor,
+        student_logits_contig: Optional[torch.Tensor],
         teacher_full_logits_by_idx: dict[int, torch.Tensor],
         aligns_by_idx: dict[int, LocalizedAlignment],
         *,
@@ -2590,6 +2703,9 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         cp_group: Optional[torch.distributed.ProcessGroup] = None,
         dp_cp_group: Optional[torch.distributed.ProcessGroup] = None,
         megatron_cp_normalize: bool = False,
+        native_student: Optional[NativeStudentContext] = None,
+        native_sparse_teachers: Optional[dict[int, SparseTeacherIPC]] = None,
+        native_dense_teachers: Optional[dict[int, DenseTeacherIPC]] = None,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Compute the (multi-teacher) cross-tokenizer distillation loss.
 
@@ -2599,12 +2715,15 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         magnitude, ``kl_loss_weight`` / ``ce_loss_scale`` ignored), else
         fixed-weighted. The single-teacher path is just ``num_teachers == 1``.
 
-        ``student_logits_contig`` (CP-relaid), the per-teacher ``aligns_by_idx``,
+        ``student_logits_contig`` (CP-relaid for legacy consumers), the per-teacher ``aligns_by_idx``,
         and the dense and sparse teacher-logit dictionaries are precomputed in
         ``prepare_loss_input``. The Automodel CP path also supplies its
         sequence-local CE inputs; Megatron keeps the raw TP/CP-sharded
         ``logits`` for its memory-efficient CE path. Production callers provide
         ``global_valid_chunks_by_idx`` from the full batch before microbatching.
+        Native teachers instead supply typed IPC descriptors and a shared native
+        student context; their invocation-local readers bypass reconstruction
+        and CE/accuracy use global next-token labels on the native CP rows.
 
         ``megatron_cp_normalize`` is internal adapter context: Megatron's outer
         wrapper omits objective CP normalization, so this call applies /CP only
@@ -2623,6 +2742,18 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         dense_reconstruction_fallbacks_by_idx = (
             dense_reconstruction_fallbacks_by_idx or {}
         )
+        native_context = self._prepare_native_loss_context(
+            logits,
+            native_student,
+            native_sparse_teachers or {},
+            native_dense_teachers or {},
+            teacher_full_logits_by_idx,
+            teacher_sparse_logits_by_idx,
+            aligns_by_idx,
+            global_valid_chunks_by_idx,
+        )
+        if native_context is None and student_logits_contig is None:
+            raise ValueError("Legacy xToken loss requires contiguous student logits")
         kd_normalizer = (
             global_valid_toks if global_valid_kd_toks is None else global_valid_kd_toks
         )
@@ -2637,16 +2768,24 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             and torch.distributed.is_initialized()
             else 1
         )
-        ce_loss = self._compute_ce(
-            logits,
-            data,
-            global_valid_toks,
-            student_next_token_logprobs=student_next_token_logprobs,
-            student_next_token_mask=student_next_token_mask,
-            student_logits_contig=student_logits_contig,
-            tp_group=tp_group,
-            cp_group=cp_group,
-        ) / legacy_cp_size
+        if native_context is not None:
+            ce_loss = native_next_token_ce(
+                native_context.student, global_valid_toks, tp_group=tp_group
+            )
+        else:
+            ce_loss = (
+                self._compute_ce(
+                    logits,
+                    data,
+                    global_valid_toks,
+                    student_next_token_logprobs=student_next_token_logprobs,
+                    student_next_token_mask=student_next_token_mask,
+                    student_logits_contig=student_logits_contig,
+                    tp_group=tp_group,
+                    cp_group=cp_group,
+                )
+                / legacy_cp_size
+            )
 
         if self.kd_loss_mode == "sum":
             total_kd, per_teacher_metrics = self._sum_kd(
@@ -2660,6 +2799,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 tp_group=tp_group,
                 cp_group=cp_group,
                 legacy_cp_size=legacy_cp_size,
+                native_context=native_context,
             )
         elif self.kd_loss_mode == "averaged_logits":
             total_kd, per_teacher_metrics = self._averaged_logits_kd(
@@ -2673,6 +2813,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 tp_group=tp_group,
                 cp_group=cp_group,
                 legacy_cp_size=legacy_cp_size,
+                native_context=native_context,
             )
         elif self.kd_loss_mode == "select_teacher":
             total_kd, per_teacher_metrics = self._select_teacher_kd(
@@ -2686,6 +2827,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 tp_group=tp_group,
                 cp_group=cp_group,
                 legacy_cp_size=legacy_cp_size,
+                native_context=native_context,
             )
         else:
             raise ValueError(f"Unknown kd_loss_mode: {self.kd_loss_mode!r}")
@@ -2735,19 +2877,23 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 self.kl_loss_weight * kd_reported + self.ce_loss_scale * ce_reported
             )
 
-        # Next-token accuracy on the student side (quick per-step signal), masked
-        # to valid tokens. Computed once on the student from the shared CP-relaid
-        # fields (carried on every teacher's align); the CP-aware shift pairs
-        # predictors with the right labels under load-balanced sharding.
-        align0 = aligns_by_idx[0]
-        accuracy = next_token_accuracy(
-            student_logits_contig,
-            input_ids=align0.student_input_ids,
-            token_mask=align0.student_token_mask,
-            sample_mask=data["sample_mask"],
-            tp_group=tp_group,
-            cp_group=cp_group,
-        )
+        # Compute accuracy once, using the same global next-token pairing as CE.
+        # Legacy callers retain their established contiguous CP-shift helper.
+        if native_context is not None:
+            accuracy = native_next_token_accuracy(
+                native_context.student, tp_group=tp_group, cp_group=cp_group
+            )
+        else:
+            assert student_logits_contig is not None
+            align0 = aligns_by_idx[0]
+            accuracy = next_token_accuracy(
+                student_logits_contig,
+                input_ids=align0.student_input_ids,
+                token_mask=align0.student_token_mask,
+                sample_mask=data["sample_mask"],
+                tp_group=tp_group,
+                cp_group=cp_group,
+            )
 
         metrics: dict[str, Any] = {
             "loss": loss_reported.item(),
@@ -2803,7 +2949,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
     def _compute_teacher_kd(
         self,
         i: int,
-        student_logits_contig: torch.Tensor,
+        student_logits_contig: Optional[torch.Tensor],
         data: BatchedDataDict[CrossTokenizerDistillationLossDataDict],
         teacher_full_logits_by_idx: dict[int, torch.Tensor],
         aligns_by_idx: dict[int, LocalizedAlignment],
@@ -2814,6 +2960,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         cp_group: Optional[torch.distributed.ProcessGroup],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]] = None,
         legacy_cp_size: int = 1,
+        native_context: Optional[_NativeXTokenLossContext] = None,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """KD term for teacher ``i`` plus its (unsuffixed) metrics.
 
@@ -2822,6 +2969,20 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         localized alignment. Both consume the shared CP-relaid student logits and
         route TP/CP through the parameterized loss-mode helpers.
         """
+        if native_context is not None and i in native_context.sparse_teachers:
+            assert global_valid_chunks_by_idx is not None
+            return compute_native_sparse_teacher_loss(
+                self,
+                i,
+                native_context.student,
+                aligns_by_idx[i],
+                native_context.sparse_teachers[i],
+                global_valid_chunks=global_valid_chunks_by_idx[i],
+                tp_group=tp_group,
+                cp_group=cp_group,
+            )
+        if student_logits_contig is None:
+            raise ValueError(f"Legacy teacher {i} requires contiguous student logits")
         has_full_logits = i in teacher_full_logits_by_idx
         has_sparse_logits = i in teacher_sparse_logits_by_idx
         if has_full_logits == has_sparse_logits:
@@ -3037,7 +3198,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
     def _sum_kd(
         self,
-        student_logits_contig: torch.Tensor,
+        student_logits_contig: Optional[torch.Tensor],
         data: BatchedDataDict[CrossTokenizerDistillationLossDataDict],
         teacher_full_logits_by_idx: dict[int, torch.Tensor],
         aligns_by_idx: dict[int, LocalizedAlignment],
@@ -3048,6 +3209,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         cp_group: Optional[torch.distributed.ProcessGroup],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]] = None,
         legacy_cp_size: int = 1,
+        native_context: Optional[_NativeXTokenLossContext] = None,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Weighted sum: ``total_kd = Σ_i weight_i · KD_i``.
 
@@ -3055,7 +3217,13 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         When ``normalize_teacher_by_vocab`` is set, each teacher's KD is
         additionally scaled by ``log(V_t_i) / log(min_j V_t_j)``.
         """
-        device = student_logits_contig.device
+        student_rows = (
+            native_context.student.logits
+            if native_context is not None
+            else student_logits_contig
+        )
+        assert student_rows is not None
+        device = student_rows.device
         if self.sum_weights_metric is not None:
             if teacher_sparse_logits_by_idx:
                 raise ValueError(
@@ -3070,7 +3238,11 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 torch.tensor(
                     self.teacher_weights[i],
                     device=device,
-                    dtype=student_logits_contig.dtype,
+                    dtype=(
+                        torch.float32
+                        if native_context is not None
+                        else student_rows.dtype
+                    ),
                 )
                 for i in range(self.num_teachers)
             ]
@@ -3097,6 +3269,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 tp_group=tp_group,
                 cp_group=cp_group,
                 legacy_cp_size=legacy_cp_size,
+                native_context=native_context,
             )
             weighted = kd_i * weights[i]
             if self.normalize_teacher_by_vocab:
@@ -3117,7 +3290,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
     def _averaged_logits_kd(
         self,
-        student_logits_contig: torch.Tensor,
+        student_logits_contig: Optional[torch.Tensor],
         data: BatchedDataDict[CrossTokenizerDistillationLossDataDict],
         teacher_full_logits_by_idx: dict[int, torch.Tensor],
         aligns_by_idx: dict[int, LocalizedAlignment],
@@ -3128,6 +3301,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         cp_group: Optional[torch.distributed.ProcessGroup],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]] = None,
         legacy_cp_size: int = 1,
+        native_context: Optional[_NativeXTokenLossContext] = None,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Convex-weighted average of teacher logits, then one direct KL.
 
@@ -3161,6 +3335,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     tp_group=tp_group,
                     cp_group=cp_group,
                     legacy_cp_size=legacy_cp_size,
+                    native_context=native_context,
                 )
                 w = self.teacher_weights[i]
                 weighted = kd_i * w
@@ -3179,6 +3354,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             contrib = f.float() * (self.teacher_weights[i] / total_w)
             avg = contrib if avg is None else avg + contrib
         assert avg is not None
+        assert student_logits_contig is not None
         kd = self._direct_full_vocab_kl(
             student_logits_contig,
             avg,
@@ -3222,7 +3398,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
 
     def _select_teacher_kd(
         self,
-        student_logits_contig: torch.Tensor,
+        student_logits_contig: Optional[torch.Tensor],
         data: BatchedDataDict[CrossTokenizerDistillationLossDataDict],
         teacher_full_logits_by_idx: dict[int, torch.Tensor],
         aligns_by_idx: dict[int, LocalizedAlignment],
@@ -3233,6 +3409,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         cp_group: Optional[torch.distributed.ProcessGroup],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]] = None,
         legacy_cp_size: int = 1,
+        native_context: Optional[_NativeXTokenLossContext] = None,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Use only the teacher with the lowest next-token CE on its own tokens."""
         if teacher_sparse_logits_by_idx:
@@ -3269,6 +3446,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             tp_group=tp_group,
             cp_group=cp_group,
             legacy_cp_size=legacy_cp_size,
+            native_context=native_context,
         )
         per_metrics: dict[str, Any] = {f"{k}_t{best}": v for k, v in m.items()}
         for i in range(self.num_teachers):

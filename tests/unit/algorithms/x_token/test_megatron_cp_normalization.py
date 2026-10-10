@@ -511,6 +511,9 @@ def test_xtoken_wrapper_keeps_schedule_compensation(
             wrapped_loss.call_args.kwargs["prepare_fn"].keywords["native_cp_enabled"]
             is eligible
         )
+        capabilities = wrapped_loss.call_args.kwargs["prepare_fn"].keywords
+        assert capabilities["native_sparse_enabled"] is True
+        assert capabilities.get("native_same_tokenizer_enabled", False) is False
     # MCore applies CP / num_microbatches after this compensation.
     torch.testing.assert_close(loss, torch.tensor(6.0))
 

@@ -141,6 +141,58 @@ baseline typing issues are not claimed fixed). Independent reviews found no
 remaining actionable issues. Native loss numerical and real-model R1–R6
 acceptance remains reserved for checkpoints 4a/4b/5.
 
+Publication: signed-off commit `310d4dcfdf0b0433d1d1c15beea9dffd6202aed7`
+pushed to `myfork/avenkateshha/xtoken-v6-loss`; remote tip verified.
+
+## Checkpoint 4a — native sparse KD, CE, accuracy and scaling
+
+Implemented after checkpoint 3's verified push. The MCore static/unpacked PP1
+wrapper enables the native sparse consumer. Native same-tokenizer activation
+remains reserved for checkpoint 4b.
+
+The loss keeps native student rows and computes CE/accuracy with global next-token
+labels, real-vocabulary masking and no rank-3 student CP relayout or full-sequence
+CE-target gathering. Each native teacher has one invocation-local validated
+reader. Common chunks belong to their predictor owner; mismatch chunks belong
+to their final predictor owner, with one unconditional differentiable CP prefix
+SUM in forward and backward, including empty and zero terms. Requested row tiles
+are bounded at 64; common support construction remains on device. The historical
+selected-support plus REST objective, forced-label/noise distinctions, M-to-N
+handling, teacher-specific full-step denominators and existing loss-mode fallback
+semantics are preserved.
+
+Native CE and KD have no extra /CP. The retained legacy v6 consumer keeps /CP;
+MCore schedule compensation is unchanged. Detached CE/KD ratios and reported
+terms are CP-complete per microbatch and DP replica. Static native weights stay
+FP32 even with BF16 forward logits. Actual legacy sparse consumers retain one
+shared compatibility view and their fully reconstructed sparse sequence.
+
+Final frozen-source CPU validation passed all four TP/CP grids with distributed
+collective diagnostics enabled: native dispatcher 4 passed (143.33 s), mixed
+native/legacy dispatcher 4 passed (141.00 s); both processes exited 0. All 11
+source/config/test hashes matched before and after. Durable commands/logs and
+hashes are recorded in `artifacts/validation/runs/checkpoint4a-cpu-20261010/`. The native suite performs 144 combined loss/gradient
+comparisons (12 cases × full B2 plus two B1 microbatches × four grids). It covers
+unequal weights and normalizers, fixed/dynamic scaling, vocabulary scaling,
+reversed teacher order, zero/empty terms, filtering, consecutive generations,
+BF16 input and averaged-logits fallback, and forbids legacy relayout/CE helpers.
+The mixed suite performs 96 comparisons across sum/fallback modes, both teacher
+orders, fixed/dynamic scaling and identical microbatch groupings, using the exact
+CP1 retained legacy consumer plus an independent native teacher oracle. Its
+initial test fixture incorrectly CP-sliced the legacy full sparse payload; that
+fixture was corrected without a production collective-ordering change.
+
+Additional focused evidence: final vectorized native sparse objective/gradient
+tests 20 passed (135.44 s, four CUDA cases deselected),
+native CE/accuracy 7 CPU passed (four CUDA cases await the final GPU run), reader
+contract/BF16-weight tests 18 passed, and orchestration/full-step-normalizer
+regressions 204 passed. FP32 comparisons use rtol 1e-4/atol 1e-5; BF16 combined
+gradients require relative L2 and norm error <= 0.02. Both new production modules
+pass targeted Pyrefly; the loss-functions file retains exactly its 63 pre-existing
+type errors. Changed-file Ruff/format checks pass. Real-model loss, optimizer,
+pre-clip parameter-gradient and native CUDA acceptance remain for checkpoint 5.
+No larger memory test or production-capacity claim is included.
+
 ## Runtime and fixture preparation
 
 - Historical submission reference: job `19467093`, with new run-owned Slurm
