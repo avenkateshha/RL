@@ -2589,6 +2589,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         tp_group: Optional[torch.distributed.ProcessGroup] = None,
         cp_group: Optional[torch.distributed.ProcessGroup] = None,
         dp_cp_group: Optional[torch.distributed.ProcessGroup] = None,
+        megatron_cp_normalize: bool = False,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Compute the (multi-teacher) cross-tokenizer distillation loss.
 
@@ -2605,6 +2606,11 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         ``logits`` for its memory-efficient CE path. Production callers provide
         ``global_valid_chunks_by_idx`` from the full batch before microbatching.
 
+        ``megatron_cp_normalize`` is internal adapter context: Megatron's outer
+        wrapper omits objective CP normalization, so this call applies /CP only
+        to legacy replicated-gradient CE and cross-tokenizer KD. Other backends
+        retain their existing normalization and reporting behavior.
+
         ``dp_cp_group`` is the group the global normalizers reduce over. It is
         stashed on the instance rather than threaded through the four levels of
         per-teacher dispatch below; ``__call__`` is the single entry point and is
@@ -2620,6 +2626,17 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         kd_normalizer = (
             global_valid_toks if global_valid_kd_toks is None else global_valid_kd_toks
         )
+        # Megatron's retained CE/v6 helpers replicate the objective and fan out
+        # its gradient across CP. Same-tokenizer KL evaluates disjoint windows;
+        # its relayout backward SUM routes those gradients to the original
+        # owners without replication. Correct each term before combining them.
+        legacy_cp_size = (
+            torch.distributed.get_world_size(cp_group)
+            if megatron_cp_normalize
+            and cp_group is not None
+            and torch.distributed.is_initialized()
+            else 1
+        )
         ce_loss = self._compute_ce(
             logits,
             data,
@@ -2629,7 +2646,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             student_logits_contig=student_logits_contig,
             tp_group=tp_group,
             cp_group=cp_group,
-        )
+        ) / legacy_cp_size
 
         if self.kd_loss_mode == "sum":
             total_kd, per_teacher_metrics = self._sum_kd(
@@ -2642,6 +2659,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 global_valid_chunks_by_idx=global_valid_chunks_by_idx,
                 tp_group=tp_group,
                 cp_group=cp_group,
+                legacy_cp_size=legacy_cp_size,
             )
         elif self.kd_loss_mode == "averaged_logits":
             total_kd, per_teacher_metrics = self._averaged_logits_kd(
@@ -2654,6 +2672,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 global_valid_chunks_by_idx=global_valid_chunks_by_idx,
                 tp_group=tp_group,
                 cp_group=cp_group,
+                legacy_cp_size=legacy_cp_size,
             )
         elif self.kd_loss_mode == "select_teacher":
             total_kd, per_teacher_metrics = self._select_teacher_kd(
@@ -2666,25 +2685,55 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 global_valid_chunks_by_idx=global_valid_chunks_by_idx,
                 tp_group=tp_group,
                 cp_group=cp_group,
+                legacy_cp_size=legacy_cp_size,
             )
         else:
             raise ValueError(f"Unknown kd_loss_mode: {self.kd_loss_mode!r}")
+
+        # One detached ratio per microbatch and DP replica. The CP sum includes
+        # corrected replicated terms and disjoint same-tokenizer contributions;
+        # never reduce over WORLD/DP here. Report the same CP-complete values
+        # even with fixed weights, since worker metric aggregation is DP-only.
+        ce_reported, kd_reported = ce_loss.detach(), total_kd.detach()
+        if megatron_cp_normalize:
+            ce_reported, kd_reported = group_all_reduce_sum(
+                torch.stack((ce_reported, kd_reported)), cp_group
+            ).unbind()
+            kd_metric_keys = sorted(
+                key
+                for key in per_teacher_metrics
+                if key == "kl_loss"
+                or key.startswith("kl_loss_t")
+                or key.endswith("/weighted_kl")
+            )
+            if kd_metric_keys:
+                values = total_kd.new_tensor(
+                    [per_teacher_metrics[key] for key in kd_metric_keys]
+                )
+                values = group_all_reduce_sum(values, cp_group)
+                per_teacher_metrics.update(
+                    zip(kd_metric_keys, values.tolist(), strict=True)
+                )
 
         # Combine the aggregated KD term with the single student CE term.
         if self.dynamic_loss_scaling:
             # loss = sg(ce/kd) * kd + ce; user kl_loss_weight / ce_loss_scale
             # are intentionally ignored in this branch.
-            kd_detached = total_kd.detach().abs()
-            ce_detached = ce_loss.detach().abs()
+            kd_detached = kd_reported.abs()
+            ce_detached = ce_reported.abs()
             kl_scale = torch.where(
                 kd_detached > 0,
                 ce_detached / kd_detached,
                 torch.ones_like(kd_detached),
             )
             loss = kl_scale * total_kd + ce_loss
+            loss_reported = kl_scale * kd_reported + ce_reported
         else:
             kl_scale = torch.tensor(1.0, device=total_kd.device, dtype=total_kd.dtype)
             loss = self.kl_loss_weight * total_kd + self.ce_loss_scale * ce_loss
+            loss_reported = (
+                self.kl_loss_weight * kd_reported + self.ce_loss_scale * ce_reported
+            )
 
         # Next-token accuracy on the student side (quick per-step signal), masked
         # to valid tokens. Computed once on the student from the shared CP-relaid
@@ -2701,12 +2750,12 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         )
 
         metrics: dict[str, Any] = {
-            "loss": loss.item(),
+            "loss": loss_reported.item(),
             # Aggregate KD term (kept under ``kl_loss`` so existing trainer
             # metric handling continues to work); per-teacher terms are suffixed
             # ``_t{i}``.
-            "kl_loss": total_kd.item(),
-            "ce_loss": ce_loss.item(),
+            "kl_loss": kd_reported.item(),
+            "ce_loss": ce_reported.item(),
             "kl_loss_scale": kl_scale.item(),
             "accuracy": accuracy.item(),
             "num_valid_samples": to_local_if_dtensor(data["sample_mask"]).sum().item(),
@@ -2764,6 +2813,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         tp_group: Optional[torch.distributed.ProcessGroup],
         cp_group: Optional[torch.distributed.ProcessGroup],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]] = None,
+        legacy_cp_size: int = 1,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """KD term for teacher ``i`` plus its (unsuffixed) metrics.
 
@@ -2811,6 +2861,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             cp_group=cp_group,
             global_valid_chunks=global_valid_chunks,
         )
+        kd = kd / legacy_cp_size
         # Surface the KD value under the shared per-teacher metric key and keep
         # the v6 chunk diagnostics; the dispatcher-level loss keys are dropped
         # (the aggregate ``loss`` / ``kl_loss`` are set by ``__call__``).
@@ -2996,6 +3047,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         tp_group: Optional[torch.distributed.ProcessGroup],
         cp_group: Optional[torch.distributed.ProcessGroup],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]] = None,
+        legacy_cp_size: int = 1,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Weighted sum: ``total_kd = Σ_i weight_i · KD_i``.
 
@@ -3044,6 +3096,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 global_valid_chunks_by_idx=global_valid_chunks_by_idx,
                 tp_group=tp_group,
                 cp_group=cp_group,
+                legacy_cp_size=legacy_cp_size,
             )
             weighted = kd_i * weights[i]
             if self.normalize_teacher_by_vocab:
@@ -3074,6 +3127,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         tp_group: Optional[torch.distributed.ProcessGroup],
         cp_group: Optional[torch.distributed.ProcessGroup],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]] = None,
+        legacy_cp_size: int = 1,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Convex-weighted average of teacher logits, then one direct KL.
 
@@ -3106,6 +3160,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                     global_valid_chunks_by_idx=global_valid_chunks_by_idx,
                     tp_group=tp_group,
                     cp_group=cp_group,
+                    legacy_cp_size=legacy_cp_size,
                 )
                 w = self.teacher_weights[i]
                 weighted = kd_i * w
@@ -3177,6 +3232,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         tp_group: Optional[torch.distributed.ProcessGroup],
         cp_group: Optional[torch.distributed.ProcessGroup],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]] = None,
+        legacy_cp_size: int = 1,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Use only the teacher with the lowest next-token CE on its own tokens."""
         if teacher_sparse_logits_by_idx:
@@ -3212,6 +3268,7 @@ class CrossTokenizerDistillationLossFn(LossFunction):
             global_valid_chunks_by_idx=global_valid_chunks_by_idx,
             tp_group=tp_group,
             cp_group=cp_group,
+            legacy_cp_size=legacy_cp_size,
         )
         per_metrics: dict[str, Any] = {f"{k}_t{best}": v for k, v in m.items()}
         for i in range(self.num_teachers):

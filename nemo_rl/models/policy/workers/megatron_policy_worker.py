@@ -52,7 +52,7 @@ from nvidia_resiliency_ext.checkpointing.async_ckpt.filesystem_async import (
 from transformers import PreTrainedTokenizerBase
 
 from nemo_rl.algorithms.logits_sampling_utils import TrainingSamplingParams
-from nemo_rl.algorithms.loss.interfaces import LossFunction
+from nemo_rl.algorithms.loss.interfaces import LossFunction, LossInputType
 from nemo_rl.algorithms.loss.loss_functions import ClippedPGLossFn
 from nemo_rl.algorithms.loss.utils import rescale_loss_metrics
 from nemo_rl.algorithms.metric_utils import LEARNING_RATE_KEY
@@ -1726,6 +1726,12 @@ class MegatronPolicyWorkerImpl(
         gbs: Optional[int] = None,
         mbs: Optional[int] = None,
     ) -> None:
+        if loss_fn.input_type == LossInputType.DISTILLATION_CROSS_TOKENIZER:
+            raise NotImplementedError(
+                "xToken distillation requires synchronous train(); the split "
+                "begin_train_step/train_microbatch API does not support its "
+                "per-teacher normalizers and per-microbatch CP loss scaling."
+            )
         existing = getattr(self, "_train_step_state", None)
         if existing is not None:
             raise RuntimeError(
@@ -1818,6 +1824,11 @@ class MegatronPolicyWorkerImpl(
         regular ``train`` path.
         """
         state = self._assert_step_open()
+        if state["loss_fn"].input_type == LossInputType.DISTILLATION_CROSS_TOKENIZER:
+            raise NotImplementedError(
+                "xToken distillation requires synchronous train(); "
+                "train_microbatch is unsupported."
+            )
         try:
             self._train_microbatch_body(state, data)
         except Exception:

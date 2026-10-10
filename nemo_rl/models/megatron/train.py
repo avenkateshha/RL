@@ -625,6 +625,8 @@ class LossPostProcessor:
             num_microbatches: Microbatch count, used to counteract Megatron's
                 per-microbatch loss averaging.
             cp_normalize: Whether to divide the loss by the context-parallel size.
+                xToken instead corrects its replicated-gradient terms inside
+                the loss, preserving disjoint same-tokenizer contributions.
             sampling_params: Optional temperature / top-k/p for logprob losses.
             draft_model: Optional EAGLE draft model for distillation.
             prepare_fn: Optional override for the default ``prepare_loss_input``.
@@ -796,7 +798,11 @@ class LossPostProcessor:
             loss_kwargs["global_valid_chunks_by_idx"] = global_valid_chunks_by_idx
         loss_fn_wrapped = partial(loss_fn_wrapped, **loss_kwargs)
 
-        if self.cp_normalize:
+        # xToken corrects replicated-gradient CE/v6 separately. Same-tokenizer
+        # KL owns disjoint predictor windows and must not receive this /CP.
+        if self.cp_normalize and not isinstance(
+            self.loss_fn, CrossTokenizerDistillationLossFn
+        ):
             cp_size = get_context_parallel_world_size()
             prev_loss_fn = loss_fn_wrapped
 

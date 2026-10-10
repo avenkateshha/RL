@@ -17,6 +17,7 @@
 from typing import TYPE_CHECKING, Any, Optional
 
 import torch
+from torch.distributed.tensor import DTensor
 
 from nemo_rl.algorithms.logits_sampling_utils import (
     TrainingSamplingParams,
@@ -365,6 +366,13 @@ def prepare_loss_input(
             "tp_group": tp_group,
             "cp_group": cp_group,
             "dp_cp_group": dp_cp_group,
+            # Only the Megatron wrapper replaces its blanket objective /CP
+            # with the per-term backward corrections in the xToken loss.
+            "megatron_cp_normalize": (
+                vocab_parallel_group is not None
+                and cp_sharder is None
+                and not isinstance(logits, DTensor)
+            ),
         }
         if cp_sharder is not None:
             next_token_logprobs = get_cp_sharded_next_token_logprobs(

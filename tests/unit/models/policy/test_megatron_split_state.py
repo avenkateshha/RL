@@ -298,6 +298,35 @@ def _fake_batch():
 
 
 class TestBegin:
+    def test_rejects_xtoken_before_mutating_model_or_step(self):
+        from nemo_rl.algorithms.loss.interfaces import LossInputType, LossType
+
+        w = _make_worker(LossType.TOKEN_LEVEL)
+        w._test_loss_fn.input_type = LossInputType.DISTILLATION_CROSS_TOKENIZER
+        w.model.inference_params = sentinel = object()
+        with pytest.raises(NotImplementedError, match="xToken.*synchronous train"):
+            w.begin_train_step(loss_fn=w._test_loss_fn)
+        assert w._train_step_state is None
+        assert w.model.inference_params is sentinel
+        w.model.train.assert_not_called()
+        w.model.zero_grad_buffer.assert_not_called()
+        w.optimizer.zero_grad.assert_not_called()
+        assert w.model.config.grad_sync_func == "ORIGINAL_GRAD_SYNC_FUNC"
+
+    def test_rejects_injected_xtoken_microbatch_before_execution(self):
+        from nemo_rl.algorithms.loss.interfaces import LossInputType, LossType
+
+        w = _make_worker(LossType.TOKEN_LEVEL)
+        w._test_loss_fn.input_type = LossInputType.DISTILLATION_CROSS_TOKENIZER
+        state = {"loss_fn": w._test_loss_fn, "num_chunks": 0}
+        w._train_step_state = state
+        w._train_microbatch_body = MagicMock()
+        with pytest.raises(NotImplementedError, match="xToken.*synchronous train"):
+            w.train_microbatch(_fake_batch())
+        w._train_microbatch_body.assert_not_called()
+        assert w._train_step_state is state
+        assert state["num_chunks"] == 0
+
     def test_opens_state(self, mock_module_symbols):
         from nemo_rl.algorithms.loss.interfaces import LossType
 
