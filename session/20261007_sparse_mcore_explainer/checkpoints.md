@@ -49,8 +49,51 @@ dependency. Container wrapper/worker execution and real-model pre-clip gradient
 checks remain pending the runtime repair and final GPU matrix. No CUDA IPC,
 model-conversion or production memory acceptance is claimed by this checkpoint.
 
-Publication: pending signed-off commit/push; the resulting SHA will be recorded
-in the next checkpoint update (avoiding a self-referential commit hash).
+Publication: signed-off commit `09de9ec5558f6768aab8bf105e933528432f1d37`
+pushed to `myfork/avenkateshha/xtoken-v6-loss`; remote tip verified. The final
+numerical harness also passed all four grids inside pinned container job
+`19989499`; its schedule-compensation wrapper test subsequently passed. The
+first pytest command filtered MCore-marked split guard tests, so those were
+not counted as passing. The frozen follow-up job `19989617` ran
+`--mcore-only -k xtoken`: **2 passed, 90 deselected**, exit 0.
+
+## Checkpoint 2 — transport and selected-probability math
+
+Implemented after checkpoint 1's verified push. Adds typed native sparse-v2
+records and invocation-scoped requested-row readers, exact TP selected-log-prob
+autograd, deterministic score/ID top-K with exact temperature-scaled logZ,
+independent two-label forced sidecars and teacher-native CP segment mapping.
+Padded vocabulary columns have zero probability/gradient. Selected requests
+accumulate repeated row/token gradients and rematerialize bounded row tiles.
+Cross-CP scalar exchange reuses the existing forward/backward SUM primitive.
+
+Readers validate K, temperature, vocabulary, membership support, sample count,
+backing offsets and complete nonoverlapping row coverage. They replace the
+natural cutoff independently for each required-label request, preserving the
+original noise membership. The forced-label builder accepts HEAD's derived
+absent spans, retains two labels at origin collisions and validates teacher IDs.
+
+Validation: `uv run --no-sync --offline pytest
+--confcutdir=tests/unit/distributed
+tests/unit/distributed/test_native_sparse_primitives.py
+tests/unit/distributed/test_native_sparse_reader.py -q`: **35 passed, 4 CUDA
+skipped**, 18.20 s. Includes CPU-gloo TP/CP `(1,1)`, `(2,1)`, `(1,2)`, `(2,2)`,
+noncontiguous logits, padded columns, tied BF16 scores, repeated/empty requests,
+owner-only cross-CP backward, two teachers with distinct lengths/microbatch
+slots, independent generations and malformed metadata. Primitive FP32 values
+use `rtol=atol=1e-6`; selected gradients use `rtol=atol=2e-6`.
+
+Independent pure-Torch two-teacher sparse-objective fixture/oracle self-checks
+pass: `uv run --no-sync python -m
+tests.unit.algorithms.x_token.native_sparse_fixtures`, loss `1.5517744005`.
+It covers selected support plus REST, prefix/mismatch cases, distinct teacher
+normalizers, teacher permutation, fixed-ratio partitioning, empty contributions
+and finite-difference gradients. Production-loss parity is reserved for 4a.
+Changed-file Ruff/format, targeted Pyrefly (**0 errors**) and diff checks pass.
+CUDA primitive execution, persistent producer streaming, CUDA IPC and complete
+loss/model integration are not claimed by this checkpoint.
+
+Publication: prepared for signed-off commit and verified normal push.
 
 ## Runtime and fixture preparation
 
@@ -66,7 +109,14 @@ in the next checkpoint update (avoiding a self-referential commit hash).
 - Branch-pinned source preflight `19989499`: worker, Bridge, MCore, Lens and
   CUDA imports **PASS**, using isolated cached git snapshots of committed
   Bridge `1f8873bb` and MCore `6a366090`. Shared installs, submodules and the
-  historical run are preserved. Wrapper and worker tests are running.
+  historical run are preserved. Wrapper test passed. Standalone model creation
+  hit the provider's APEX fusion default; a follow-up uses the existing exemplar
+  setting `gradient_accumulation_fusion=false`. A late edit of the active driver
+  also produced a shell EOF; the follow-up launcher is frozen before submission.
+- Follow-up `19989617`: split guards **2 passed**. Pinned Llama-3.2-1B student
+  and SmolLM2-1.7B teacher loaded actual weights and completed finite native
+  TP2/CP2 forwards at B1/T32. Other pinned models remain in progress; these
+  checks do not establish KD, backward, optimizer or IPC acceptance.
 - Pinned Qwen forward/reverse table validation and offline SmolLM2 table
   generation completed; exact evidence resides in fixture-preparation results.
 - Real-model R1–R6 acceptance remains **NOT_RUN** until implementation and
