@@ -27,8 +27,12 @@ from typing import Any
 import torch
 
 from nemo_rl.distributed.selected_logprobs import cp_native_global_positions
+from nemo_rl.utils.reusable_cuda_ipc import (
+    ReusableCudaIPCDescriptor,
+    open_reusable_cuda_ipc,
+)
 
-SparseBacking = torch.Tensor | tuple[Any, ...]
+SparseBacking = torch.Tensor | ReusableCudaIPCDescriptor
 
 
 @dataclass(frozen=True)
@@ -116,6 +120,20 @@ class SparseTeacherShard:
             raise ValueError(
                 "Invalid sparse teacher sequence/slot or two-label sidecar width"
             )
+        for backing in (
+            shard.topk_logits_ipc,
+            shard.topk_indices_ipc,
+            shard.log_z_ipc,
+            shard.natural_tail_indices_ipc,
+            shard.forced_logits_ipc,
+            shard.forced_indices_ipc,
+            shard.forced_in_topk_ipc,
+        ):
+            if not isinstance(backing, (torch.Tensor, ReusableCudaIPCDescriptor)):
+                raise ValueError(
+                    "Native sparse teacher requires reusable IPC descriptors; "
+                    "one-use Torch reduction tuples cannot be reopened safely"
+                )
         return shard
 
     def to_record(self) -> dict[str, Any]:
@@ -317,10 +335,7 @@ class SparseTeacherRowReader:
             else:
                 if self._device_id is None:
                     raise ValueError("CUDA IPC backing requires a CUDA consumer device")
-                # Policy imports Ray; pure tensor readers must not load it.
-                from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
-
-                tensor = rebuild_cuda_tensor_from_ipc(value, self._device_id).detach()
+                tensor = open_reusable_cuda_ipc(value, self._device_id).detach()
             self._backing_tensors[key] = tensor
         if (
             tensor.ndim != 4

@@ -22,10 +22,19 @@ from typing import Any, Callable, Optional, Union
 
 import ray
 from ray.util.placement_group import PlacementGroup
-from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
+from ray.util.scheduling_strategies import (
+    NodeAffinitySchedulingStrategy,
+    PlacementGroupSchedulingStrategy,
+)
 from tqdm import tqdm
 
 from nemo_rl.distributed.named_sharding import NamedSharding
+from nemo_rl.distributed.process_lifetime import (
+    WorkerProcessIdentity,
+    WorkerProcessSnapshot,
+    capture_worker_process,
+    observe_worker_processes_exit,
+)
 from nemo_rl.distributed.ray_actor_environment_registry import (
     get_actor_python_env,
 )
@@ -367,6 +376,10 @@ class RayWorkerGroup:
     - Support for tied worker groups where multiple workers process the same data
     """
 
+    # Immutable defaults also preserve lightweight groups built via __new__.
+    _termination_snapshot: Optional[WorkerProcessSnapshot] = None
+    _termination_unconfirmed: bool = False
+
     def __init__(
         self,
         cluster: RayVirtualCluster,
@@ -392,6 +405,8 @@ class RayWorkerGroup:
         """
         self._workers: list[ray.actor.ActorHandle] = []
         self._worker_metadata: list[dict[str, Any]] = []
+        self._termination_snapshot: Optional[WorkerProcessSnapshot] = None
+        self._termination_unconfirmed = False
         # worker_idx -> the arguments its creation call was made with, so a single
         # worker can be rebuilt without redoing group-wide setup. Populated during
         # creation; see _create_workers_from_bundle_indices.
@@ -1212,11 +1227,78 @@ class RayWorkerGroup:
             self, return_generators_as_proxies=return_generators_as_proxies
         )
 
+    def record_worker_processes(self, timeout: Optional[float] = 30.0) -> None:
+        """Capture OS identities before exposing reusable IPC to healthy workers.
+
+        Ray's built-in ``__ray_call__`` executes in each actor without requiring
+        a new worker API. Failure to capture every worker raises before any IPC
+        consumer may start. Call again before a new lifetime if workers change.
+        """
+        if not self._workers:
+            raise RuntimeError(
+                "Cannot record process identities for an empty worker group"
+            )
+        actor_ids = tuple(worker._actor_id.hex() for worker in self._workers)
+        if (
+            self._termination_snapshot is not None
+            and self._termination_snapshot.actor_ids != actor_ids
+        ):
+            self._termination_snapshot = None
+        # A nested capture can time out while the same actors are still busy.
+        # Retain their earlier identity snapshot for failure cleanup.
+        processes = ray.get(
+            [
+                worker.__ray_call__.remote(capture_worker_process)
+                for worker in self._workers
+            ],
+            timeout=timeout,
+        )
+        if len(processes) != len(self._workers) or not all(
+            isinstance(process, WorkerProcessIdentity) for process in processes
+        ):
+            raise RuntimeError("Incomplete worker process identity snapshot")
+        self._termination_snapshot = WorkerProcessSnapshot(
+            actor_ids=actor_ids,
+            processes=tuple(processes),
+        )
+        self._termination_unconfirmed = False
+
+    def _wait_for_worker_processes_exit(self, timeout: Optional[float]) -> bool:
+        snapshot = self._termination_snapshot
+        if snapshot is None:
+            return not self._termination_unconfirmed
+        by_node: dict[str, list[WorkerProcessIdentity]] = {}
+        for identity in snapshot.processes:
+            by_node.setdefault(identity.node_id, []).append(identity)
+        refs = [
+            observe_worker_processes_exit.options(
+                scheduling_strategy=NodeAffinitySchedulingStrategy(node_id, soft=False)
+            ).remote(tuple(identities), timeout)
+            for node_id, identities in by_node.items()
+        ]
+        try:
+            confirmed = all(ray.get(refs, timeout=timeout))
+        except ray.exceptions.RayError as error:
+            print(f"Could not confirm worker process termination: {error}")
+            confirmed = False
+        finally:
+            for ref in refs:
+                try:
+                    ray.cancel(ref, force=True)
+                except ray.exceptions.RayError as error:
+                    # Observer cleanup must not replace the consumer's failure.
+                    print(f"Could not cancel process observer: {error}")
+        if confirmed:
+            self._termination_snapshot = None
+            self._termination_unconfirmed = False
+        return confirmed
+
     def shutdown(
         self,
         cleanup_method: Optional[str] = None,
         timeout: Optional[float] = 30.0,
         force: bool = False,
+        wait_for_termination: bool = False,
     ) -> bool:
         """Shutdown all workers in the worker group.
 
@@ -1228,14 +1310,30 @@ class RayWorkerGroup:
                      If None, wait indefinitely for workers to complete their cleanup.
             force: If True, forcefully terminate workers with ray.kill() even if cleanup_method is provided.
                    If cleanup_method is None, workers are always forcefully terminated.
+            wait_for_termination: Require OS process-exit evidence after killing workers.
+                    Requires record_worker_processes() before consumers start. Uses timeout
+                    separately for the process observer. Failure retains the snapshot for
+                    a later shutdown retry; callers must retain producer IPC allocations.
 
         Returns:
             bool: True if all workers were successfully shut down
         """
         if not self._workers:
+            if wait_for_termination:
+                return self._wait_for_worker_processes_exit(timeout)
             return True
 
         success = True
+        if self._termination_snapshot is not None or wait_for_termination:
+            self._termination_unconfirmed = True
+        if (
+            self._termination_snapshot is not None
+            and self._termination_snapshot.actor_ids
+            != tuple(worker._actor_id.hex() for worker in self._workers)
+        ) or (wait_for_termination and self._termination_snapshot is None):
+            # Never use an old exited PID as evidence for a replacement actor.
+            self._termination_snapshot = None
+            success = False
 
         # First attempt graceful shutdown if cleanup method is provided and force=False
         if cleanup_method is not None and not force:
@@ -1282,5 +1380,8 @@ class RayWorkerGroup:
         # Clear worker lists
         self._workers = []
         self._worker_metadata = []
+
+        if wait_for_termination:
+            success = self._wait_for_worker_processes_exit(timeout) and success
 
         return success

@@ -188,6 +188,15 @@ def test_empty_request_has_no_cuda_or_storage_reads():
     assert not reader._backing_tensors
 
 
+def test_native_reader_rejects_one_use_torch_ipc_before_opening():
+    payload, _ = _payload()
+    payload.samples[0]["teacher_shards"][0]["topk_logits_ipc"] = (
+        "old_torch_reduction_with_single_receiver_counter",
+    )
+    with pytest.raises(ValueError, match="reusable IPC descriptors"):
+        SparseTeacherRowReader(payload, device=torch.device("cpu"))
+
+
 def test_reader_natural_label_outside_smaller_membership_support():
     payload, logits = _payload()
     for sample in payload.samples:

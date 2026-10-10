@@ -210,7 +210,12 @@ def _get_non_packed_sequence_pad_factor(cfg: dict[str, Any]) -> int:
 def _pad_sequence_aligned_tensors(
     data_dict: BatchedDataDict[Any], multiple: int
 ) -> None:
-    """Right-pad every dense sequence tensor in a microbatch in place."""
+    """Pad model-sequence fields, preserving xToken ID sentinels and metadata.
+
+    Teacher token axes and alignment pair axes remain independent even when
+    their widths happen to equal the student sequence length. The unindexed
+    force_include_token_ids field belongs to the current teacher forward.
+    """
     if multiple <= 1:
         return
     batch_size, sequence_length = data_dict["input_ids"].shape[:2]
@@ -219,6 +224,20 @@ def _pad_sequence_aligned_tensors(
     if padding == 0:
         return
     for key, value in list(data_dict.items()):
+        student_chunk_ids = key.startswith("alignment_") and key.endswith(
+            "_student_chunk_id"
+        )
+        student_alignment = student_chunk_ids or (
+            key.startswith("alignment_")
+            and key.endswith("_student_exact_partition_mask")
+        )
+        if (
+            key.startswith("teacher_")
+            or (key.startswith("alignment_") and not student_alignment)
+            or key.startswith("global_valid_")
+            or key in {"pair_valid", "pair_is_correct", "teacher_chunk_id"}
+        ):
+            continue
         if (
             not torch.is_tensor(value)
             or value.ndim < 2
@@ -228,8 +247,14 @@ def _pad_sequence_aligned_tensors(
             continue
         pad_shape = list(value.shape)
         pad_shape[1] = padding
+        fill = (
+            -1
+            if student_chunk_ids
+            or key in {"student_chunk_id", "force_include_token_ids"}
+            else 0
+        )
         data_dict[key] = torch.cat(
-            (value, value.new_zeros(pad_shape)), dim=1
+            (value, value.new_full(pad_shape, fill)), dim=1
         ).contiguous()
 
 

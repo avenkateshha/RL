@@ -37,12 +37,17 @@ Used by both :mod:`token_aligner` and
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Tuple, Union
 
 import torch
 from torch.distributed.tensor import DTensor
 
+from nemo_rl.algorithms.x_token.dense_teacher import (
+    DenseTeacherIPC,
+    supports_native_dense_reads,
+)
+from nemo_rl.algorithms.x_token.sparse_teacher import SparseTeacherIPC
 from nemo_rl.distributed.model_utils import (
     allgather_cp_contiguous_tensor,
     cp_load_balanced_to_contiguous,
@@ -52,6 +57,7 @@ from nemo_rl.distributed.model_utils import (
     to_local_if_dtensor,
     vocab_parallel_argmax,
 )
+from nemo_rl.distributed.selected_logprobs import cp_native_global_positions
 
 if TYPE_CHECKING:
     from nemo_automodel.components.distributed.context_parallel import (
@@ -341,6 +347,43 @@ class LocalizedAlignment:
     student_spans: Optional[torch.Tensor] = None
     teacher_spans: Optional[torch.Tensor] = None
     num_chunks: Optional[torch.Tensor] = None
+
+
+@dataclass(frozen=True)
+class NativeStudentContext:
+    """Native MCore predictor rows and their explicit global next-token targets.
+
+    ``input_ids`` retains the full sample for cross-tokenizer chain labels.
+    Masks/targets are indexed at ``global_positions + 1`` and the final global
+    predictor is inactive. No CP communication or sequence relayout is needed.
+    """
+
+    logits: torch.Tensor
+    global_positions: torch.Tensor
+    input_ids: torch.Tensor
+    next_token_ids: torch.Tensor
+    next_token_mask: torch.Tensor
+    next_kd_token_mask: torch.Tensor
+    sample_mask: torch.Tensor
+    full_seq_len: int
+    real_vocab_size: int
+
+
+@dataclass
+class XTokenLossInput:
+    """Typed adapter result for native consumers and preserved legacy routes."""
+
+    student_logits_contig: Optional[torch.Tensor]
+    teacher_full_logits_by_idx: Dict[int, torch.Tensor]
+    teacher_sparse_logits_by_idx: Dict[int, SparseTeacherLogits]
+    aligns_by_idx: Dict[int, LocalizedAlignment]
+    dense_reconstruction_fallbacks_by_idx: Dict[int, int]
+    tp_group: Optional[torch.distributed.ProcessGroup]
+    cp_group: Optional[torch.distributed.ProcessGroup]
+    dp_cp_group: Optional[torch.distributed.ProcessGroup]
+    native_student: Optional[NativeStudentContext] = None
+    native_sparse_teachers: Dict[int, SparseTeacherIPC] = field(default_factory=dict)
+    native_dense_teachers: Dict[int, DenseTeacherIPC] = field(default_factory=dict)
 
 
 def localize_alignment(
@@ -1400,7 +1443,7 @@ def _student_seq_to_contiguous_window(
     return local.narrow(seq_dim, cp_rank * local_len, local_len).contiguous()
 
 
-def prepare_xtoken_cross_tokenizer_loss_input(
+def _prepare_legacy_xtoken_loss_input(
     logits: torch.Tensor,
     data: Mapping[str, Any],
     *,
@@ -1408,16 +1451,8 @@ def prepare_xtoken_cross_tokenizer_loss_input(
     vocab_parallel_group: Optional[torch.distributed.ProcessGroup] = None,
     context_parallel_group: Optional[torch.distributed.ProcessGroup] = None,
     cp_sharder: Optional["ContextParallelSharder"] = None,
-) -> tuple[
-    torch.Tensor,
-    Dict[int, torch.Tensor],
-    Dict[int, SparseTeacherLogits],
-    Dict[int, LocalizedAlignment],
-    Dict[int, int],
-    Optional[torch.distributed.ProcessGroup],
-    Optional[torch.distributed.ProcessGroup],
-    Optional[torch.distributed.ProcessGroup],
-]:
+    teacher_indices: Optional[set[int]] = None,
+) -> XTokenLossInput:
     """Build the per-teacher cross-tokenizer distillation loss pieces from student logits + IPC teacher data.
 
     Rebuilds each teacher's dense full-vocab or sparse top-k + logZ logits from
@@ -1440,10 +1475,7 @@ def prepare_xtoken_cross_tokenizer_loss_input(
             replaces the legacy load-balanced CP relayout for student tensors.
 
     Returns:
-        ``(student_logits_contig, teacher_full_logits_by_idx,
-        teacher_sparse_logits_by_idx, aligns_by_idx,
-        dense_reconstruction_fallbacks_by_idx, tp_group, cp_group,
-        dp_cp_group)``. The reconstruction counts come from the actual dense
+        The typed result's reconstruction counts come from the actual dense
         rebuild branch. ``dp_cp_group`` is the group the loss reduces its global
         normalizers over; see :func:`loss_replica_group` for why it must not be
         ``WORLD`` under pipeline parallelism.
@@ -1536,6 +1568,8 @@ def prepare_xtoken_cross_tokenizer_loss_input(
         torch.distributed.get_world_size(cp_group) if cp_group is not None else 1
     )
     for i, is_cross_tokenizer in enumerate(teacher_is_cross_tokenizer):
+        if teacher_indices is not None and i not in teacher_indices:
+            continue
         sparse_key = f"teacher_{i}_sparse_logits_ipc"
         full_key = f"teacher_{i}_full_logits_ipc"
         has_sparse_logits = sparse_key in data
@@ -1696,7 +1730,7 @@ def prepare_xtoken_cross_tokenizer_loss_input(
         align.student_token_mask = student_token_mask
         align.student_kd_token_mask = student_kd_token_mask
         aligns_by_idx[i] = align
-    return (
+    return XTokenLossInput(
         student_logits_contig,
         teacher_full_logits_by_idx,
         teacher_sparse_logits_by_idx,
@@ -1706,3 +1740,246 @@ def prepare_xtoken_cross_tokenizer_loss_input(
         cp_group,
         loss_replica_group(cp_group),
     )
+
+
+def _native_student_context(
+    logits: torch.Tensor,
+    data: Mapping[str, Any],
+    *,
+    cp_group: Optional[torch.distributed.ProcessGroup],
+    tp_group: Optional[torch.distributed.ProcessGroup],
+    real_vocab_size: Optional[int],
+) -> NativeStudentContext:
+    ids = data["input_ids"].to(logits.device)
+    token_mask = data["token_mask"].to(logits.device)
+    kd_mask = data.get("kd_token_mask", data["token_mask"]).to(logits.device)
+    sample_mask = data["sample_mask"].to(logits.device)
+    if (
+        ids.ndim != 2
+        or ids.dtype not in (torch.int32, torch.int64)
+        or ids.shape != token_mask.shape
+        or ids.shape != kd_mask.shape
+        or tuple(sample_mask.shape) != (ids.shape[0],)
+        or logits.ndim != 3
+        or logits.shape[0] != ids.shape[0]
+        or ids.shape[1] < 1
+    ):
+        raise ValueError(
+            "Native xToken requires matching full [B,T] IDs/masks and [B] sample mask"
+        )
+    tp_size = torch.distributed.get_world_size(tp_group) if tp_group is not None else 1
+    if real_vocab_size is None or not 0 < real_vocab_size <= logits.shape[-1] * tp_size:
+        raise ValueError(
+            "Native xToken real student vocabulary must fit its TP logit shards"
+        )
+    if bool(((ids < 0) | (ids >= real_vocab_size)).any()):
+        raise ValueError("Native xToken student input IDs must be real-vocabulary IDs")
+    cp_size = torch.distributed.get_world_size(cp_group) if cp_group is not None else 1
+    cp_rank = torch.distributed.get_rank(cp_group) if cp_group is not None else 0
+    positions = cp_native_global_positions(
+        ids.shape[1], cp_rank, cp_size, device=logits.device
+    )
+    if positions.numel() != logits.shape[1]:
+        raise ValueError(
+            "Native xToken global positions do not match student logit rows"
+        )
+    next_positions = (positions + 1).clamp(max=ids.shape[1] - 1)
+    valid = (positions + 1 < ids.shape[1]).unsqueeze(0)
+    return NativeStudentContext(
+        logits=logits,
+        global_positions=positions,
+        input_ids=ids,
+        next_token_ids=ids.index_select(1, next_positions),
+        next_token_mask=token_mask.index_select(1, next_positions) * valid,
+        next_kd_token_mask=kd_mask.index_select(1, next_positions) * valid,
+        sample_mask=sample_mask,
+        full_seq_len=ids.shape[1],
+        real_vocab_size=real_vocab_size,
+    )
+
+
+def _native_alignment(
+    data: Mapping[str, Any],
+    index: int,
+    context: NativeStudentContext,
+    *,
+    cross_tokenizer: bool,
+) -> LocalizedAlignment:
+    """Keep global chain metadata for native KD; never CP-gather rank-3 logits."""
+    device = context.logits.device
+    align = LocalizedAlignment(
+        sample_mask=context.sample_mask,
+        student_input_ids=context.input_ids,
+        student_token_mask=data["token_mask"].to(device),
+        student_kd_token_mask=data.get("kd_token_mask", data["token_mask"]).to(device),
+    )
+    if not cross_tokenizer:
+        return align
+    prefix = f"alignment_{index}_"
+    student_chunks = data[f"{prefix}student_chunk_id"].to(device)
+    teacher_chunks = data[f"{prefix}teacher_chunk_id"].to(device)
+    pair_valid = data[f"{prefix}pair_valid"].to(device)
+    teacher_ids = data[f"teacher_{index}_input_ids"].to(device)
+    if (
+        student_chunks.shape != context.input_ids.shape
+        or teacher_chunks.shape != teacher_ids.shape
+        or pair_valid.ndim != 2
+        or pair_valid.shape[0] != context.input_ids.shape[0]
+    ):
+        raise ValueError(
+            "Native xToken alignment must retain full student/teacher sequence axes"
+        )
+    max_pairs = pair_valid.shape[1]
+    align.pair_valid = pair_valid
+    align.pair_is_correct = data[f"{prefix}pair_is_correct"].to(device)
+    align.student_chunk_id = student_chunks
+    align.teacher_chunk_id = teacher_chunks
+    align.teacher_input_ids = teacher_ids
+    if max_pairs:
+        align.student_spans = _chunk_ids_to_spans(student_chunks, max_pairs)
+        align.teacher_spans = _chunk_ids_to_spans(teacher_chunks, max_pairs)
+        align.num_chunks = (
+            torch.maximum(student_chunks.amax(1), teacher_chunks.amax(1)) + 1
+        ).clamp(min=0, max=max_pairs)
+    else:
+        align.student_spans = torch.empty(
+            (context.input_ids.shape[0], 0, 2), device=device, dtype=torch.long
+        )
+        align.teacher_spans = torch.empty_like(align.student_spans)
+        align.num_chunks = torch.zeros(
+            context.input_ids.shape[0], device=device, dtype=torch.long
+        )
+    return align
+
+
+def prepare_xtoken_cross_tokenizer_loss_input(
+    logits: torch.Tensor,
+    data: Mapping[str, Any],
+    *,
+    teacher_is_cross_tokenizer: list[bool],
+    vocab_parallel_group: Optional[torch.distributed.ProcessGroup] = None,
+    context_parallel_group: Optional[torch.distributed.ProcessGroup] = None,
+    cp_sharder: Optional["ContextParallelSharder"] = None,
+    native_cp_enabled: bool = False,
+    native_sparse_enabled: bool = False,
+    native_same_tokenizer_enabled: bool = False,
+    student_vocab_size: Optional[int] = None,
+) -> XTokenLossInput:
+    """Prepare teacher-indexed native descriptors or preserved legacy inputs.
+
+    Envelope eligibility and implemented consumer capabilities are explicit
+    internal arguments. A legacy consumer requests one shared differentiable
+    contiguous view. All-native consumers retain the original student tensor;
+    native same-tokenizer dense export does not request a compatibility view.
+    The capability flags default false while the native losses are introduced.
+    """
+    eligible = (
+        native_cp_enabled and cp_sharder is None and not isinstance(logits, DTensor)
+    )
+    native_sparse: Dict[int, SparseTeacherIPC] = {}
+    native_dense: Dict[int, DenseTeacherIPC] = {}
+    legacy: set[int] = set()
+    for index, cross_tokenizer in enumerate(teacher_is_cross_tokenizer):
+        sparse_key, dense_key = (
+            f"teacher_{index}_sparse_logits_ipc",
+            f"teacher_{index}_full_logits_ipc",
+        )
+        sparse, dense = sparse_key in data, dense_key in data
+        if sparse == dense:
+            raise ValueError(
+                f"Teacher {index} must provide exactly one dense or sparse logits IPC payload; dense={dense}, sparse={sparse}."
+            )
+        if sparse:
+            if not cross_tokenizer:
+                raise ValueError(
+                    f"Same-vocab teacher {index} cannot use sparse xToken IPC."
+                )
+            payload = data[sparse_key]
+            versions = {
+                shard.get("transport")
+                for sample in payload
+                if isinstance(sample, dict)
+                for shard in sample.get("teacher_shards", [sample])
+            }
+            if "sparse_topk_v2" in versions:
+                if versions != {"sparse_topk_v2"}:
+                    raise ValueError(
+                        "Sparse teacher payload mixes incompatible transport versions"
+                    )
+                if not eligible or not native_sparse_enabled:
+                    raise NotImplementedError(
+                        "sparse_topk_v2 requires an enabled native MCore sparse loss consumer"
+                    )
+                native_sparse[index] = SparseTeacherIPC(payload)
+            else:
+                legacy.add(index)
+        elif eligible and not cross_tokenizer and native_same_tokenizer_enabled:
+            descriptor = DenseTeacherIPC(data[dense_key])
+            if supports_native_dense_reads(descriptor):
+                native_dense[index] = descriptor
+            else:
+                # Existing DTensor/other dense exporters retain their legacy
+                # one-use PyTorch protocol and contiguous consumer contract.
+                legacy.add(index)
+        else:
+            legacy.add(index)
+
+    if not native_sparse and not native_dense:
+        return _prepare_legacy_xtoken_loss_input(
+            logits,
+            data,
+            teacher_is_cross_tokenizer=teacher_is_cross_tokenizer,
+            vocab_parallel_group=vocab_parallel_group,
+            context_parallel_group=context_parallel_group,
+            cp_sharder=cp_sharder,
+        )
+    context = _native_student_context(
+        logits,
+        data,
+        cp_group=context_parallel_group,
+        tp_group=vocab_parallel_group,
+        real_vocab_size=student_vocab_size,
+    )
+    native_samples: list[list[dict[str, Any]]] = [
+        descriptor.samples for descriptor in native_sparse.values()
+    ] + [descriptor.samples for descriptor in native_dense.values()]
+    for samples in native_samples:
+        if len(samples) != context.input_ids.shape[0]:
+            raise ValueError(
+                "Native teacher IPC sample count does not match the student microbatch"
+            )
+        if "batch_item_id" in data:
+            expected_ids = data["batch_item_id"].reshape(-1).tolist()
+            if [sample.get("batch_item_id") for sample in samples] != expected_ids:
+                raise ValueError(
+                    "Native teacher IPC sample identities do not match the student microbatch"
+                )
+    if legacy:
+        result = _prepare_legacy_xtoken_loss_input(
+            logits,
+            data,
+            teacher_is_cross_tokenizer=teacher_is_cross_tokenizer,
+            vocab_parallel_group=vocab_parallel_group,
+            context_parallel_group=context_parallel_group,
+            cp_sharder=cp_sharder,
+            teacher_indices=legacy,
+        )
+    else:
+        result = XTokenLossInput(
+            None,
+            {},
+            {},
+            {},
+            {},
+            vocab_parallel_group,
+            context_parallel_group,
+            loss_replica_group(context_parallel_group),
+        )
+    result.native_student = context
+    result.native_sparse_teachers = native_sparse
+    result.native_dense_teachers = native_dense
+    for index in sorted(native_sparse.keys() | native_dense.keys()):
+        result.aligns_by_idx[index] = _native_alignment(
+            data, index, context, cross_tokenizer=teacher_is_cross_tokenizer[index]
+        )
+    return result

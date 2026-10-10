@@ -94,13 +94,19 @@ def assert_xtoken_ipc_node_local(
     A single-node job is therefore always safe; a multi-node job is only safe
     when every student rank's required teacher shards live on its own node.
 
-    The model-parallel group is ``tp * cp * pp``. Pipeline parallelism counts
-    even though only the last stage produces logits: the group must stay inside
-    one node for that stage to be co-located with the student ranks that import
-    its buffers.
+    Multi-node IPC requires PP=1 on both sides. Group-size arithmetic alone
+    does not establish pipeline-stage placement: only the final teacher stage
+    exports logits and its buffers may be remote from a student consumer.
+    With PP=1, matching node-aligned model groups and DP keep imports local.
     """
     if num_nodes <= 1:
         return
+
+    assert student_pp == teacher_pp == 1, (
+        "Multi-node xtoken CUDA IPC requires student_pp == teacher_pp == 1; "
+        f"got student_pp={student_pp}, teacher_pp={teacher_pp}. Pipeline-stage "
+        "placement is not guaranteed by matching model-parallel group sizes."
+    )
 
     student_group = student_tp * student_cp * student_pp
     teacher_group = teacher_tp * teacher_cp * teacher_pp

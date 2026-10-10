@@ -1266,14 +1266,23 @@ def aggregate_per_sample_handles(
                 f"{[len(h) for h in worker_handles_in_dp]}"
             )
         for sample_idx in range(num_samples):
-            aggregated.append(
-                {
-                    "teacher_shards": [
-                        worker_handles[sample_idx]
-                        for worker_handles in worker_handles_in_dp
-                    ]
+            shards = [
+                worker_handles[sample_idx] for worker_handles in worker_handles_in_dp
+            ]
+            sample: dict[str, Any] = {"teacher_shards": shards}
+            if any(
+                isinstance(shard, dict) and "batch_item_id" in shard for shard in shards
+            ):
+                identities = {
+                    shard.get("batch_item_id") if isinstance(shard, dict) else None
+                    for shard in shards
                 }
-            )
+                if None in identities or len(identities) != 1:
+                    raise ValueError(
+                        f"Teacher shards disagree on batch_item_id at dp={dp_rank}, sample={sample_idx}."
+                    )
+                sample["batch_item_id"] = next(iter(identities))
+            aggregated.append(sample)
     return aggregated
 
 

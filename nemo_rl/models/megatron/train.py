@@ -24,7 +24,9 @@ from megatron.core.models.gpt import GPTModel
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.parallel_state import (
     get_context_parallel_group,
+    get_context_parallel_rank,
     get_context_parallel_world_size,
+    get_pipeline_model_parallel_world_size,
     get_tensor_model_parallel_group,
     get_tensor_model_parallel_rank,
 )
@@ -58,6 +60,7 @@ from nemo_rl.algorithms.utils import mask_out_neg_inf_logprobs
 from nemo_rl.algorithms.x_token.packing_loss import (
     XTokenSequencePackingLossWrapper,
 )
+from nemo_rl.algorithms.x_token.sparse_teacher import shard_native_teacher_force_ids
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.model_utils import (
     allgather_cp_sharded_tensor,
@@ -66,6 +69,7 @@ from nemo_rl.distributed.model_utils import (
     from_parallel_logits_to_logprobs,
     from_parallel_logits_to_logprobs_packed_sequences,
 )
+from nemo_rl.distributed.sparse_topk import distributed_vocab_topk_logz_force
 from nemo_rl.models.megatron.config import MegatronModule
 from nemo_rl.models.megatron.data import ProcessedMicrobatch
 from nemo_rl.models.megatron.draft.hidden_capture import (
@@ -77,6 +81,10 @@ from nemo_rl.models.megatron.router_replay import (
     set_router_replay_backward,
     set_router_replay_forward,
 )
+from nemo_rl.models.megatron.sparse_teacher import (
+    SparseTeacherStorage,
+    StreamedSparseLogitsMetadata,
+)
 from nemo_rl.models.policy import PolicyConfig
 
 # Union type for any post-processing function (defined after classes below)
@@ -86,6 +94,7 @@ PostProcessingFunction = Union[
     "TeacherFullPayloadPostProcessor",
     "TopkLogitsPostProcessor",
     "FullLogitsPostProcessor",
+    "SparseTeacherLogitsPostProcessor",
 ]
 
 
@@ -500,7 +509,9 @@ def forward_with_post_processing_fn(
             cu_seqlens_padded=cu_seqlens_padded,
             original_seq_length=original_seq_length,
         )
-    elif isinstance(post_processing_fn, FullLogitsPostProcessor):
+    elif isinstance(
+        post_processing_fn, (FullLogitsPostProcessor, SparseTeacherLogitsPostProcessor)
+    ):
         post_processing_fn_wrapped = post_processing_fn(
             data_dict=data_dict,
             cu_seqlens_padded=cu_seqlens_padded,
@@ -695,6 +706,16 @@ class LossPostProcessor:
                 chunk_size=logprob_chunk_size,
                 teacher_output_layer_weight_by_index=self.teacher_output_layer_weight_by_index,
             )
+            if isinstance(self.loss_fn, CrossTokenizerDistillationLossFn):
+                prepare_loss_input_wrapped = partial(
+                    prepare_loss_input_wrapped,
+                    native_cp_enabled=(
+                        not self.cfg["sequence_packing"]["enabled"]
+                        and not self.cfg["dynamic_batching"]["enabled"]
+                        and packed_seq_params is None
+                        and get_pipeline_model_parallel_world_size() == 1
+                    ),
+                )
 
         # wrap loss function with loss input preparation
         pack_sequences = self.cfg["sequence_packing"]["enabled"]
@@ -1231,6 +1252,99 @@ class TopkLogitsPostProcessor:
                 }
 
         return processor_fn_inner
+
+
+class SparseTeacherLogitsPostProcessor:
+    """Compute native per-position sparse scores and stream only TP0 storage.
+
+    Every TP rank participates in top-K/logZ/forced-label collectives. The
+    schedule retains tensor-free metadata, while TP0 writes each result into
+    its preallocated teacher-owned buffers before the next forward starts.
+    """
+
+    def __init__(
+        self,
+        *,
+        k: int,
+        temperature: float,
+        real_vocab_size: int,
+        noise_filter_k: int,
+        output_storage: Optional[SparseTeacherStorage],
+        chunk_size: Optional[int] = None,
+    ) -> None:
+        self.k = k
+        self.temperature = temperature
+        self.real_vocab_size = real_vocab_size
+        self.noise_filter_k = noise_filter_k
+        self.output_storage = output_storage
+        self.chunk_size = chunk_size
+        self.sample_cursor = 0
+
+    def __call__(
+        self,
+        data_dict: BatchedDataDict[Any],
+        cu_seqlens_padded: Optional[torch.Tensor],
+        packed_seq_params: Optional[PackedSeqParams] = None,
+    ) -> Callable[
+        [torch.Tensor], tuple[torch.Tensor, dict[str, StreamedSparseLogitsMetadata]]
+    ]:
+        if cu_seqlens_padded is not None or packed_seq_params is not None:
+            raise ValueError("Native sparse teacher IPC requires unpacked batches")
+        force_ids = data_dict.get("force_include_token_ids")
+        if not isinstance(force_ids, torch.Tensor):
+            raise ValueError(
+                "Native sparse teacher IPC requires two-slot forced labels"
+            )
+        sample_offset = self.sample_cursor
+
+        @torch.no_grad()
+        def process(
+            output: torch.Tensor,
+        ) -> tuple[torch.Tensor, dict[str, StreamedSparseLogitsMetadata]]:
+            if output.ndim != 3 or output.shape[0] != force_ids.shape[0]:
+                raise ValueError(
+                    "Sparse teacher model output must match [B, S_local, V_local]"
+                )
+            full_sequence_length = force_ids.shape[1]
+            forced_local = shard_native_teacher_force_ids(
+                force_ids,
+                cp_rank=get_context_parallel_rank(),
+                cp_size=get_context_parallel_world_size(),
+                local_sequence_length=output.shape[1],
+            )
+            tp_rank = get_tensor_model_parallel_rank()
+            sparse = distributed_vocab_topk_logz_force(
+                output,
+                forced_local,
+                self.k,
+                get_tensor_model_parallel_group(),
+                vocab_start_index=tp_rank * output.shape[-1],
+                vocab_end_index=(tp_rank + 1) * output.shape[-1],
+                real_vocab_size=self.real_vocab_size,
+                temperature=self.temperature,
+                noise_filter_k=self.noise_filter_k,
+                chunk_size=self.chunk_size,
+            )
+            if tp_rank == 0:
+                if self.output_storage is None:
+                    raise RuntimeError(
+                        "TP0 sparse exporter has no preallocated storage"
+                    )
+                self.output_storage.write(sparse, sample_offset=sample_offset)
+            elif self.output_storage is not None:
+                raise RuntimeError("Only TP0 may own persistent sparse teacher storage")
+            self.sample_cursor += output.shape[0]
+            return output.new_zeros(()), {
+                "sparse_logits": StreamedSparseLogitsMetadata(
+                    batch_size=output.shape[0],
+                    sample_offset=sample_offset,
+                    full_sequence_length=full_sequence_length,
+                    local_sequence_length=output.shape[1],
+                    local_vocab_size=output.shape[-1],
+                )
+            }
+
+        return process
 
 
 class FullLogitsPostProcessor:

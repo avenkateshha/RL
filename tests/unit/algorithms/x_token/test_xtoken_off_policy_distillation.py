@@ -888,6 +888,97 @@ def test_setup_table_only_sparse_teacher_preserves_scoring_guards(
         _patched_setup_call(cfg)
 
 
+def _native_sparse_master():
+    cfg = _make_master_config()
+    cfg.policy["dtensor_cfg"]["enabled"] = False
+    cfg.policy["megatron_cfg"] = _megatron_cfg(tp=2, cp=2)
+    cfg.policy["dynamic_batching"] = {"enabled": False}
+    cfg.policy["sequence_packing"] = {"enabled": False}
+    cfg.loss_fn["teacher_topk_ipc_k"] = 8
+    cfg.teachers = [deepcopy(cfg.teachers[0]), deepcopy(cfg.teachers[0])]
+    for teacher in cfg.teachers:
+        teacher.is_cross_tokenizer = True
+        teacher.dtensor_cfg["enabled"] = False
+        teacher.megatron_cfg = _megatron_cfg(tp=2, cp=2)
+        teacher.dynamic_batching = {"enabled": False}
+        teacher.sequence_packing = {"enabled": False}
+        teacher.aligner.pseudo_target_path = "/tmp/forward.pt"
+        teacher.aligner.reverse_pseudo_target_path = "/tmp/reverse.pt"
+    return cfg
+
+
+def test_native_sparse_setup_accepts_each_native_teacher_and_mixed_backends():
+    cfg = _native_sparse_master()
+    xt_mod.validate_xtoken_sparse_setup(cfg, [24, 16])
+    cfg.teachers[1].dtensor_cfg["enabled"] = True
+    cfg.teachers[1].megatron_cfg["enabled"] = False
+    # DTensor's own validation applies, not native-vocabulary bounds.
+    xt_mod.validate_xtoken_sparse_setup(cfg, [24, 4])
+    cfg.teachers[1].is_cross_tokenizer = False
+    cfg.teachers[1].aligner.pseudo_target_path = None
+    cfg.teachers[1].aligner.reverse_pseudo_target_path = None
+    xt_mod.validate_xtoken_sparse_setup(cfg, [24, 4])
+
+
+@pytest.mark.parametrize(
+    "failure", ["vocab", "reverse", "teacher_pp", "student_pp", "packing", "dynamic"]
+)
+def test_native_sparse_setup_rejects_second_teacher_and_unsupported_layout(failure):
+    cfg = _native_sparse_master()
+    vocabularies = [24, 16]
+    if failure == "vocab":
+        vocabularies[1] = 7
+    elif failure == "reverse":
+        cfg.teachers[1].aligner.reverse_pseudo_target_path = None
+    elif failure == "teacher_pp":
+        cfg.teachers[1].megatron_cfg["pipeline_model_parallel_size"] = 2
+    elif failure == "student_pp":
+        cfg.policy["megatron_cfg"]["pipeline_model_parallel_size"] = 2
+    elif failure == "packing":
+        cfg.teachers[1].sequence_packing["enabled"] = True
+    else:
+        cfg.teachers[1].dynamic_batching["enabled"] = True
+    with pytest.raises(ValueError, match=r"teachers\[[01]\]"):
+        xt_mod.validate_xtoken_sparse_setup(cfg, vocabularies)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"prefix_bidir_v3_loss_fn": "bce"},
+        {"prefix_bidir_v3_last_pos_loss_fn": "bce"},
+        {"prefix_bidir_v3_noise_filter_topk": 17},
+        {"teacher_topk_ipc_keep_realized": False},
+        {"prefix_bidir_v3_pure_alm": True},
+        {"prefix_bidir_v3_position_0_kl": True},
+        {"prefix_bidir_v3_mismatch_loss_beta": 0.5},
+        {"prefix_bidir_v3_mismatch_pos0_alpha": 0.1},
+        {
+            "prefix_bidir_v3_mismatch_pos0_alpha": 0,
+            "prefix_bidir_v3_mismatch_pos0_weight": 0,
+        },
+        {
+            "prefix_bidir_v3_mismatch_loss_beta": 0.5,
+            "prefix_bidir_v3_mismatch_loss_scale": 1,
+        },
+        {"prefix_bidir_v3_mismatch_loss_scale": -1},
+    ],
+)
+def test_native_sparse_setup_rejects_unsupported_math(overrides):
+    cfg = _native_sparse_master()
+    cfg.loss_fn.update(overrides)
+    with pytest.raises(ValueError):
+        xt_mod.validate_xtoken_sparse_setup(cfg, [24, 16])
+
+
+def test_native_sparse_setup_accepts_explicit_zero_alpha_and_nonnegative_beta():
+    cfg = _native_sparse_master()
+    cfg.loss_fn.update(
+        prefix_bidir_v3_mismatch_pos0_alpha=0, prefix_bidir_v3_mismatch_loss_beta=0.5
+    )
+    xt_mod.validate_xtoken_sparse_setup(cfg, [24, 16])
+
+
 def test_setup_sets_derived_train_iters_on_megatron_teacher_and_student():
     cfg = _make_master_config(max_num_steps=10, max_num_epochs=2)
     cfg.policy["dtensor_cfg"]["enabled"] = False
@@ -1215,7 +1306,7 @@ def test_packed_dense_ipc_telemetry_fails_closed_and_releases_buffers(
     with pytest.raises(RuntimeError, match=error_match):
         _run_train(c)
 
-    c.teacher_policy.release_ipc_buffer.assert_called_once_with()
+    c.teacher_policy.release_ipc_buffer.assert_called_once_with(timeout=30.0)
 
 
 # ---------------------------------------------------------------------------
@@ -1407,6 +1498,141 @@ def test_ipc_buffer_released_for_every_teacher_on_train_failure(
     # `>= 1` check while leaking the rest).
     for t in teacher_policies:
         assert t.release_ipc_buffer.call_count == 1
+
+
+@pytest.mark.parametrize("validation", [False, True])
+@pytest.mark.parametrize(
+    "failure", ["first_export", "second_export", "prepare", "execute", "restore"]
+)
+def test_ipc_failure_boundary_covers_all_phases_and_tears_down_consumers_first(
+    mock_xtoken_components, monkeypatch, validation, failure
+):
+    c = mock_xtoken_components
+    c.master_config.distillation.update(
+        max_num_steps=1,
+        val_at_start=False,
+        val_period=0,
+        val_at_end=False,
+        offload_student_after_step=True,
+    )
+    c.master_config.teachers = [c.master_config.teachers[0]] * 2
+    c.loss_fn.num_teachers = 2
+    c.loss_fn.teacher_is_cross_tokenizer = [False, False]
+    c.loss_fn.projection_matrix_paths = [None, None]
+    teachers = [MagicMock(data_parallel_size=1), MagicMock(data_parallel_size=1)]
+    events = []
+    error = RuntimeError(failure)
+    for i, teacher in enumerate(teachers):
+        teacher.get_full_logits_ipc.return_value = [{"payload_ipc": (4, 32)}]
+        teacher.release_ipc_buffer.side_effect = lambda *, timeout, i=i: events.append(
+            f"release{i}"
+        )
+    c.student_policy.worker_group.shutdown.side_effect = (
+        lambda **kwargs: events.append("terminate_student") or True
+    )
+    if failure == "first_export":
+        teachers[0].get_full_logits_ipc.side_effect = error
+    elif failure == "second_export":
+        teachers[1].get_full_logits_ipc.side_effect = error
+    elif failure == "prepare":
+        c.student_policy.prepare_for_training.side_effect = error
+    elif failure == "execute":
+        c.student_policy.train.side_effect = error
+    else:
+        monkeypatch.setattr(
+            xt_mod,
+            "_restore_student_between_teacher_state",
+            MagicMock(side_effect=error),
+        )
+    with pytest.raises(RuntimeError) as caught:
+        if validation:
+            validate(
+                c.student_policy,
+                teachers,
+                c.val_dataloader,
+                c.loss_fn,
+                c.master_config,
+                skip_keys=frozenset(),
+            )
+        else:
+            xtoken_off_policy_distillation_train(
+                c.student_policy,
+                teachers,
+                c.train_dataloader,
+                None,
+                c.loss_fn,
+                c.logger,
+                c.checkpointer,
+                c.save_state,
+                c.master_config,
+            )
+    assert caught.value is error
+    assert events == ["terminate_student", "release0", "release1"]
+
+
+def test_ipc_cleanup_failure_preserves_original_and_attempts_later_teachers():
+    student = MagicMock()
+    student.worker_group.shutdown.return_value = True
+    teachers = [MagicMock(), MagicMock()]
+    teachers[0].release_ipc_buffer.side_effect = RuntimeError("cleanup failed")
+    original = ValueError("export failed")
+    with pytest.raises(ValueError) as caught:
+        with xt_mod._xtoken_ipc_lifetime(student, teachers):
+            raise original
+    assert caught.value is original
+    assert any("cleanup failed" in note for note in original.__notes__)
+    teachers[0].worker_group.shutdown.assert_called_once_with(force=True)
+    teachers[1].release_ipc_buffer.assert_called_once_with(timeout=30.0)
+
+
+def test_ipc_success_keeps_buffers_until_enclosing_exit():
+    student = MagicMock()
+    teachers = [MagicMock(), MagicMock()]
+    with xt_mod._xtoken_ipc_lifetime(student, teachers):
+        for _ in range(3):
+            for teacher in teachers:
+                teacher.release_ipc_buffer.assert_not_called()
+    for teacher in teachers:
+        teacher.release_ipc_buffer.assert_called_once_with()
+    student.worker_group.shutdown.assert_not_called()
+    student.worker_group.record_worker_processes.assert_called_once_with(timeout=30.0)
+
+
+@pytest.mark.parametrize("shutdown_raises", [False, True])
+def test_ipc_unconfirmed_consumer_exit_retains_every_producer(shutdown_raises):
+    student = MagicMock()
+    student.worker_group.shutdown.return_value = False
+    if shutdown_raises:
+        student.worker_group.shutdown.side_effect = RuntimeError("observer failed")
+    teachers = [MagicMock(), MagicMock()]
+    original = ValueError("student failed")
+    with pytest.raises(ValueError) as caught:
+        with xt_mod._xtoken_ipc_lifetime(student, teachers):
+            raise original
+    assert caught.value is original
+    student.worker_group.shutdown.assert_called_once_with(
+        force=True, wait_for_termination=True, timeout=30.0
+    )
+    for index, teacher in enumerate(teachers):
+        teacher.release_ipc_buffer.assert_not_called()
+        teacher.worker_group.shutdown.assert_not_called()
+        assert any(
+            f"Teacher {index} IPC storage retained" in note
+            for note in original.__notes__
+        )
+
+
+def test_ipc_process_capture_failure_prevents_any_export():
+    student = MagicMock()
+    original = RuntimeError("capture failed")
+    student.worker_group.record_worker_processes.side_effect = original
+    student.worker_group.shutdown.return_value = False
+    teacher = MagicMock()
+    with pytest.raises(RuntimeError) as caught:
+        with xt_mod._xtoken_ipc_lifetime(student, [teacher]):
+            pytest.fail("Export must not start without consumer process identities")
+    assert caught.value is original
+    teacher.release_ipc_buffer.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1608,6 +1834,84 @@ def test_export_teacher_logits_preserves_student_routed_experts():
     )
 
     assert train_data["routed_experts"] is routed_experts
+
+
+@pytest.mark.parametrize("batch_uid", [None, 9])
+def test_unpacked_export_preserves_shared_sample_occurrence_ids(batch_uid):
+    teachers = [MagicMock(), MagicMock()]
+    loss_fn = _FakeLossFn(
+        projection_matrix_paths=[None, None],
+        teacher_is_cross_tokenizer=[True, False],
+    )
+    batch = _make_batch(batch_size=2, num_teachers=1)
+    if batch_uid is None:
+        batch["batch_item_id"] = torch.tensor([41, 29])
+    train_data = export_teacher_logits_and_pack(
+        teachers, loss_fn, batch, teacher_mbs=[1, 2], batch_uid=batch_uid
+    )
+    expected = (
+        torch.tensor([41, 29])
+        if batch_uid is None
+        else torch.tensor([9 << 32, (9 << 32) + 1])
+    )
+    torch.testing.assert_close(train_data["batch_item_id"], expected)
+    for teacher in teachers:
+        torch.testing.assert_close(
+            teacher.get_full_logits_ipc.call_args.args[0]["batch_item_id"], expected
+        )
+
+
+def test_unpacked_export_rejects_stale_batch_occurrence_ids():
+    batch = _make_batch(batch_size=2, num_teachers=1)
+    batch["batch_item_id"] = torch.tensor([41, 29])
+    with pytest.raises(ValueError, match="occurrence IDs disagree"):
+        export_teacher_logits_and_pack(
+            [MagicMock()],
+            _FakeLossFn(projection_matrix_paths=[None]),
+            batch,
+            teacher_mbs=[1],
+            batch_uid=9,
+        )
+
+
+@pytest.mark.parametrize(
+    "cross_tokenizer,mcore,pp,dynamic,packed,requested,expected",
+    [
+        (False, True, 1, False, False, True, True),
+        (False, True, 1, False, False, False, False),
+        (True, True, 1, False, False, True, False),
+        (False, False, 1, False, False, True, False),
+        (False, True, 2, False, False, True, False),
+        (False, True, 1, True, False, True, False),
+        (False, True, 1, False, True, True, False),
+    ],
+)
+def test_reusable_dense_export_is_native_same_teacher_specific(
+    cross_tokenizer, mcore, pp, dynamic, packed, requested, expected
+):
+    teacher = MagicMock()
+    teacher.cfg = {
+        "megatron_cfg": {"enabled": mcore, "pipeline_model_parallel_size": pp}
+    }
+    teacher.use_dynamic_batches = dynamic
+    teacher.use_sequence_packing = packed
+    teacher.get_full_logits_ipc.return_value = [{"payload_ipc": 0}]
+    loss_fn = _FakeLossFn(
+        projection_matrix_paths=[None],
+        teacher_is_cross_tokenizer=[cross_tokenizer],
+    )
+    train_data = export_teacher_logits_and_pack(
+        [teacher],
+        loss_fn,
+        _make_batch(num_teachers=1),
+        teacher_mbs=[1],
+        reusable_dense_ipc=requested,
+    )
+    assert "teacher_0_full_logits_ipc" in train_data
+    assert (
+        teacher.get_full_logits_ipc.call_args.kwargs.get("reusable_ipc", False)
+        is expected
+    )
 
 
 @pytest.mark.parametrize("projection_path", ["/projection.pt", None])

@@ -110,8 +110,15 @@ class TestAssertXtokenIpcNodeLocal:
         with pytest.raises(AssertionError):
             self._check(gpus_per_node=8, student_pp=2, teacher_pp=1)
 
-    def test_multinode_matched_grid_with_pp_ok(self):
-        self._check(gpus_per_node=8, student_pp=2, teacher_pp=2)
+    @pytest.mark.parametrize("student_pp,teacher_pp", [(2, 1), (1, 2), (2, 2)])
+    def test_multinode_rejects_pipeline_stages_even_when_group_fits(
+        self, student_pp, teacher_pp
+    ):
+        with pytest.raises(AssertionError, match="student_pp == teacher_pp == 1"):
+            self._check(gpus_per_node=8, student_pp=student_pp, teacher_pp=teacher_pp)
+
+    def test_single_node_preserves_legacy_pipeline_support(self):
+        self._check(num_nodes=1, gpus_per_node=8, student_pp=2, teacher_pp=2)
 
 
 class TestPadDistillationValBatch:

@@ -39,6 +39,7 @@ import math
 import os
 import re
 from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from functools import partial
 from itertools import count
 from typing import Any, NotRequired, Optional, TypedDict, cast
@@ -56,6 +57,7 @@ from nemo_rl.algorithms.loss.loss_functions import (
 from nemo_rl.algorithms.utils import set_seed
 from nemo_rl.algorithms.x_token import TokenAligner
 from nemo_rl.algorithms.x_token.loss_utils import _chunk_ids_to_spans
+from nemo_rl.algorithms.x_token.sparse_teacher import build_native_force_token_ids
 from nemo_rl.algorithms.x_token.utils import (
     assert_teacher_student_batch_grid,
     assert_xtoken_ipc_node_local,
@@ -77,7 +79,7 @@ from nemo_rl.data.utils import load_dataloader_state
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.virtual_cluster import ClusterConfig, RayVirtualCluster
 from nemo_rl.models.megatron.router_replay import router_replay_enabled
-from nemo_rl.models.policy import PolicyConfig
+from nemo_rl.models.policy import MegatronConfig, PolicyConfig
 from nemo_rl.models.policy.lm_policy import Policy
 from nemo_rl.models.policy.utils import reject_dtensor_v1
 from nemo_rl.utils.checkpoint import (
@@ -532,12 +534,13 @@ def _build_teacher_force_include_token_ids(
     *,
     teacher_idx: int,
     loss_config: CrossTokenizerDistillationLossConfig,
+    native_teacher_vocab_size: Optional[int] = None,
 ) -> Optional[torch.Tensor]:
     """Build realized teacher labels that sparse IPC must retain per position."""
     needs_force_ids = _teacher_topk_ipc_keep_realized(loss_config) or (
         int(loss_config["prefix_bidir_v3_noise_filter_topk"]) > 0
     )
-    if not needs_force_ids:
+    if not needs_force_ids and native_teacher_vocab_size is None:
         return None
 
     teacher_input_ids = batch[f"teacher_{teacher_idx}_input_ids"]
@@ -552,6 +555,16 @@ def _build_teacher_force_include_token_ids(
     teacher_spans = _chunk_ids_to_spans(
         batch[f"alignment_{teacher_idx}_teacher_chunk_id"], max_pairs
     )
+    if native_teacher_vocab_size is not None:
+        return build_native_force_token_ids(
+            teacher_input_ids,
+            student_spans,
+            teacher_spans,
+            pair_valid,
+            kl_chunk_shift=bool(loss_config["kl_chunk_shift"]),
+            teacher_real_vocab_size=native_teacher_vocab_size,
+            sample_mask=batch["sample_mask"],
+        )
     force_ids = torch.full_like(teacher_input_ids, -1)
     kl_chunk_shift = bool(loss_config["kl_chunk_shift"])
     batch_size, teacher_seq_len = teacher_input_ids.shape
@@ -594,6 +607,7 @@ def _get_teacher_logits_ipc(
     timer: Optional[Timer],
     packing_plan: Optional[LockstepPackingPlan] = None,
     packing_side_id: Optional[str] = None,
+    reusable_dense_ipc: bool = False,
 ) -> tuple[str, list[dict[str, Any]]]:
     """Return the indexed transport suffix and IPC handles for one teacher."""
     topk_k = int(loss_fn.cfg["teacher_topk_ipc_k"])
@@ -623,11 +637,12 @@ def _get_teacher_logits_ipc(
         return "sparse_logits_ipc", handles
 
     full_logits_kwargs: dict[str, Any] = {}
+    if reusable_dense_ipc:
+        full_logits_kwargs["reusable_ipc"] = True
     if packing_plan is not None:
-        full_logits_kwargs = {
-            "packing_plan": packing_plan,
-            "packing_side_id": packing_side_id,
-        }
+        full_logits_kwargs.update(
+            packing_plan=packing_plan, packing_side_id=packing_side_id
+        )
     handles = teacher_policy.get_full_logits_ipc(
         teacher_data,
         micro_batch_size=micro_batch_size,
@@ -1346,6 +1361,96 @@ def validate_xtoken_tokenizer_reuse(
                 )
 
 
+def validate_xtoken_sparse_setup(
+    master_config: MasterConfig,
+    teacher_vocab_sizes: list[int],
+) -> None:
+    """Validate sparse transport and math only for teachers that use that route."""
+    loss = master_config.loss_fn
+    k = int(loss["teacher_topk_ipc_k"])
+    if k <= 0:
+        return
+    if len(teacher_vocab_sizes) != len(master_config.teachers):
+        raise ValueError("Sparse setup requires one vocabulary size per teacher.")
+    for i, teacher in enumerate(master_config.teachers):
+        if not teacher.uses_cross_tokenizer:
+            continue
+        cfg = teacher.policy_config()
+        dtensor = cfg["dtensor_cfg"]
+        if not cfg.get("megatron_cfg", {}).get("enabled", False):
+            if dtensor["enabled"] and dtensor.get("_v2", False):
+                continue
+            raise ValueError(
+                f"teachers[{i}]: sparse teacher IPC requires DTensor-V2 or Megatron."
+            )
+        prefix = f"teachers[{i}]: native Megatron sparse IPC"
+        for label, entity in (("student", master_config.policy), ("teacher", cfg)):
+            mcore = entity.get("megatron_cfg", {})
+            if (
+                not mcore.get("enabled", False)
+                or cast(MegatronConfig, mcore)["pipeline_model_parallel_size"] != 1
+            ):
+                raise ValueError(f"{prefix} requires a Megatron PP=1 {label}.")
+            if (
+                entity["sequence_packing"]["enabled"]
+                or entity["dynamic_batching"]["enabled"]
+            ):
+                raise ValueError(f"{prefix} requires static unpacked {label} batches.")
+        noise_k = int(loss["prefix_bidir_v3_noise_filter_topk"])
+        if noise_k < 0 or max(k, noise_k) > teacher_vocab_sizes[i]:
+            raise ValueError(
+                f"{prefix} requires 0 <= noise_filter_topk and max(K, noise_filter_topk) "
+                f"<= teacher real vocabulary {teacher_vocab_sizes[i]}; got K={k}, noise={noise_k}."
+            )
+        if (
+            not teacher.aligner.pseudo_target_path
+            or not teacher.aligner.reverse_pseudo_target_path
+        ):
+            raise ValueError(
+                f"{prefix} requires both forward and reverse prefix tables."
+            )
+        if not loss["teacher_topk_ipc_keep_realized"]:
+            raise ValueError(f"{prefix} requires teacher_topk_ipc_keep_realized=true.")
+        if loss.get("prefix_bidir_v3_pure_alm") or loss.get(
+            "prefix_bidir_v3_position_0_kl"
+        ):
+            raise ValueError(f"{prefix} does not support pure ALM or position-zero KL.")
+        common = str(loss.get("prefix_bidir_v3_loss_fn", "kl") or "kl")
+        last = str(loss.get("prefix_bidir_v3_last_pos_loss_fn") or common)
+        if common not in {"kl", "jsd"} or last not in {"kl", "jsd"}:
+            raise ValueError(
+                f"{prefix} requires KL/JSD common and prefix partitions; BCE is unsupported."
+            )
+        alpha = loss.get("prefix_bidir_v3_mismatch_pos0_alpha")
+        beta = loss.get("prefix_bidir_v3_mismatch_loss_beta")
+        old_weight = loss.get("prefix_bidir_v3_mismatch_pos0_weight")
+        old_scale = loss.get("prefix_bidir_v3_mismatch_loss_scale")
+        if (alpha is not None or beta is not None) and (
+            old_weight is not None or old_scale is not None
+        ):
+            raise ValueError(
+                f"{prefix}: new mismatch alpha/beta cannot be mixed with deprecated weight/scale keys."
+            )
+        if (beta is not None and alpha is None) or (
+            alpha is not None and float(alpha) != 0
+        ):
+            raise ValueError(
+                f"{prefix} requires explicit mismatch_pos0_alpha=0 when beta is set and forbids nonzero alpha."
+            )
+        if old_weight is not None and float(old_weight) != 0:
+            raise ValueError(
+                f"{prefix} forbids a nonzero deprecated mismatch_pos0_weight."
+            )
+        for name, value in (
+            ("mismatch_loss_beta", beta),
+            ("mismatch_loss_scale", old_scale),
+        ):
+            if value is not None and (
+                not math.isfinite(float(value)) or float(value) < 0
+            ):
+                raise ValueError(f"{prefix} requires finite nonnegative {name}.")
+
+
 def setup(
     master_config: MasterConfig,
     student_tokenizer: PreTrainedTokenizerBase,
@@ -1414,17 +1519,9 @@ def setup(
                 "Sparse teacher IPC cannot be combined with "
                 "kd_loss_mode='select_teacher'; teacher selection requires full logits."
             )
-        for i, (teacher, teacher_config) in enumerate(
-            zip(teachers, teacher_configs, strict=True)
-        ):
-            if not teacher.uses_cross_tokenizer:
-                continue
-            dtensor_cfg = teacher_config["dtensor_cfg"]
-            if not (dtensor_cfg["enabled"] and dtensor_cfg.get("_v2", False)):
-                raise ValueError(
-                    "Sparse teacher IPC currently requires DTensor-V2 for each "
-                    f"cross-tokenizer teacher; teachers[{i}] is not DTensor-V2."
-                )
+        validate_xtoken_sparse_setup(
+            master_config, [len(tok) for tok in teacher_tokenizers]
+        )
 
     # Same-tokenizer teachers use direct KL without alignment. Reuse is safe
     # only when the complete tokenizer semantics match; equal vocabulary size
@@ -1647,11 +1744,9 @@ def setup(
             teacher_mbs=tc["train_micro_batch_size"],
         )
         # Node-local CUDA IPC: on >1 node it only works when teacher/student
-        # share DP and a node-aligned model-parallel group, else a student rank
-        # would read teacher shards from another node. The teacher's TP/CP/PP
-        # are read per backend (DTensor reports PP=1), and the model-parallel
-        # group is tp * cp * pp — PP counts because the producing last stage
-        # must land on the same node as the consuming student ranks.
+        # use PP1, share DP and a node-aligned model-parallel group, else a
+        # student rank can read teacher shards from another node. Matching
+        # group sizes alone cannot prove pipeline-stage locality.
         teacher_tp, teacher_cp, teacher_pp = _xtoken_entity_parallelism(
             tc, label=f"teachers[{i}]"
         )
@@ -1969,6 +2064,8 @@ def export_teacher_logits_and_pack(
     *,
     timer: Optional[Timer] = None,
     packing_plan: Optional[LockstepPackingPlan] = None,
+    reusable_dense_ipc: bool = False,
+    batch_uid: Optional[int] = None,
 ) -> BatchedDataDict[Any]:
     """Serially run each teacher's forward and pack the student ``train_data``.
 
@@ -1977,11 +2074,24 @@ def export_teacher_logits_and_pack(
     IPC when ``teacher_topk_ipc_k > 0`` and otherwise use full-vocab IPC;
     same-vocab teachers always retain full logits for their direct-KL path. A
     cross-tokenizer teacher's own tokenization and ``alignment_{i}_*`` payload
-    ride along (teacher-indexed). The persistent IPC buffers stay resident on
-    the teacher GPUs until released by the caller after ``student.train``.
+    ride along (teacher-indexed). Persistent IPC buffers survive completed
+    student steps and are released at enclosing train/validation exit or error.
     Shared by the train loop and ``validate`` so the forward+pack sequence can't
-    drift between them.
+    drift between them. ``reusable_dense_ipc`` is an internal capability of the
+    native student consumer; eligible same-tokenizer Megatron teachers retain
+    their dense row layout while exporting explicitly owned reusable handles.
     """
+    occurrence_ids = batch.get("batch_item_id")
+    if batch_uid is not None:
+        if not 0 <= batch_uid < 2**31:
+            raise ValueError("xToken batch_uid must fit nonnegative int64 high bits.")
+        occurrence_ids = torch.arange(
+            batch.size, device=batch["input_ids"].device, dtype=torch.long
+        ) + (batch_uid << 32)
+        if "batch_item_id" in batch and not torch.equal(
+            batch["batch_item_id"].to(occurrence_ids.device), occurrence_ids
+        ):
+            raise ValueError("xToken batch occurrence IDs disagree with batch_uid.")
     train_data: dict[str, Any] = {
         "input_ids": batch["input_ids"],
         "input_lengths": batch["input_lengths"],
@@ -1991,9 +2101,10 @@ def export_teacher_logits_and_pack(
     }
     if "routed_experts" in batch:
         train_data["routed_experts"] = batch["routed_experts"]
+    if occurrence_ids is not None:
+        train_data["batch_item_id"] = occurrence_ids
     if packing_plan is not None:
         train_data["sample_id"] = batch["sample_id"]
-        train_data["batch_item_id"] = batch["batch_item_id"]
         if "student_semantic_regions" in batch:
             train_data["student_semantic_regions"] = batch["student_semantic_regions"]
     for i, teacher_policy in enumerate(teacher_policies):
@@ -2028,9 +2139,10 @@ def export_teacher_logits_and_pack(
             ):
                 train_data[f"alignment_{i}_{field}"] = batch[f"alignment_{i}_{field}"]
 
+        if occurrence_ids is not None:
+            teacher_data["batch_item_id"] = occurrence_ids
         if packing_plan is not None:
             teacher_data["sample_id"] = batch["sample_id"]
-            teacher_data["batch_item_id"] = batch["batch_item_id"]
 
         teacher_policy.prepare_for_lp_inference()
         force_include_token_ids = (
@@ -2040,6 +2152,12 @@ def export_teacher_logits_and_pack(
                 batch,
                 teacher_idx=i,
                 loss_config=loss_fn.cfg,
+                native_teacher_vocab_size=(
+                    loss_fn.teacher_vocab_sizes[i]
+                    if teacher_policy.cfg["megatron_cfg"]["enabled"] is True
+                    and int(loss_fn.cfg["teacher_topk_ipc_k"]) > 0
+                    else None
+                ),
             )
         )
         ipc_suffix, handles = _get_teacher_logits_ipc(
@@ -2052,6 +2170,18 @@ def export_teacher_logits_and_pack(
             timer=timer,
             packing_plan=packing_plan,
             packing_side_id=f"teacher_{i}" if packing_plan is not None else None,
+            reusable_dense_ipc=(
+                reusable_dense_ipc
+                and same_vocab
+                and packing_plan is None
+                and teacher_policy.cfg["megatron_cfg"]["enabled"] is True
+                and cast(MegatronConfig, teacher_policy.cfg["megatron_cfg"])[
+                    "pipeline_model_parallel_size"
+                ]
+                == 1
+                and not teacher_policy.use_dynamic_batches
+                and not teacher_policy.use_sequence_packing
+            ),
         )
         train_data[f"teacher_{i}_{ipc_suffix}"] = handles
         if packing_plan is not None:
@@ -2112,6 +2242,78 @@ def _restore_student_between_teacher_state(
         student_policy.offload_before_refit()
 
 
+def _release_xtoken_teacher_buffers(
+    teacher_policies: list[Policy],
+    *,
+    original_error: Optional[BaseException] = None,
+    consumers_terminated: bool = True,
+) -> None:
+    """Attempt every producer cleanup, retaining the original execution error."""
+    first_cleanup_error: Optional[Exception] = None
+    for i, teacher in enumerate(teacher_policies):
+        try:
+            if original_error is None:
+                teacher.release_ipc_buffer()
+            elif consumers_terminated:
+                teacher.release_ipc_buffer(timeout=30.0)
+            else:
+                # Killing a producer also frees its allocation. Keep its owner
+                # alive when the failed consumers' OS exit is not confirmed.
+                original_error.add_note(
+                    f"Teacher {i} IPC storage retained: failed consumer process exit "
+                    "could not be confirmed."
+                )
+        except Exception as cleanup_error:
+            if original_error is not None:
+                original_error.add_note(
+                    f"Teacher {i} IPC cleanup failed: {type(cleanup_error).__name__}: {cleanup_error}"
+                )
+                try:
+                    teacher.worker_group.shutdown(force=True)
+                except Exception as shutdown_error:
+                    original_error.add_note(
+                        f"Teacher {i} teardown also failed: {type(shutdown_error).__name__}: {shutdown_error}"
+                    )
+            elif first_cleanup_error is None:
+                first_cleanup_error = cleanup_error
+    if first_cleanup_error is not None:
+        raise first_cleanup_error
+
+
+@contextmanager
+def _xtoken_ipc_lifetime(
+    student_policy: Policy, teacher_policies: list[Policy]
+) -> Iterator[None]:
+    """Own IPC across exports, preparation, execution and restoration.
+
+    Successful steps retain buffers until the enclosing train/validation call
+    exits. Failed GPU consumers must exit before producer release. Ray's kill
+    request is asynchronous, so an independent node-local OS process observer
+    confirms termination without calling a potentially hung GPU worker.
+    """
+    try:
+        student_policy.worker_group.record_worker_processes(timeout=30.0)
+        yield
+    except BaseException as error:
+        consumers_terminated = False
+        try:
+            consumers_terminated = student_policy.worker_group.shutdown(
+                force=True, wait_for_termination=True, timeout=30.0
+            )
+        except Exception as shutdown_error:
+            error.add_note(
+                f"Student teardown failed: {type(shutdown_error).__name__}: {shutdown_error}"
+            )
+        _release_xtoken_teacher_buffers(
+            teacher_policies,
+            original_error=error,
+            consumers_terminated=consumers_terminated,
+        )
+        raise
+    else:
+        _release_xtoken_teacher_buffers(teacher_policies)
+
+
 def xtoken_off_policy_distillation_train(
     student_policy: Policy,
     teacher_policies: list[Policy],
@@ -2124,114 +2326,117 @@ def xtoken_off_policy_distillation_train(
     master_config: MasterConfig,
 ) -> None:
     """Off-policy CT distillation training loop."""
-    timer = Timer()
-    timeout = TimeoutChecker(
-        timeout=master_config.checkpointing["checkpoint_must_save_by"],
-        fit_last_save_time=True,
-    )
-    timeout.start_iterations()
-
-    distill_cfg = master_config.distillation
-    current_epoch = off_policy_distillation_state["current_epoch"]
-    current_step = off_policy_distillation_state["current_step"]
-    total_steps = off_policy_distillation_state["total_steps"]
-    consumed_samples = off_policy_distillation_state["consumed_samples"]
-    total_valid_tokens = off_policy_distillation_state["total_valid_tokens"]
-    val_period = distill_cfg["val_period"]
-    val_at_start = distill_cfg["val_at_start"]
-    val_at_end = distill_cfg["val_at_end"]
-    max_epochs = distill_cfg["max_num_epochs"]
-    max_steps = distill_cfg["max_num_steps"]
-    offload_student_after_step = bool(
-        distill_cfg.get("offload_student_after_step", False)
-    )
-    offload_student_optimizer_after_step = bool(
-        master_config.policy.get("offload_optimizer_for_logprob", False)
-    )
-    if offload_student_after_step:
-        print(
-            "Student post-step offload enabled: the student model/optimizer are "
-            "offloaded after each optimizer step, before the next teacher pass.",
-            flush=True,
+    with _xtoken_ipc_lifetime(student_policy, teacher_policies):
+        timer = Timer()
+        timeout = TimeoutChecker(
+            timeout=master_config.checkpointing["checkpoint_must_save_by"],
+            fit_last_save_time=True,
         )
-    elif offload_student_optimizer_after_step:
-        print(
-            "Student post-step optimizer offload enabled: optimizer state is "
-            "offloaded before the next teacher pass while model shards remain resident.",
-            flush=True,
-        )
-    # Per-teacher export MBS (each teacher's own train MBS) and the
-    # non-student-seq keys the worker's check_sequence_dim must skip
-    # (teacher-count-dependent, so built from the loss fn).
-    teacher_mbs = [
-        t.policy_config()["train_micro_batch_size"] for t in master_config.teachers
-    ]
-    skip_keys = xtoken_non_student_seq_keys(loss_fn)
-    # Training and validation draw from one checkpointed high-water mark. A
-    # step-derived train counter is insufficient because one validation pass can
-    # consume many global batches before the next checkpoint/resume boundary.
-    packing_batch_uids = _packing_batch_uids_from_state(off_policy_distillation_state)
+        timeout.start_iterations()
 
-    if val_at_start and total_steps == 0 and val_dataloader is not None:
-        val_metrics, val_timings = validate(
-            student_policy,
-            teacher_policies,
-            val_dataloader,
-            loss_fn,
-            master_config,
-            skip_keys=skip_keys,
-            timer=timer,
-            packing_batch_uids=packing_batch_uids,
+        distill_cfg = master_config.distillation
+        current_epoch = off_policy_distillation_state["current_epoch"]
+        current_step = off_policy_distillation_state["current_step"]
+        total_steps = off_policy_distillation_state["total_steps"]
+        consumed_samples = off_policy_distillation_state["consumed_samples"]
+        total_valid_tokens = off_policy_distillation_state["total_valid_tokens"]
+        val_period = distill_cfg["val_period"]
+        val_at_start = distill_cfg["val_at_start"]
+        val_at_end = distill_cfg["val_at_end"]
+        max_epochs = distill_cfg["max_num_epochs"]
+        max_steps = distill_cfg["max_num_steps"]
+        offload_student_after_step = bool(
+            distill_cfg.get("offload_student_after_step", False)
         )
-        logger.log_metrics(val_metrics, total_steps, prefix="validation")
-        logger.log_metrics(val_timings, total_steps, prefix="timing/validation")
-
-    ft_save_period = master_config.checkpointing.get("ft_save_period")
-
-    while total_steps < max_steps and current_epoch < max_epochs:
-        print(
-            f"\n{'=' * 25} Epoch {current_epoch + 1}/{max_epochs} {'=' * 25}",
-            flush=True,
+        offload_student_optimizer_after_step = bool(
+            master_config.policy.get("offload_optimizer_for_logprob", False)
         )
-        for batch in dataloader:
+        if offload_student_after_step:
             print(
-                f"\n{'=' * 25} Step {current_step + 1}/"
-                f"{min(len(dataloader), max_steps)} {'=' * 25}",
+                "Student post-step offload enabled: the student model/optimizer are "
+                "offloaded after each optimizer step, before the next teacher pass.",
                 flush=True,
             )
-            maybe_gpu_profile_step(student_policy, total_steps + 1)
-
-            batch_uid = next(packing_batch_uids)
-            log_xtoken_logical_batch_digest(batch, batch_uid=batch_uid)
-            packing_plan = build_xtoken_lockstep_packing_plan(
-                batch,
-                master_config,
-                batch_uid=batch_uid,
-                data_parallel_size=student_policy.data_parallel_size,
+        elif offload_student_optimizer_after_step:
+            print(
+                "Student post-step optimizer offload enabled: optimizer state is "
+                "offloaded before the next teacher pass while model shards remain resident.",
+                flush=True,
             )
-            if packing_plan is not None:
-                log_xtoken_packing_telemetry(packing_plan, batch)
+        # Per-teacher export MBS (each teacher's own train MBS) and the
+        # non-student-seq keys the worker's check_sequence_dim must skip
+        # (teacher-count-dependent, so built from the loss fn).
+        teacher_mbs = [
+            t.policy_config()["train_micro_batch_size"] for t in master_config.teachers
+        ]
+        skip_keys = xtoken_non_student_seq_keys(loss_fn)
+        # Training and validation draw from one checkpointed high-water mark. A
+        # step-derived train counter is insufficient because one validation pass can
+        # consume many global batches before the next checkpoint/resume boundary.
+        packing_batch_uids = _packing_batch_uids_from_state(
+            off_policy_distillation_state
+        )
 
-            with timer.time("total_step_time"):
-                with timer.time("teacher_forward"):
-                    # Serial per-teacher forward; each cross-tokenizer teacher
-                    # selects dense or sparse IPC from the loss config while a
-                    # same-vocab teacher keeps full logits. The per-teacher
-                    # alignment payload is packed alongside the handles.
-                    train_data = export_teacher_logits_and_pack(
-                        teacher_policies,
-                        loss_fn,
-                        batch,
-                        teacher_mbs,
-                        timer=timer,
-                        packing_plan=packing_plan,
-                    )
+        if val_at_start and total_steps == 0 and val_dataloader is not None:
+            val_metrics, val_timings = validate(
+                student_policy,
+                teacher_policies,
+                val_dataloader,
+                loss_fn,
+                master_config,
+                skip_keys=skip_keys,
+                timer=timer,
+                packing_batch_uids=packing_batch_uids,
+            )
+            logger.log_metrics(val_metrics, total_steps, prefix="validation")
+            logger.log_metrics(val_timings, total_steps, prefix="timing/validation")
 
-                with timer.time("training_prep"):
-                    student_policy.prepare_for_training()
+        ft_save_period = master_config.checkpointing.get("ft_save_period")
 
-                with timer.time("policy_training"):
-                    try:
+        while total_steps < max_steps and current_epoch < max_epochs:
+            print(
+                f"\n{'=' * 25} Epoch {current_epoch + 1}/{max_epochs} {'=' * 25}",
+                flush=True,
+            )
+            for batch in dataloader:
+                print(
+                    f"\n{'=' * 25} Step {current_step + 1}/"
+                    f"{min(len(dataloader), max_steps)} {'=' * 25}",
+                    flush=True,
+                )
+                maybe_gpu_profile_step(student_policy, total_steps + 1)
+
+                batch_uid = next(packing_batch_uids)
+                log_xtoken_logical_batch_digest(batch, batch_uid=batch_uid)
+                packing_plan = build_xtoken_lockstep_packing_plan(
+                    batch,
+                    master_config,
+                    batch_uid=batch_uid,
+                    data_parallel_size=student_policy.data_parallel_size,
+                )
+                if packing_plan is not None:
+                    log_xtoken_packing_telemetry(packing_plan, batch)
+
+                with timer.time("total_step_time"):
+                    with timer.time("teacher_forward"):
+                        # Serial per-teacher forward; each cross-tokenizer teacher
+                        # selects dense or sparse IPC from the loss config while a
+                        # same-vocab teacher keeps full logits. The per-teacher
+                        # alignment payload is packed alongside the handles.
+                        train_data = export_teacher_logits_and_pack(
+                            teacher_policies,
+                            loss_fn,
+                            batch,
+                            teacher_mbs,
+                            timer=timer,
+                            packing_plan=packing_plan,
+                            batch_uid=batch_uid,
+                        )
+
+                    with timer.time("training_prep"):
+                        student_policy.prepare_for_training()
+
+                    with timer.time("policy_training"):
                         packing_kwargs: dict[str, Any] = {}
                         if packing_plan is not None:
                             packing_kwargs = {
@@ -2251,235 +2456,228 @@ def xtoken_off_policy_distillation_train(
                                 packing_plan=packing_plan,
                                 num_teachers=loss_fn.num_teachers,
                             )
-                    except Exception:
-                        # Free every teacher's producer IPC buffer before
-                        # propagating so a failed step doesn't leak teacher
-                        # logits. The happy path keeps the buffers persistent
-                        # across steps (reused via copy_) and releases once at
-                        # loop exit — releasing every step would free + realloc
-                        # the large teacher logits buffers and fragment into OOM.
-                        for teacher_policy in teacher_policies:
-                            teacher_policy.release_ipc_buffer()
-                        raise
 
-                if offload_student_after_step:
-                    with timer.time("student_step_offload"):
-                        _restore_student_between_teacher_state(
-                            student_policy, master_config
-                        )
-                elif offload_student_optimizer_after_step:
-                    with timer.time("student_optimizer_offload"):
-                        _restore_student_between_teacher_state(
-                            student_policy, master_config
-                        )
-
-                is_last_step = (total_steps + 1 >= max_steps) or (
-                    (current_epoch + 1 == max_epochs)
-                    and (current_step + 1 == len(dataloader))
-                )
-
-                val_metrics: dict[str, Any] | None = None
-                if val_dataloader is not None and (
-                    (val_period > 0 and (total_steps + 1) % val_period == 0)
-                    or (val_at_end and is_last_step)
-                ):
-                    val_metrics, val_timings = validate(
-                        student_policy,
-                        teacher_policies,
-                        val_dataloader,
-                        loss_fn,
-                        master_config,
-                        skip_keys=skip_keys,
-                        timer=timer,
-                        packing_batch_uids=packing_batch_uids,
-                    )
-                    logger.log_metrics(
-                        val_metrics, total_steps + 1, prefix="validation"
-                    )
-                    logger.log_metrics(
-                        val_timings, total_steps + 1, prefix="timing/validation"
-                    )
-
-                metrics: dict[str, Any] = {
-                    "loss": train_results["loss"].numpy(),
-                    "grad_norm": train_results["grad_norm"].numpy(),
-                }
-                metrics.update(train_results["all_mb_metrics"])
-                # Reduce per-microbatch metrics to per-step scalars. The
-                # P-KL path emits kl_loss/ce_loss/kl_loss_scale/proj_accuracy;
-                # the gold-loss path emits kl_common/l1_uncommon; the v6 path
-                # emits the *_per_chunk diagnostics. Any set may be present —
-                # reduce all via the same rules.
-                for k, v in metrics.items():
-                    metrics[k] = reduce_mb_metric(k, v)
-                if "global_valid_toks" in metrics:
-                    total_valid_tokens += int(metrics["global_valid_toks"])
-
-                consumed_samples += distill_cfg["num_prompts_per_step"]
-                timeout.mark_iteration()
-
-                # ===== Checkpointing =====
-                should_save_by_step = (
-                    is_last_step
-                    or (total_steps + 1) % master_config.checkpointing["save_period"]
-                    == 0
-                    or (
-                        ft_save_period is not None
-                        and (total_steps + 1) % ft_save_period == 0
-                    )
-                )
-                should_save_by_timeout = timeout.check_save()
-                if master_config.checkpointing["enabled"] and (
-                    should_save_by_step or should_save_by_timeout
-                ):
-                    student_policy.prepare_for_training()
-                    off_policy_distillation_state["current_epoch"] = current_epoch
-                    off_policy_distillation_state["current_step"] = current_step + 1
-                    off_policy_distillation_state["total_steps"] = total_steps + 1
-                    off_policy_distillation_state["total_valid_tokens"] = (
-                        total_valid_tokens
-                    )
-                    off_policy_distillation_state["consumed_samples"] = consumed_samples
-                    if val_metrics is not None and "loss" in val_metrics:
-                        off_policy_distillation_state["val_loss"] = float(
-                            val_metrics["loss"]
-                        )
-                    elif "val_loss" in off_policy_distillation_state:
-                        del off_policy_distillation_state["val_loss"]
-
-                    full_metric_name = master_config.checkpointing["metric_name"]
-                    if full_metric_name is not None:
-                        prefix, metric_name = full_metric_name.split(":", 1)
-                        source = metrics if prefix == "train" else (val_metrics or {})
-                        if metric_name in source:
-                            off_policy_distillation_state[full_metric_name] = float(
-                                source[metric_name]
+                    if offload_student_after_step:
+                        with timer.time("student_step_offload"):
+                            _restore_student_between_teacher_state(
+                                student_policy, master_config
+                            )
+                    elif offload_student_optimizer_after_step:
+                        with timer.time("student_optimizer_offload"):
+                            _restore_student_between_teacher_state(
+                                student_policy, master_config
                             )
 
-                    with timer.time("checkpointing"):
-                        ckpt_path = checkpointer.init_tmp_checkpoint(
-                            total_steps + 1,
-                            off_policy_distillation_state,
+                    is_last_step = (total_steps + 1 >= max_steps) or (
+                        (current_epoch + 1 == max_epochs)
+                        and (current_step + 1 == len(dataloader))
+                    )
+
+                    val_metrics: dict[str, Any] | None = None
+                    if val_dataloader is not None and (
+                        (val_period > 0 and (total_steps + 1) % val_period == 0)
+                        or (val_at_end and is_last_step)
+                    ):
+                        val_metrics, val_timings = validate(
+                            student_policy,
+                            teacher_policies,
+                            val_dataloader,
+                            loss_fn,
                             master_config,
+                            skip_keys=skip_keys,
+                            timer=timer,
+                            packing_batch_uids=packing_batch_uids,
                         )
-                        student_policy.save_checkpoint(
-                            weights_path=os.path.join(ckpt_path, "policy", "weights"),
-                            optimizer_path=os.path.join(
-                                ckpt_path, "policy", "optimizer"
-                            )
-                            if checkpointer.save_optimizer
-                            else None,
-                            tokenizer_path=os.path.join(
-                                ckpt_path, "policy", "tokenizer"
-                            ),
-                            is_final_checkpoint=is_last_step,
+                        logger.log_metrics(
+                            val_metrics, total_steps + 1, prefix="validation"
                         )
-                        torch.save(
-                            dataloader.state_dict(),
-                            os.path.join(ckpt_path, "train_dataloader.pt"),
+                        logger.log_metrics(
+                            val_timings, total_steps + 1, prefix="timing/validation"
                         )
-                        checkpointer.begin_finalization(
-                            ckpt_path,
-                            wait_fn=student_policy.finalize_async_save,
+
+                    metrics: dict[str, Any] = {
+                        "loss": train_results["loss"].numpy(),
+                        "grad_norm": train_results["grad_norm"].numpy(),
+                    }
+                    metrics.update(train_results["all_mb_metrics"])
+                    # Reduce per-microbatch metrics to per-step scalars. The
+                    # P-KL path emits kl_loss/ce_loss/kl_loss_scale/proj_accuracy;
+                    # the gold-loss path emits kl_common/l1_uncommon; the v6 path
+                    # emits the *_per_chunk diagnostics. Any set may be present —
+                    # reduce all via the same rules.
+                    for k, v in metrics.items():
+                        metrics[k] = reduce_mb_metric(k, v)
+                    if "global_valid_toks" in metrics:
+                        total_valid_tokens += int(metrics["global_valid_toks"])
+
+                    consumed_samples += distill_cfg["num_prompts_per_step"]
+                    timeout.mark_iteration()
+
+                    # ===== Checkpointing =====
+                    should_save_by_step = (
+                        is_last_step
+                        or (total_steps + 1)
+                        % master_config.checkpointing["save_period"]
+                        == 0
+                        or (
+                            ft_save_period is not None
+                            and (total_steps + 1) % ft_save_period == 0
                         )
-                    _restore_student_between_teacher_state(
-                        student_policy, master_config
                     )
+                    should_save_by_timeout = timeout.check_save()
+                    if master_config.checkpointing["enabled"] and (
+                        should_save_by_step or should_save_by_timeout
+                    ):
+                        student_policy.prepare_for_training()
+                        off_policy_distillation_state["current_epoch"] = current_epoch
+                        off_policy_distillation_state["current_step"] = current_step + 1
+                        off_policy_distillation_state["total_steps"] = total_steps + 1
+                        off_policy_distillation_state["total_valid_tokens"] = (
+                            total_valid_tokens
+                        )
+                        off_policy_distillation_state["consumed_samples"] = (
+                            consumed_samples
+                        )
+                        if val_metrics is not None and "loss" in val_metrics:
+                            off_policy_distillation_state["val_loss"] = float(
+                                val_metrics["loss"]
+                            )
+                        elif "val_loss" in off_policy_distillation_state:
+                            del off_policy_distillation_state["val_loss"]
 
-            # ===== Logging =====
-            timing_metrics: dict[str, float] = timer.get_timing_metrics(
-                reduction_op="sum"
-            )  # type: ignore
-            # `metrics["loss"]` and the SUM-reduced terms (kl_loss, ce_loss
-            # for the P-KL path) are SUM across all DP ranks AND microbatches
-            # (= dp_size * local_mbs values summed). We also print the
-            # per-MB-mean for a per-microbatch-comparable signal.
-            # n_mb = len of the flat list of per-MB metrics.
-            n_mb = max(len(train_results["all_mb_metrics"].get("loss", [])), 1)
-            print(
-                f"  • Loss: {metrics['loss']:.4f} "
-                f"(per-MB-mean: {metrics['loss'] / n_mb:.4f})",
-                flush=True,
-            )
-            print(f"  • GradNorm: {metrics['grad_norm']:.4f}", flush=True)
-            # P-KL path metrics — only printed when they're present.
-            if "kl_loss" in metrics:
-                kl_sum = float(metrics["kl_loss"])
-                print(
-                    f"  • KL:   {kl_sum:.4f} (per-MB-mean: {kl_sum / n_mb:.4f})",
-                    flush=True,
-                )
-            if "ce_loss" in metrics:
-                ce_sum = float(metrics["ce_loss"])
-                print(
-                    f"  • CE:   {ce_sum:.4f} (per-MB-mean: {ce_sum / n_mb:.4f})",
-                    flush=True,
-                )
-            # Gold-loss path metrics — kl_common/l1_uncommon are already
-            # per-MB means (np.mean branch above), so no /n_mb division.
-            if "kl_common" in metrics:
-                print(
-                    f"  • KL(common):  {metrics['kl_common']:.4f}",
-                    flush=True,
-                )
-            if "l1_uncommon" in metrics:
-                print(
-                    f"  • L1(uncommon): {metrics['l1_uncommon']:.4f}",
-                    flush=True,
-                )
-            # Accuracy: P-KL emits next-token student accuracy + projection
-            # top-1; gold emits top-1 common-vocab accuracy. Both arrive
-            # under "accuracy" so the same line works.
-            if "accuracy" in metrics:
-                print(
-                    f"  • Acc:  {metrics['accuracy'] * 100:.2f}%",
-                    flush=True,
-                )
-            if "proj_accuracy" in metrics:
-                print(
-                    f"  • ProjAcc: {metrics['proj_accuracy'] * 100:.2f}%",
-                    flush=True,
-                )
-            print(
-                f"  • Total step time: {timing_metrics.get('total_step_time', 0):.2f}s",
-                flush=True,
-            )
-            for k, v in sorted(
-                timing_metrics.items(), key=lambda kv: kv[1], reverse=True
-            ):
-                if k != "total_step_time":
-                    print(f"  • {k}: {v:.2f}s", flush=True)
+                        full_metric_name = master_config.checkpointing["metric_name"]
+                        if full_metric_name is not None:
+                            prefix, metric_name = full_metric_name.split(":", 1)
+                            source = (
+                                metrics if prefix == "train" else (val_metrics or {})
+                            )
+                            if metric_name in source:
+                                off_policy_distillation_state[full_metric_name] = float(
+                                    source[metric_name]
+                                )
 
-            logger.log_metrics(metrics, total_steps + 1, prefix="train")
-            logger.log_metrics(timing_metrics, total_steps + 1, prefix="timing/train")
+                        with timer.time("checkpointing"):
+                            ckpt_path = checkpointer.init_tmp_checkpoint(
+                                total_steps + 1,
+                                off_policy_distillation_state,
+                                master_config,
+                            )
+                            student_policy.save_checkpoint(
+                                weights_path=os.path.join(
+                                    ckpt_path, "policy", "weights"
+                                ),
+                                optimizer_path=os.path.join(
+                                    ckpt_path, "policy", "optimizer"
+                                )
+                                if checkpointer.save_optimizer
+                                else None,
+                                tokenizer_path=os.path.join(
+                                    ckpt_path, "policy", "tokenizer"
+                                ),
+                                is_final_checkpoint=is_last_step,
+                            )
+                            torch.save(
+                                dataloader.state_dict(),
+                                os.path.join(ckpt_path, "train_dataloader.pt"),
+                            )
+                            checkpointer.begin_finalization(
+                                ckpt_path,
+                                wait_fn=student_policy.finalize_async_save,
+                            )
+                        _restore_student_between_teacher_state(
+                            student_policy, master_config
+                        )
 
-            timer.reset()
-            current_step += 1
-            total_steps += 1
+                # ===== Logging =====
+                timing_metrics: dict[str, float] = timer.get_timing_metrics(
+                    reduction_op="sum"
+                )  # type: ignore
+                # `metrics["loss"]` and the SUM-reduced terms (kl_loss, ce_loss
+                # for the P-KL path) are SUM across all DP ranks AND microbatches
+                # (= dp_size * local_mbs values summed). We also print the
+                # per-MB-mean for a per-microbatch-comparable signal.
+                # n_mb = len of the flat list of per-MB metrics.
+                n_mb = max(len(train_results["all_mb_metrics"].get("loss", [])), 1)
+                print(
+                    f"  • Loss: {metrics['loss']:.4f} "
+                    f"(per-MB-mean: {metrics['loss'] / n_mb:.4f})",
+                    flush=True,
+                )
+                print(f"  • GradNorm: {metrics['grad_norm']:.4f}", flush=True)
+                # P-KL path metrics — only printed when they're present.
+                if "kl_loss" in metrics:
+                    kl_sum = float(metrics["kl_loss"])
+                    print(
+                        f"  • KL:   {kl_sum:.4f} (per-MB-mean: {kl_sum / n_mb:.4f})",
+                        flush=True,
+                    )
+                if "ce_loss" in metrics:
+                    ce_sum = float(metrics["ce_loss"])
+                    print(
+                        f"  • CE:   {ce_sum:.4f} (per-MB-mean: {ce_sum / n_mb:.4f})",
+                        flush=True,
+                    )
+                # Gold-loss path metrics — kl_common/l1_uncommon are already
+                # per-MB means (np.mean branch above), so no /n_mb division.
+                if "kl_common" in metrics:
+                    print(
+                        f"  • KL(common):  {metrics['kl_common']:.4f}",
+                        flush=True,
+                    )
+                if "l1_uncommon" in metrics:
+                    print(
+                        f"  • L1(uncommon): {metrics['l1_uncommon']:.4f}",
+                        flush=True,
+                    )
+                # Accuracy: P-KL emits next-token student accuracy + projection
+                # top-1; gold emits top-1 common-vocab accuracy. Both arrive
+                # under "accuracy" so the same line works.
+                if "accuracy" in metrics:
+                    print(
+                        f"  • Acc:  {metrics['accuracy'] * 100:.2f}%",
+                        flush=True,
+                    )
+                if "proj_accuracy" in metrics:
+                    print(
+                        f"  • ProjAcc: {metrics['proj_accuracy'] * 100:.2f}%",
+                        flush=True,
+                    )
+                print(
+                    f"  • Total step time: {timing_metrics.get('total_step_time', 0):.2f}s",
+                    flush=True,
+                )
+                for k, v in sorted(
+                    timing_metrics.items(), key=lambda kv: kv[1], reverse=True
+                ):
+                    if k != "total_step_time":
+                        print(f"  • {k}: {v:.2f}s", flush=True)
 
-            if should_save_by_timeout:
-                checkpointer.shutdown()
-                print("Timeout reached, stopping training early.", flush=True)
-                for teacher_policy in teacher_policies:
-                    teacher_policy.release_ipc_buffer()
-                return
-            if total_steps >= max_steps:
-                checkpointer.shutdown()
-                print("Max steps reached, stopping training.", flush=True)
-                for teacher_policy in teacher_policies:
-                    teacher_policy.release_ipc_buffer()
-                return
+                logger.log_metrics(metrics, total_steps + 1, prefix="train")
+                logger.log_metrics(
+                    timing_metrics, total_steps + 1, prefix="timing/train"
+                )
 
-        current_epoch += 1
-        current_step = 0
-    # Flush the last checkpoint's background finalization on an epoch-bounded
-    # exit. Reaching max_epochs falls through the while loop and bypasses the
-    # inline shutdown() calls at the max_steps / timeout early returns, so
-    # without this the daemon finalization thread could be killed before the
-    # final tmp_step_N is renamed.
-    checkpointer.shutdown()
-    for teacher_policy in teacher_policies:
-        teacher_policy.release_ipc_buffer()
+                timer.reset()
+                current_step += 1
+                total_steps += 1
+
+                if should_save_by_timeout:
+                    checkpointer.shutdown()
+                    print("Timeout reached, stopping training early.", flush=True)
+                    return
+                if total_steps >= max_steps:
+                    checkpointer.shutdown()
+                    print("Max steps reached, stopping training.", flush=True)
+                    return
+
+            current_epoch += 1
+            current_step = 0
+        # Flush the last checkpoint's background finalization on an epoch-bounded
+        # exit. Reaching max_epochs falls through the while loop and bypasses the
+        # inline shutdown() calls at the max_steps / timeout early returns, so
+        # without this the daemon finalization thread could be killed before the
+        # final tmp_step_N is renamed.
+        checkpointer.shutdown()
 
 
 # ===============================================================================
@@ -2506,61 +2704,63 @@ def validate(
     ``check_sequence_dim`` pre-flight; built once in the train loop and threaded
     in so it can't drift from a parallel rebuild here.
     """
-    distill_cfg = master_config.distillation
-    timer = timer if timer is not None else Timer()
-    if packing_batch_uids is None:
-        packing_batch_uids = count()
+    with _xtoken_ipc_lifetime(student_policy, teacher_policies):
+        distill_cfg = master_config.distillation
+        timer = timer if timer is not None else Timer()
+        if packing_batch_uids is None:
+            packing_batch_uids = count()
 
-    losses: list[float] = []
-    # The P-KL path emits kl_loss/ce_loss; the gold path emits
-    # kl_common/l1_uncommon. Track both, only the ones the active loss
-    # populates will end up in the returned metrics.
-    kl_losses: list[float] = []
-    ce_losses: list[float] = []
-    kl_common_losses: list[float] = []
-    l1_uncommon_losses: list[float] = []
+        losses: list[float] = []
+        # The P-KL path emits kl_loss/ce_loss; the gold path emits
+        # kl_common/l1_uncommon. Track both, only the ones the active loss
+        # populates will end up in the returned metrics.
+        kl_losses: list[float] = []
+        ce_losses: list[float] = []
+        kl_common_losses: list[float] = []
+        l1_uncommon_losses: list[float] = []
 
-    # Teacher and student may differ in DP/MBS, and teachers may differ from
-    # each other; the final val batch (drop_last=False) can be ragged. Pad each
-    # batch up to the smallest size that tiles cleanly on the student grid and
-    # every teacher's grid so the even-split path applies. Each teacher's val
-    # export reuses its own train MBS (no separate val knob).
-    student_dp = student_policy.data_parallel_size
-    student_mbs = master_config.policy["train_micro_batch_size"]
-    teacher_mbs = [
-        t.policy_config()["train_micro_batch_size"] for t in master_config.teachers
-    ]
-    pad_quantum = math.lcm(
-        student_dp * student_mbs,
-        *[
-            teacher_policy.data_parallel_size * teacher_mbs[i]
-            for i, teacher_policy in enumerate(teacher_policies)
-        ],
-    )
+        # Teacher and student may differ in DP/MBS, and teachers may differ from
+        # each other; the final val batch (drop_last=False) can be ragged. Pad each
+        # batch up to the smallest size that tiles cleanly on the student grid and
+        # every teacher's grid so the even-split path applies. Each teacher's val
+        # export reuses its own train MBS (no separate val knob).
+        student_dp = student_policy.data_parallel_size
+        student_mbs = master_config.policy["train_micro_batch_size"]
+        teacher_mbs = [
+            t.policy_config()["train_micro_batch_size"] for t in master_config.teachers
+        ]
+        pad_quantum = math.lcm(
+            student_dp * student_mbs,
+            *[
+                teacher_policy.data_parallel_size * teacher_mbs[i]
+                for i, teacher_policy in enumerate(teacher_policies)
+            ],
+        )
 
-    with timer.time("validation_total"):
-        for batch in val_dataloader:
-            target_size = math.ceil(batch.size / pad_quantum) * pad_quantum
-            batch = pad_distillation_val_batch(batch, target_size)
-            packing_plan = build_xtoken_lockstep_packing_plan(
-                batch,
-                master_config,
-                batch_uid=next(packing_batch_uids),
-                data_parallel_size=student_policy.data_parallel_size,
-            )
-            if packing_plan is not None:
-                log_xtoken_packing_telemetry(packing_plan, batch)
+        with timer.time("validation_total"):
+            for batch in val_dataloader:
+                target_size = math.ceil(batch.size / pad_quantum) * pad_quantum
+                batch = pad_distillation_val_batch(batch, target_size)
+                batch_uid = next(packing_batch_uids)
+                packing_plan = build_xtoken_lockstep_packing_plan(
+                    batch,
+                    master_config,
+                    batch_uid=batch_uid,
+                    data_parallel_size=student_policy.data_parallel_size,
+                )
+                if packing_plan is not None:
+                    log_xtoken_packing_telemetry(packing_plan, batch)
 
-            train_data = export_teacher_logits_and_pack(
-                teacher_policies,
-                loss_fn,
-                batch,
-                teacher_mbs,
-                timer=timer,
-                packing_plan=packing_plan,
-            )
-            student_policy.prepare_for_training()
-            try:
+                train_data = export_teacher_logits_and_pack(
+                    teacher_policies,
+                    loss_fn,
+                    batch,
+                    teacher_mbs,
+                    timer=timer,
+                    packing_plan=packing_plan,
+                    batch_uid=batch_uid,
+                )
+                student_policy.prepare_for_training()
                 packing_kwargs: dict[str, Any] = {}
                 if packing_plan is not None:
                     packing_kwargs = {
@@ -2576,34 +2776,29 @@ def validate(
                     **packing_kwargs,
                 )
                 _restore_student_between_teacher_state(student_policy, master_config)
-            except Exception:
-                for teacher_policy in teacher_policies:
-                    teacher_policy.release_ipc_buffer()
-                raise
-            losses.append(float(np.mean(results["loss"].numpy())))
-            mb_metrics = results.get("all_mb_metrics", {})
-            if "kl_loss" in mb_metrics:
-                kl_losses.append(float(np.mean(mb_metrics["kl_loss"])))
-            if "ce_loss" in mb_metrics:
-                ce_losses.append(float(np.mean(mb_metrics["ce_loss"])))
-            if "kl_common" in mb_metrics:
-                kl_common_losses.append(float(np.mean(mb_metrics["kl_common"])))
-            if "l1_uncommon" in mb_metrics:
-                l1_uncommon_losses.append(float(np.mean(mb_metrics["l1_uncommon"])))
-        for teacher_policy in teacher_policies:
-            teacher_policy.release_ipc_buffer()
-            teacher_policy.offload_after_refit()
+                losses.append(float(np.mean(results["loss"].numpy())))
+                mb_metrics = results.get("all_mb_metrics", {})
+                if "kl_loss" in mb_metrics:
+                    kl_losses.append(float(np.mean(mb_metrics["kl_loss"])))
+                if "ce_loss" in mb_metrics:
+                    ce_losses.append(float(np.mean(mb_metrics["ce_loss"])))
+                if "kl_common" in mb_metrics:
+                    kl_common_losses.append(float(np.mean(mb_metrics["kl_common"])))
+                if "l1_uncommon" in mb_metrics:
+                    l1_uncommon_losses.append(float(np.mean(mb_metrics["l1_uncommon"])))
+            for teacher_policy in teacher_policies:
+                teacher_policy.offload_after_refit()
 
-    metrics: dict[str, Any] = {
-        "loss": float(np.mean(losses)) if losses else 0.0,
-    }
-    if kl_losses:
-        metrics["kl_loss"] = float(np.mean(kl_losses))
-    if ce_losses:
-        metrics["ce_loss"] = float(np.mean(ce_losses))
-    if kl_common_losses:
-        metrics["kl_common"] = float(np.mean(kl_common_losses))
-    if l1_uncommon_losses:
-        metrics["l1_uncommon"] = float(np.mean(l1_uncommon_losses))
+        metrics: dict[str, Any] = {
+            "loss": float(np.mean(losses)) if losses else 0.0,
+        }
+        if kl_losses:
+            metrics["kl_loss"] = float(np.mean(kl_losses))
+        if ce_losses:
+            metrics["ce_loss"] = float(np.mean(ce_losses))
+        if kl_common_losses:
+            metrics["kl_common"] = float(np.mean(kl_common_losses))
+        if l1_uncommon_losses:
+            metrics["l1_uncommon"] = float(np.mean(l1_uncommon_losses))
 
-    return metrics, timer.get_timing_metrics(reduction_op="sum")  # type: ignore
+        return metrics, timer.get_timing_metrics(reduction_op="sum")  # type: ignore

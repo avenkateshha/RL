@@ -93,7 +93,53 @@ Changed-file Ruff/format, targeted Pyrefly (**0 errors**) and diff checks pass.
 CUDA primitive execution, persistent producer streaming, CUDA IPC and complete
 loss/model integration are not claimed by this checkpoint.
 
-Publication: prepared for signed-off commit and verified normal push.
+Publication: signed-off commit `7e6492b1b5c192bc9949d87405a469ab018c9770`
+pushed to `myfork/avenkateshha/xtoken-v6-loss`; remote tip verified.
+
+## Checkpoint 3 — teacher producer and reader integration
+
+Implemented after checkpoint 2's verified push. Teacher-native streaming
+producer, public backend dispatch, route-scoped validation, typed adapter and
+dense requested-row reader, padding/locality guards and enclosing IPC lifetime.
+
+Host checks: 140 existing orchestration tests plus 31 new setup/lifetime tests
+passed; six public sparse dispatch tests passed; 38 adapter/reader tests and
+eight legacy caller regressions passed. Frozen container job `19989936`
+completed with **76 passed, 0 skipped**, including 14 actual CUDA producer and
+padding tests, 56 utility/adapter tests and six policy dispatch tests. Source
+hashes matched before and after execution. A CUDA IPC shutdown warning exposed
+unsafe reuse of PyTorch's one-use exported reference counters; publication is
+held until reusable producer-owned descriptors and teardown probes resolve it.
+Native losses remain disabled until checkpoints 4a/4b.
+
+Follow-up `19990303`: **217 passed, 0 skipped** (two reusable raw CUDA IPC
+tests, 181 orchestration tests, 27 public policy/aggregation tests, seven
+wrapper/eligibility tests). Before/after source hashes matched. The corrected
+legacy diagnostic measured exported counters **1 → 0 → -1** over two fresh
+consumers, confirming the underflow; the raw CUDA replacement passed repeated
+fanout, nondefault-stream copies, view lifetime, storage growth and final free
+without the shutdown warning. Unpacked sample occurrence IDs now survive
+teacher export and aggregation. Final producer/dense-reader integration and
+explicit OS process-exit checks were completed in the final frozen run below.
+
+Final frozen job `19990413`: **COMPLETED 0:0**, 5m35s, **340 passed, zero
+failures/errors/skips**. The nine suites cover reusable raw CUDA IPC (2),
+CPU/Gloo plus CUDA/NCCL primitives/readers (40), actual producer and padding
+(14), dense CUDA reader (1), dense reader/adapter (42), process lifetime and
+worker recreation including real Ray actors (23), orchestration (184), policy
+and aggregation (27), and wrapper/eligibility (7). All nine commands exited 0;
+394 source/test/launcher hashes matched before and after. No IPC producer-exit,
+counter-underflow or leaked-handle warning occurred in the final run logs.
+
+The actual Ray check confirms OS process exit before producer release; when
+exit cannot be confirmed the controller preserves the original error and
+retains producer-owned storage. New reusable dense export remains internal and
+opt-in; native same-tokenizer activation is reserved for checkpoint 4b. Changed
+source/test Ruff and format checks and `git diff --check` pass. Targeted
+Pyrefly reports zero errors for all four new modules (existing unrelated
+baseline typing issues are not claimed fixed). Independent reviews found no
+remaining actionable issues. Native loss numerical and real-model R1–R6
+acceptance remains reserved for checkpoints 4a/4b/5.
 
 ## Runtime and fixture preparation
 
@@ -113,10 +159,13 @@ Publication: prepared for signed-off commit and verified normal push.
   hit the provider's APEX fusion default; a follow-up uses the existing exemplar
   setting `gradient_accumulation_fusion=false`. A late edit of the active driver
   also produced a shell EOF; the follow-up launcher is frozen before submission.
-- Follow-up `19989617`: split guards **2 passed**. Pinned Llama-3.2-1B student
-  and SmolLM2-1.7B teacher loaded actual weights and completed finite native
-  TP2/CP2 forwards at B1/T32. Other pinned models remain in progress; these
-  checks do not establish KD, backward, optimizer or IPC acceptance.
+- Follow-up `19989617`: **COMPLETED 0:0**, split guards **2 passed**. All four
+  pinned models (Llama-3.2-1B, SmolLM2-1.7B, Qwen3-4B, Llama-3.2-3B) loaded
+  actual weights and completed finite native TP2/CP2 forwards at B1/T32.
+  These checks do not establish KD, backward, optimizer or IPC acceptance.
+- Frozen checkpoint-2 CPU/CUDA primitive job `19989749`: **COMPLETED 0:0**,
+  **39 passed, 0 skipped**, including all four CUDA/NCCL TP/CP grids; source
+  hashes matched before/after. No production loss acceptance is claimed.
 - Pinned Qwen forward/reverse table validation and offline SmolLM2 table
   generation completed; exact evidence resides in fixture-preparation results.
 - Real-model R1–R6 acceptance remains **NOT_RUN** until implementation and

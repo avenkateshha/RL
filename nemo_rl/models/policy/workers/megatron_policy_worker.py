@@ -13,6 +13,7 @@
 # limitations under the License.
 import copy
 import gc
+import math
 import logging
 import os
 import re
@@ -114,10 +115,15 @@ from nemo_rl.models.megatron.setup import (
     validate_megatron_config,
     validate_model_paths,
 )
+from nemo_rl.models.megatron.sparse_teacher import (
+    SparseTeacherStorage,
+    StreamedSparseLogitsMetadata,
+)
 from nemo_rl.models.megatron.train import (
     FullLogitsPostProcessor,
     LogprobsPostProcessor,
     LossPostProcessor,
+    SparseTeacherLogitsPostProcessor,
     StreamedFullLogitsMetadata,
     TeacherFullPayloadPostProcessor,
     TopkLogitsPostProcessor,
@@ -163,6 +169,11 @@ from nemo_rl.utils.nsys import wrap_with_nvtx_name
 from nemo_rl.utils.nvml import log_gpu_memory_diagnostics
 from nemo_rl.utils.packed_tensor import packed_broadcast_producer
 from nemo_rl.utils.r3_trace import maybe_r3_trace_stage
+from nemo_rl.utils.reusable_cuda_ipc import (
+    ReusableCudaIPCDescriptor,
+    allocate_reusable_cuda_tensor,
+    get_reusable_cuda_ipc_handle,
+)
 from nemo_rl.utils.timer import Timer
 from nemo_rl.weight_sync.nccl_reshard_utils import (
     _INDIVIDUAL_EXPERT_RE,
@@ -476,6 +487,7 @@ class MegatronPolicyWorkerImpl(
     _train_step_state: Optional[dict[str, Any]] = None
     _remote_sparse_refit: Any = None
     _async_checkpoint_cuda_cache_active: bool = False
+    _teacher_ipc_reusable: bool = False
 
     def _ensure_teacher_ipc_storage(
         self,
@@ -484,15 +496,19 @@ class MegatronPolicyWorkerImpl(
         vocab_size: int,
         dtype: torch.dtype,
         device: torch.device,
+        reusable_ipc: bool = False,
     ) -> torch.Tensor:
         """Reuse or replace the compact IPC slab without overlapping owners."""
         storage = self._teacher_ipc_storage
-        if storage is not None and not can_reuse_teacher_ipc_token_buffer(
-            storage,
-            total_tokens=total_tokens,
-            vocab_size=vocab_size,
-            dtype=dtype,
-            device=device,
+        if storage is not None and (
+            self._teacher_ipc_reusable != reusable_ipc
+            or not can_reuse_teacher_ipc_token_buffer(
+                storage,
+                total_tokens=total_tokens,
+                vocab_size=vocab_size,
+                dtype=dtype,
+                device=device,
+            )
         ):
             # A new get_full_logits_ipc call starts only after the previous
             # student train call has returned, so its imported views are no
@@ -504,14 +520,22 @@ class MegatronPolicyWorkerImpl(
             gc.collect()
             torch.cuda.empty_cache()
 
-        storage = ensure_teacher_ipc_token_buffer(
-            self._teacher_ipc_storage,
-            total_tokens=total_tokens,
-            vocab_size=vocab_size,
-            dtype=dtype,
-            device=device,
-        )
+        if reusable_ipc:
+            storage = self._teacher_ipc_storage
+            if storage is None:
+                storage = allocate_reusable_cuda_tensor(
+                    (total_tokens, vocab_size), dtype=dtype, device=device
+                )
+        else:
+            storage = ensure_teacher_ipc_token_buffer(
+                self._teacher_ipc_storage,
+                total_tokens=total_tokens,
+                vocab_size=vocab_size,
+                dtype=dtype,
+                device=device,
+            )
         self._teacher_ipc_storage = storage
+        self._teacher_ipc_reusable = reusable_ipc
         return storage
 
     def __repr__(self):
@@ -673,7 +697,10 @@ class MegatronPolicyWorkerImpl(
         # ``release_ipc_buffer``. Logical row and TP/CP geometry remain in each
         # handle while zero padding is omitted from the physical allocation.
         self._teacher_ipc_storage: Optional[torch.Tensor] = None
-        self._teacher_ipc_handles: list[tuple[Any, ...]] = []
+        self._teacher_ipc_handles: list[
+            tuple[Any, ...] | ReusableCudaIPCDescriptor
+        ] = []
+        self._teacher_sparse_ipc_storage: Optional[SparseTeacherStorage] = None
         self._router_replay_enabled = router_replay_enabled(config)
         self._nixl_preinit_agent = maybe_preinit_nixl_checkpoint_engine(config)
 
@@ -3020,6 +3047,8 @@ class MegatronPolicyWorkerImpl(
         self,
         data: BatchedDataDict[GenerationDatumSpec],
         micro_batch_size: Optional[int] = None,
+        *,
+        reusable_ipc: bool = False,
     ) -> dict[str, Any]:
         """Teacher forward; full-vocab logits exposed via persistent CUDA IPC storage.
 
@@ -3044,15 +3073,25 @@ class MegatronPolicyWorkerImpl(
         returns an empty output list on every earlier stage and this method
         returns no handles there; :func:`aggregate_per_sample_handles` skips
         those empty contributions.
-        Multi-node PP is guarded separately by
-        :func:`assert_xtoken_ipc_node_local`, which requires the whole
-        ``tp * cp * pp`` group to fit inside one node so the producing stage is
-        co-located with the importing student ranks.
+        Multi-node IPC is guarded separately by
+        :func:`assert_xtoken_ipc_node_local`, which requires student/teacher
+        PP=1 and each model-parallel group to fit inside a node. A model-parallel
+        group-size check alone cannot establish pipeline-stage co-location.
 
         Sequence-packed outputs are reconstructed one physical sample at a time
         by :class:`FullLogitsPostProcessor` and streamed directly into the
         persistent IPC slab.
+
+        ``reusable_ipc`` opts native dense readers into producer-owned raw CUDA
+        slabs and reusable descriptors. Values, layout and row metadata stay
+        identical; legacy consumers retain the default Torch IPC transport.
         """
+        if reusable_ipc and (
+            self.cfg["sequence_packing"]["enabled"]
+            or self.cfg["dynamic_batching"]["enabled"]
+            or parallel_state.get_pipeline_model_parallel_world_size() != 1
+        ):
+            raise ValueError("Reusable dense teacher IPC requires static unpacked PP=1")
         if (
             self.delegate_pack_to_model
             and parallel_state.get_context_parallel_world_size() > 1
@@ -3128,6 +3167,7 @@ class MegatronPolicyWorkerImpl(
                 vocab_size=planned_local_vocab_size,
                 dtype=torch.float32,
                 device=storage_device,
+                reusable_ipc=reusable_ipc,
             )
         elif not pack:
             # Preserve the existing unpacked path. It cannot omit padding logits,
@@ -3152,6 +3192,7 @@ class MegatronPolicyWorkerImpl(
                     vocab_size=vocab_size,
                     dtype=storage_dtype,
                     device=storage_device,
+                    reusable_ipc=reusable_ipc,
                 )
 
         (
@@ -3234,7 +3275,7 @@ class MegatronPolicyWorkerImpl(
         local_valid_lengths_by_microbatch: list[list[int]] = []
         total_stored_tokens = 0
         row_offsets: list[int] = []
-        payload_ipc: Optional[tuple[Any, ...]] = None
+        payload_ipc: Optional[tuple[Any, ...] | ReusableCudaIPCDescriptor] = None
         batch_sizes: list[int] = []
         local_vocab_size = 0
         streamed_metadata: list[StreamedFullLogitsMetadata] = []
@@ -3382,13 +3423,18 @@ class MegatronPolicyWorkerImpl(
                     vocab_size=local_vocab_size,
                     dtype=first_vals.dtype,
                     device=first_vals.device,
+                    reusable_ipc=reusable_ipc,
                 )
 
             token_partitions = partition_teacher_ipc_token_buffer(
                 storage, local_valid_lengths_by_microbatch
             )
             if total_stored_tokens > 0:
-                payload_ipc = get_handle_from_tensor(storage)
+                payload_ipc = (
+                    get_reusable_cuda_ipc_handle(storage)
+                    if reusable_ipc
+                    else get_handle_from_tensor(storage)
+                )
                 self._teacher_ipc_handles = [payload_ipc]
             else:
                 self._teacher_ipc_handles = []
@@ -3480,6 +3526,200 @@ class MegatronPolicyWorkerImpl(
         torch.cuda.synchronize()
         return {"per_sample_handles": per_sample_handles, "dp_rank": dp_rank}
 
+    @torch.no_grad()
+    @wrap_with_nvtx_name("megatron_policy_worker/get_topk_logits_ipc")
+    def get_topk_logits_ipc(
+        self,
+        data: BatchedDataDict[Any],
+        *,
+        k: int,
+        temperature: float,
+        vocab_size: Optional[int] = None,
+        micro_batch_size: Optional[int] = None,
+        support_mode: str,
+        gt_filter_topk: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Stream native CP sparse teacher rows through persistent TP0 IPC buffers.
+
+        The enclosing controller guarantees that prior student consumers have
+        completed before reuse/reallocation, and quiesces failed consumers
+        before calling release_ipc_buffer. No whole-step sparse output tensors
+        are retained by the MCore schedule. Each worker belongs to one teacher,
+        so separate teachers retain separate storage even on the same GPU.
+        """
+        if (
+            self.cfg["sequence_packing"]["enabled"]
+            or self.cfg["dynamic_batching"]["enabled"]
+            or self.delegate_pack_to_model
+            or parallel_state.get_pipeline_model_parallel_world_size() != 1
+        ):
+            raise NotImplementedError(
+                "Native sparse teacher IPC requires static unpacked batches and PP=1"
+            )
+        if support_mode != "row_topk":
+            raise NotImplementedError(
+                "Native sparse teacher IPC requires support_mode='row_topk'"
+            )
+        real_vocab = len(self.tokenizer) if vocab_size is None else int(vocab_size)
+        membership_k = int(gt_filter_topk or 0)
+        if (
+            k <= 0
+            or membership_k < 0
+            or max(k, membership_k) > real_vocab
+            or not math.isfinite(temperature)
+            or temperature <= 0
+        ):
+            raise ValueError(
+                "Invalid native sparse K/temperature/real-vocabulary/membership support"
+            )
+        input_ids = data["input_ids"]
+        force_ids = data.get("force_include_token_ids")
+        if (
+            not isinstance(input_ids, torch.Tensor)
+            or input_ids.ndim != 2
+            or input_ids.dtype not in (torch.int32, torch.int64)
+            or bool(((input_ids < 0) | (input_ids >= real_vocab)).any())
+        ):
+            raise ValueError(
+                "Native sparse teacher input IDs must belong to its real vocabulary"
+            )
+        if not isinstance(force_ids, torch.Tensor) or force_ids.shape != (
+            *input_ids.shape,
+            2,
+        ):
+            raise ValueError(
+                "Native sparse teacher requires force_include_token_ids [B,T_teacher,2]"
+            )
+        forward_mbs = (
+            self.cfg["logprob_batch_size"]
+            if micro_batch_size is None
+            else micro_batch_size
+        )
+        if forward_mbs <= 0 or data.size % forward_mbs:
+            raise ValueError(
+                "Native sparse teacher batch must be divisible by its microbatch size"
+            )
+        self.model.eval()
+        iterator, count, forward_mbs, _, full_sequence_length = get_microbatch_iterator(
+            data,
+            self.cfg,
+            forward_mbs,
+            straggler_timer=self.mcore_state.straggler_timer,
+            model_config=get_model_config(self.model),
+            delegate_pack_to_model=self.delegate_pack_to_model,
+            delegate_mtp_loss_mask_to_model=self.delegate_mtp_loss_mask_to_model,
+            model_slices_context_parallel_inputs=self.model_slices_context_parallel_inputs,
+            mtp_enabled=self.mtp_enabled,
+        )
+        cp_rank = parallel_state.get_context_parallel_rank()
+        cp_size = parallel_state.get_context_parallel_world_size()
+        tp_rank = parallel_state.get_tensor_model_parallel_rank()
+        if cp_size > 1 and full_sequence_length % (2 * cp_size):
+            raise ValueError(
+                "Native sparse teacher padded sequence must be divisible by 2*teacher_CP"
+            )
+        local_sequence_length = full_sequence_length // cp_size
+        device = torch.device("cuda", torch.cuda.current_device())
+        if tp_rank == 0:
+            current = self._teacher_sparse_ipc_storage
+            if current is not None and not current.can_reuse(
+                batch_size=data.size,
+                local_sequence_length=local_sequence_length,
+                k=k,
+                device=device,
+            ):
+                # Previous consumers have completed before this RPC. Drop stale
+                # handles/owners before allocating replacement storage.
+                self._teacher_sparse_ipc_storage = None
+                del current
+            if self._teacher_sparse_ipc_storage is None:
+                self._teacher_sparse_ipc_storage = SparseTeacherStorage.allocate(
+                    batch_size=data.size,
+                    local_sequence_length=local_sequence_length,
+                    k=k,
+                    device=device,
+                )
+        elif self._teacher_sparse_ipc_storage is not None:
+            raise RuntimeError(
+                "Non-TP0 worker unexpectedly owns sparse teacher storage"
+            )
+        processor = SparseTeacherLogitsPostProcessor(
+            k=k,
+            temperature=temperature,
+            real_vocab_size=real_vocab,
+            noise_filter_k=membership_k,
+            output_storage=self._teacher_sparse_ipc_storage,
+            chunk_size=self.cfg.get("logprob_chunk_size"),
+        )
+        outputs = megatron_forward_backward(
+            model=self.model,
+            data_iterator=iterator,
+            seq_length=full_sequence_length,
+            mbs=forward_mbs,
+            num_microbatches=count,
+            post_processing_fn=processor,
+            forward_only=True,
+            defer_fp32_logits=self.defer_fp32_logits,
+            sampling_params=None,
+            straggler_timer=self.mcore_state.straggler_timer,
+            model_slices_context_parallel_inputs=self.model_slices_context_parallel_inputs,
+        )
+        expected_offset = 0
+        if len(outputs) != count:
+            raise RuntimeError(
+                "Sparse teacher schedule returned an unexpected microbatch count"
+            )
+        for output in outputs:
+            metadata = output.get("sparse_logits")
+            if (
+                not isinstance(metadata, StreamedSparseLogitsMetadata)
+                or metadata.sample_offset != expected_offset
+                or metadata.batch_size != forward_mbs
+                or metadata.full_sequence_length != full_sequence_length
+                or metadata.local_sequence_length != local_sequence_length
+            ):
+                raise ValueError(
+                    "Sparse teacher streamed metadata disagrees with planned geometry"
+                )
+            expected_offset += metadata.batch_size
+        if expected_offset != data.size or processor.sample_cursor != data.size:
+            raise ValueError("Sparse teacher forward did not fill every sample slot")
+        # Required on every export, including handle/buffer reuse. MCore's
+        # scheduler returning does not prove asynchronous payload copies ended.
+        torch.cuda.synchronize()
+        records: list[dict[str, Any]] = []
+        if tp_rank == 0:
+            storage = self._teacher_sparse_ipc_storage
+            assert storage is not None
+            storage.export_handles(get_reusable_cuda_ipc_handle)
+            sample_ids = extract_batch_item_ids(data, data.size, required=False)
+            for sample_index in range(data.size):
+                record = storage.sample_record(
+                    sample_index=sample_index,
+                    full_sequence_length=full_sequence_length,
+                    cp_rank=cp_rank,
+                    cp_size=cp_size,
+                    real_vocab_size=real_vocab,
+                    temperature=temperature,
+                    membership_k=membership_k or k,
+                )
+                record.update(
+                    tp_rank=tp_rank,
+                    cp_rank=cp_rank,
+                    tp_size=parallel_state.get_tensor_model_parallel_world_size(),
+                    cp_size=cp_size,
+                    world_rank=torch.distributed.get_rank(),
+                    vocab_sharded=False,
+                    sequence_sharded=cp_size > 1,
+                )
+                if sample_ids is not None:
+                    record["batch_item_id"] = sample_ids[sample_index]
+                records.append(record)
+        return {
+            "per_sample_handles": records,
+            "dp_rank": parallel_state.get_data_parallel_rank(),
+        }
+
     def release_ipc_buffer(self) -> None:
         """Free the persistent teacher-logit IPC storage.
 
@@ -3488,6 +3728,7 @@ class MegatronPolicyWorkerImpl(
         """
         self._teacher_ipc_storage = None
         self._teacher_ipc_handles = []
+        self._teacher_sparse_ipc_storage = None
         gc.collect()
         torch.cuda.empty_cache()
 

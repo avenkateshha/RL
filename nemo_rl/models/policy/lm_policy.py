@@ -15,7 +15,7 @@ import os
 import warnings
 from collections import defaultdict
 from contextlib import nullcontext
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Iterable, Optional, Union, cast
 
 import numpy as np
 import ray
@@ -41,7 +41,7 @@ from nemo_rl.models.generation.interfaces import (
     GenerationOutputSpec,
     RefitPayloadMode,
 )
-from nemo_rl.models.policy import PolicyConfig
+from nemo_rl.models.policy import MegatronConfig, PolicyConfig
 from nemo_rl.models.policy.draft_config import coerce_draft_config
 from nemo_rl.models.policy.interfaces import (
     ColocatablePolicyInterface,
@@ -867,6 +867,7 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
         *,
         packing_plan: Optional[LockstepPackingPlan] = None,
         packing_side_id: Optional[str] = None,
+        reusable_ipc: bool = False,
     ) -> list[dict[str, Any]]:
         """Ship the teacher's full-vocab logits to the student via CUDA IPC.
 
@@ -887,10 +888,25 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
 
         Packed xToken callers must supply the controller-owned plan and side ID;
         this method never recomputes membership locally.
+
+        Native same-tokenizer consumers opt into reusable producer-owned handles
+        through the internal ``reusable_ipc`` argument. Dense values and shard
+        layout are unchanged; the legacy export remains the default.
         """
         if self.use_dynamic_batches:
             raise NotImplementedError(
                 "get_full_logits_ipc does not support dynamic batching."
+            )
+        if reusable_ipc and (
+            not self.cfg["megatron_cfg"]["enabled"]
+            or cast(MegatronConfig, self.cfg["megatron_cfg"])[
+                "pipeline_model_parallel_size"
+            ]
+            != 1
+            or self.use_sequence_packing
+        ):
+            raise ValueError(
+                "Reusable dense IPC requires static unpacked Megatron PP=1."
             )
         if (packing_plan is None) != (packing_side_id is None):
             raise ValueError(
@@ -937,7 +953,10 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
                 # "replicated" would return stage 0's result — which is empty.
                 # Non-last stages return no handles and drop out in
                 # aggregate_per_sample_handles.
-                common_kwargs={"micro_batch_size": micro_batch_size},
+                common_kwargs={
+                    "micro_batch_size": micro_batch_size,
+                    **({"reusable_ipc": True} if reusable_ipc else {}),
+                },
             )
         worker_results = self.worker_group.get_all_worker_results(futures)
         if packing_plan is not None:
@@ -961,15 +980,26 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
     ) -> list[dict[str, Any]]:
         """Ship sparse teacher logits, ids, and full-vocab logZ via CUDA IPC.
 
-        Tensor-parallel workers reduce to the same global top-k support; context
-        parallel workers retain distinct contiguous sequence shards, which are
-        grouped per sample for reconstruction by the student loss worker.
+        DTensor-V2 retains its reconstructed sparse transport. Megatron exports
+        native CP segments from TP0 with two-label sidecars; the student reads
+        requested rows directly from each teacher's independent records.
         """
         dtensor_cfg = self.cfg["dtensor_cfg"]
-        if not (dtensor_cfg["enabled"] and dtensor_cfg.get("_v2", False)):
+        native_megatron = self.cfg.get("megatron_cfg", {}).get("enabled", False)
+        if not native_megatron and not (
+            dtensor_cfg["enabled"] and dtensor_cfg.get("_v2", False)
+        ):
             raise NotImplementedError(
-                "get_topk_logits_ipc currently supports only DTensor-V2 workers."
+                "get_topk_logits_ipc requires DTensor-V2 or Megatron workers."
             )
+        if (
+            native_megatron
+            and cast(MegatronConfig, self.cfg["megatron_cfg"])[
+                "pipeline_model_parallel_size"
+            ]
+            != 1
+        ):
+            raise ValueError("Native Megatron sparse teacher IPC requires PP=1.")
         if self.use_dynamic_batches or self.use_sequence_packing:
             raise NotImplementedError(
                 "get_topk_logits_ipc does not support dynamic batching or "
@@ -1003,10 +1033,14 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
         worker_results = self.worker_group.get_all_worker_results(futures)
         return aggregate_per_sample_handles(worker_results)
 
-    def release_ipc_buffer(self) -> None:
-        """Tell all workers to drop their stashed IPC tensors."""
+    def release_ipc_buffer(self, *, timeout: Optional[float] = None) -> None:
+        """Drop teacher IPC tensors after consumers finish or are terminated.
+
+        Failure cleanup supplies a bounded timeout so a failed exporter cannot
+        prevent cleanup of the remaining teachers.
+        """
         futures = self.worker_group.run_all_workers_single_data("release_ipc_buffer")
-        ray.get(futures)
+        ray.get(futures, timeout=timeout)
 
     def train(
         self,

@@ -33,6 +33,7 @@ from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLos
 from nemo_rl.algorithms.utils import calculate_kl, masked_mean
 from nemo_rl.algorithms.x_token.loss_utils import (
     LocalizedAlignment,
+    XTokenLossInput,
 )
 from nemo_rl.distributed.batched_data_dict import BatchedDataDict
 from nemo_rl.distributed.model_utils import (
@@ -2807,7 +2808,9 @@ def test_cross_tokenizer_prepare_loss_input_partitions_canonical_ce(
 
     monkeypatch.setattr(
         "nemo_rl.algorithms.loss.loss_input.prepare_xtoken_cross_tokenizer_loss_input",
-        lambda *args, **kwargs: (torch.empty(0), {}, {}, {}, {}, None, cp_group, None),
+        lambda *args, **kwargs: XTokenLossInput(
+            torch.empty(0), {}, {}, {}, {}, None, cp_group, None
+        ),
     )
     monkeypatch.setattr(
         "nemo_rl.algorithms.loss.loss_input.get_cp_sharded_next_token_logprobs",
@@ -2854,7 +2857,9 @@ def test_cross_tokenizer_prepare_loss_input_rejects_nondivisible_cp_window(
 
     monkeypatch.setattr(
         "nemo_rl.algorithms.loss.loss_input.prepare_xtoken_cross_tokenizer_loss_input",
-        lambda *args, **kwargs: (torch.empty(0), {}, {}, {}, {}, None, cp_group, None),
+        lambda *args, **kwargs: XTokenLossInput(
+            torch.empty(0), {}, {}, {}, {}, None, cp_group, None
+        ),
     )
     monkeypatch.setattr(
         "nemo_rl.algorithms.loss.loss_input.get_cp_sharded_next_token_logprobs",

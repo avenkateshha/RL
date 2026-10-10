@@ -93,16 +93,7 @@ def test_automodel_cp_layout_localizes_xtoken_windows_after_global_shift():
             return_value=(teacher_logits, 0),
         ) as rebuild_teacher,
     ):
-        (
-            student_logits,
-            teachers,
-            sparse_teachers,
-            aligns,
-            dense_reconstruction_fallbacks,
-            tp_group,
-            returned_cp_group,
-            dp_cp_group,
-        ) = prepare_xtoken_cross_tokenizer_loss_input(
+        prepared = prepare_xtoken_cross_tokenizer_loss_input(
             local_logits,
             data,
             teacher_is_cross_tokenizer=[True],
@@ -110,13 +101,16 @@ def test_automodel_cp_layout_localizes_xtoken_windows_after_global_shift():
             cp_sharder=cp_sharder,
         )
 
-    torch.testing.assert_close(student_logits, full_student_logits[:, :3])
-    assert teachers[0] is teacher_logits
-    assert sparse_teachers == {}
-    assert dense_reconstruction_fallbacks == {0: 0}
-    assert tp_group is None
-    assert returned_cp_group is cp_group
-    assert dp_cp_group is None
+    aligns = prepared.aligns_by_idx
+    torch.testing.assert_close(
+        prepared.student_logits_contig, full_student_logits[:, :3]
+    )
+    assert prepared.teacher_full_logits_by_idx[0] is teacher_logits
+    assert prepared.teacher_sparse_logits_by_idx == {}
+    assert prepared.dense_reconstruction_fallbacks_by_idx == {0: 0}
+    assert prepared.tp_group is None
+    assert prepared.cp_group is cp_group
+    assert prepared.dp_cp_group is None
     torch.testing.assert_close(aligns[0].student_input_ids, data["input_ids"][:, :3])
     torch.testing.assert_close(aligns[0].student_token_mask, data["token_mask"][:, :3])
     torch.testing.assert_close(aligns[0].student_chunk_id, torch.tensor([[0, 0, -1]]))
@@ -172,18 +166,17 @@ def test_matrix_free_mixed_teacher_ipc_alignment(sparse):
             return_value=sparse_payload,
         ),
     ):
-        _, dense_teachers, sparse_teachers, aligns, *_ = (
-            prepare_xtoken_cross_tokenizer_loss_input(
-                logits,
-                data,
-                teacher_is_cross_tokenizer=[True, False],
-                cp_sharder=cp_sharder,
-            )
+        prepared = prepare_xtoken_cross_tokenizer_loss_input(
+            logits,
+            data,
+            teacher_is_cross_tokenizer=[True, False],
+            cp_sharder=cp_sharder,
         )
 
-    assert 1 in dense_teachers
-    assert (0 in sparse_teachers) is sparse
-    assert (0 in dense_teachers) is not sparse
+    aligns = prepared.aligns_by_idx
+    assert 1 in prepared.teacher_full_logits_by_idx
+    assert (0 in prepared.teacher_sparse_logits_by_idx) is sparse
+    assert (0 in prepared.teacher_full_logits_by_idx) is not sparse
     torch.testing.assert_close(
         aligns[0].student_spans, torch.tensor([[[0, 1], [1, 2], [2, 3]]])
     )

@@ -467,7 +467,19 @@ def test_megatron_cp_normalization(tp_size: int, cp_size: int) -> None:
         )
 
 
-def test_xtoken_wrapper_keeps_schedule_compensation() -> None:
+@pytest.mark.parametrize(
+    "packed,dynamic,pp,has_packed_metadata,eligible",
+    [
+        (False, False, 1, False, True),
+        (False, False, 2, False, False),
+        (True, False, 1, False, False),
+        (False, True, 1, False, False),
+        (False, False, 1, True, False),
+    ],
+)
+def test_xtoken_wrapper_keeps_schedule_compensation(
+    packed: bool, dynamic: bool, pp: int, has_packed_metadata: bool, eligible: bool
+) -> None:
     from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLossFn
     from nemo_rl.models.megatron import train
 
@@ -479,16 +491,26 @@ def test_xtoken_wrapper_keeps_schedule_compensation() -> None:
         patch.object(train, "get_tensor_model_parallel_group"),
         patch.object(train, "get_context_parallel_group"),
         patch.object(train, "get_context_parallel_world_size", return_value=2),
+        patch.object(train, "get_pipeline_model_parallel_world_size", return_value=pp),
         patch.object(
             train,
             "wrap_loss_fn_with_input_preparation",
             return_value=(torch.tensor(3.0), {}),
-        ),
+        ) as wrapped_loss,
     ):
         wrapped = train.LossPostProcessor(
-            loss_fn, {"sequence_packing": {"enabled": False}}, num_microbatches=4
-        )({})
+            loss_fn,
+            {
+                "sequence_packing": {"enabled": packed},
+                "dynamic_batching": {"enabled": dynamic},
+            },
+            num_microbatches=4,
+        )({}, packed_seq_params=object() if has_packed_metadata else None)
         loss, _ = wrapped(torch.empty(0))
+        assert (
+            wrapped_loss.call_args.kwargs["prepare_fn"].keywords["native_cp_enabled"]
+            is eligible
+        )
     # MCore applies CP / num_microbatches after this compensation.
     torch.testing.assert_close(loss, torch.tensor(6.0))
 
@@ -499,6 +521,7 @@ def test_megatron_loss_input_enables_per_term_cp_normalization(
 ) -> None:
     from nemo_rl.algorithms.loss import loss_input as module
     from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLossFn
+    from nemo_rl.algorithms.x_token.loss_utils import XTokenLossInput
 
     fn = CrossTokenizerDistillationLossFn(
         _config(mode="sum", topk=12, dynamic=False, reverse=False)
@@ -508,7 +531,7 @@ def test_megatron_loss_input_enables_per_term_cp_normalization(
     with patch.object(
         module,
         "prepare_xtoken_cross_tokenizer_loss_input",
-        return_value=(logits, {}, {}, {}, {}, group, None, None),
+        return_value=XTokenLossInput(logits, {}, {}, {}, {}, group, None, None),
     ):
         prepared, _ = module.prepare_loss_input(
             logits, {}, fn, vocab_parallel_group=group

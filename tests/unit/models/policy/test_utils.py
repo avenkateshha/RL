@@ -725,6 +725,28 @@ class TestAggregatePerSampleHandles:
                 ]
             )
 
+    def test_unpacked_aggregation_preserves_occurrence_ids(self):
+        out = aggregate_per_sample_handles(
+            [
+                {"dp_rank": 1, "per_sample_handles": [{"batch_item_id": 19}]},
+                {"dp_rank": 0, "per_sample_handles": [{"batch_item_id": 17}]},
+                {"dp_rank": 0, "per_sample_handles": [{"batch_item_id": 17}]},
+                {"dp_rank": 1, "per_sample_handles": [{"batch_item_id": 19}]},
+            ]
+        )
+        assert [sample["batch_item_id"] for sample in out] == [17, 19]
+        assert [len(sample["teacher_shards"]) for sample in out] == [2, 2]
+
+    @pytest.mark.parametrize("other", [{"batch_item_id": 18}, {}, "legacy"])
+    def test_unpacked_aggregation_rejects_shard_identity_disagreement(self, other):
+        with pytest.raises(ValueError, match="disagree on batch_item_id"):
+            aggregate_per_sample_handles(
+                [
+                    {"dp_rank": 0, "per_sample_handles": [{"batch_item_id": 17}]},
+                    {"dp_rank": 0, "per_sample_handles": [other]},
+                ]
+            )
+
     def test_identity_aware_aggregation_uses_exact_canonical_order(self):
         out = aggregate_per_sample_handles(
             [

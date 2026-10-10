@@ -210,6 +210,9 @@ def prepare_loss_input(
     chunk_size: Optional[int] = None,
     cp_sharder: Optional["ContextParallelSharder"] = None,
     teacher_output_layer_weight_by_index: Optional[dict[int, torch.Tensor]] = None,
+    native_cp_enabled: bool = False,
+    native_sparse_enabled: bool = False,
+    native_same_tokenizer_enabled: bool = False,
 ) -> tuple[dict[str, Any], BatchedDataDict[Any]]:
     """Prepare loss input for a loss function.
 
@@ -232,6 +235,9 @@ def prepare_loss_input(
             ``[V_local, H_teacher]`` teacher LM-head shards, keyed by the stable
             index rows are tagged with. The ``opd_full`` hidden-state path
             projects each row's teacher payload into teacher logits with them.
+        native_cp_enabled: Internal MCore static/unpacked PP1 eligibility.
+        native_sparse_enabled: Internal native sparse loss capability.
+        native_same_tokenizer_enabled: Internal native same-tokenizer capability.
 
     Notes:
         vocab_parallel_rank, vocab_parallel_group, context_parallel_group are only used for megatron policy worker.
@@ -242,6 +248,7 @@ def prepare_loss_input(
     Returns:
         tuple(loss_input, maybe_updated_data)
     """
+    loss_input: dict[str, Any]
     if loss_fn.input_type == LossInputType.LOGIT:
         loss_input = {"logits": logits}
 
@@ -331,41 +338,34 @@ def prepare_loss_input(
         }
 
     elif loss_fn.input_type == LossInputType.DISTILLATION_CROSS_TOKENIZER:
-        # Rebuild each teacher's full-vocab logits from its per-rank CUDA IPC
-        # handles and do the shared CP-resolution the loss needs; the loss fn
-        # does the per-teacher projection / chunk-average / KL reductions and
-        # aggregates them by ``kd_loss_mode``. ``teacher_is_cross_tokenizer`` drives
-        # the teacher count and which teachers are same-tokenizer (``False``). The
-        # TP/CP groups are derived from the student logits' own device mesh.
-        (
-            student_logits_contig,
-            teacher_full_logits_by_idx,
-            teacher_sparse_logits_by_idx,
-            aligns_by_idx,
-            dense_reconstruction_fallbacks_by_idx,
-            tp_group,
-            cp_group,
-            dp_cp_group,
-        ) = prepare_xtoken_cross_tokenizer_loss_input(
+        prepared = prepare_xtoken_cross_tokenizer_loss_input(
             logits,
             data,
             teacher_is_cross_tokenizer=loss_fn.teacher_is_cross_tokenizer,
             vocab_parallel_group=vocab_parallel_group,
             context_parallel_group=context_parallel_group,
             cp_sharder=cp_sharder,
+            native_cp_enabled=native_cp_enabled,
+            native_sparse_enabled=native_sparse_enabled,
+            native_same_tokenizer_enabled=native_same_tokenizer_enabled,
+            student_vocab_size=(
+                loss_fn.student_vocab_size
+                if native_sparse_enabled or native_same_tokenizer_enabled
+                else None
+            ),
         )
         loss_input = {
             "logits": logits,
-            "student_logits_contig": student_logits_contig,
-            "teacher_full_logits_by_idx": teacher_full_logits_by_idx,
-            "teacher_sparse_logits_by_idx": teacher_sparse_logits_by_idx,
-            "aligns_by_idx": aligns_by_idx,
+            "student_logits_contig": prepared.student_logits_contig,
+            "teacher_full_logits_by_idx": prepared.teacher_full_logits_by_idx,
+            "teacher_sparse_logits_by_idx": prepared.teacher_sparse_logits_by_idx,
+            "aligns_by_idx": prepared.aligns_by_idx,
             "dense_reconstruction_fallbacks_by_idx": (
-                dense_reconstruction_fallbacks_by_idx
+                prepared.dense_reconstruction_fallbacks_by_idx
             ),
-            "tp_group": tp_group,
-            "cp_group": cp_group,
-            "dp_cp_group": dp_cp_group,
+            "tp_group": prepared.tp_group,
+            "cp_group": prepared.cp_group,
+            "dp_cp_group": prepared.dp_cp_group,
             # Only the Megatron wrapper replaces its blanket objective /CP
             # with the per-term backward corrections in the xToken loss.
             "megatron_cp_normalize": (
@@ -374,6 +374,12 @@ def prepare_loss_input(
                 and not isinstance(logits, DTensor)
             ),
         }
+        if prepared.native_student is not None:
+            loss_input.update(
+                native_student=prepared.native_student,
+                native_sparse_teachers=prepared.native_sparse_teachers,
+                native_dense_teachers=prepared.native_dense_teachers,
+            )
         if cp_sharder is not None:
             next_token_logprobs = get_cp_sharded_next_token_logprobs(
                 logits,
