@@ -1,0 +1,16 @@
+{"id": "fixture_00", "text": "The cat sat beside the window. A bird landed on the fence."}
+{"id": "fixture_01", "text": "New York and San Francisco have different names and different lengths."}
+{"id": "fixture_02", "text": "The answer is 42. The next numbers are 43, 44, and 45."}
+{"id": "fixture_03", "text": "A short sentence."}
+{"id": "fixture_04", "text": "Whitespace matters: one space,  two spaces, and a\ttab."}
+{"id": "fixture_05", "text": "First line.\nSecond line.\nThird line."}
+{"id": "fixture_06", "text": "Café, naïve, résumé, and jalapeño contain accented letters."}
+{"id": "fixture_07", "text": "Punctuation: (round), [square], {curly}; question? answer!"}
+{"id": "fixture_08", "text": "Case changes: apple Apple APPLE; token Token TOKEN."}
+{"id": "fixture_09", "text": "Identifier example: sample_001 contains value_002 and counter_003."}
+{"id": "fixture_10", "text": "An unusually_long_identifier can split into several pieces."}
+{"id": "fixture_11", "text": "The train arrives at 09:15 and leaves at 09:47."}
+{"id": "fixture_12", "text": "Repeat repeat repeat. Different words follow the repetition."}
+{"id": "fixture_13", "text": "Short words and longer words: a, to, bird, encyclopedia."}
+{"id": "fixture_14", "text": "Quotation marks surround \"a phrase\" and another phrase follows."}
+{"id": "fixture_15", "text": "This final example ends with a complete sentence."}

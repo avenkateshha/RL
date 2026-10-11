@@ -1,0 +1,200 @@
+{
+  "status": "PASS",
+  "recorded_utc": "2026-10-10T23:46:16.158810+00:00",
+  "scope": "Independent read-only audit of actual mixed native sparse/same-tokenizer controller dynamic scaling and complete first-step accumulated optimizer replay. No extra model or GPU execution.",
+  "job": {
+    "id": "19994429",
+    "slurm_state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:07:58"
+  },
+  "ratio_probe": {
+    "status": "PASS",
+    "scope": "Read-only CPU audit of actual captured production metrics and retained independent-reference reports; no model/GPU execution.",
+    "all_controller_reports": 80,
+    "full_cp_microbatch_groups": 20,
+    "first_step_actual_capture_count": 16,
+    "first_step_actual_ratios": [
+      {
+        "dp_rank": 0,
+        "item_ids": [
+          0,
+          1
+        ],
+        "ranks": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "ce": 1.0166115760803223,
+        "kd": 0.07058151066303253,
+        "ratio": 14.403369903564453
+      },
+      {
+        "dp_rank": 0,
+        "item_ids": [
+          2,
+          3
+        ],
+        "ranks": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "ce": 1.3933054208755493,
+        "kd": 0.11377708613872528,
+        "ratio": 12.245923042297363
+      },
+      {
+        "dp_rank": 1,
+        "item_ids": [
+          4,
+          5
+        ],
+        "ranks": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "ce": 1.2054650783538818,
+        "kd": 0.059925079345703125,
+        "ratio": 20.11620330810547
+      },
+      {
+        "dp_rank": 1,
+        "item_ids": [
+          6,
+          7
+        ],
+        "ranks": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "ce": 0.5166152715682983,
+        "kd": 0.05301949009299278,
+        "ratio": 9.743874549865723
+      }
+    ],
+    "counterfactual_whole_step_ratio": 13.898262164945,
+    "ratio_semantics": "One ratio per microbatch and DP replica, shared across its TP/CP ranks, formed from CP-complete CE and weighted KD. Full-step denominators remain108 tokens and178 cross-tokenizer chunks.",
+    "gradient_scope": "Stored dlogits compare against the independent oracle with detached ratio; production source detaches CE and KD before the CP sum and ratio.",
+    "input_and_source_sha256": {
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-first-step/rank0-index.json": "a6445dcaa6f5fef5dc80c220c1eca2bdff4ef23792bebe2a37ba305638aa9fa6",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items0-1-rank0.pt": "bc751528ead14e65ddc4c133ff1624222a73c58a95ae82f5b0110510439ac6d4",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items2-3-rank0.pt": "4074db0fd9e877bb5b1880a430c2f2001c4edeb3c9ac35293b5524d297b53cc6",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-first-step/rank1-index.json": "8887dbca352b7b5f7651450a6954dc68b6df46c52433d59e68e92c3a276dea99",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items0-1-rank1.pt": "36ca759a5a5d919e25a77dae5fe72b61aae1aeefc7d8071b5170619028974679",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items2-3-rank1.pt": "d0711cc6973ee6114bf6f377de6e85530eeda1a6117a6e28e9d1db7e9cedb02a",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-first-step/rank2-index.json": "9f60fec602cb8bd52602ecb699a316e6ef71470857576c51135b038608dfc36f",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items0-1-rank2.pt": "ba4472505322ba78b0d603d916d7a872dfc5809fc1b55456ce3cda26dc01252c",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items2-3-rank2.pt": "ed3611ba6a72bff138485e8b900bc67b04b05f1e7cbabbabd9a98b7fe30ac042",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-first-step/rank3-index.json": "1cea724d5bb7b7d8002f918f46defdc0e46e851bf30e49ae17070a8fca62dac0",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items0-1-rank3.pt": "4dba1e2bce44d60bbab659fbc17dc30dfdf567673a99d3e833b175dd4fdd0fff",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items2-3-rank3.pt": "46a050a0725d9441382974ad83544ac4d98fc62f5436de64b94ce2f7ce792f38",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-first-step/rank4-index.json": "c1f57c3b250f14d8e9c0666f2ddfaec87c526931365ca757281fa22e9a451ee3",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items4-5-rank4.pt": "27c20b7bc48d5fabde94c414ae43d86a6ee4af5ba32d9d6d924d758feeaaf416",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items6-7-rank4.pt": "22925cd6fdfb8148669de9e1e114badf15517e641dbcf00c8066851db0c7f435",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-first-step/rank5-index.json": "b7af06ab1e0b53e7668a234ff469aa5bcb9e23ef6a2ea770ac97aa62dbeadbbc",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items4-5-rank5.pt": "65f419050d199dc458a861f7c0a57280b7e07f68ec4c6b72a6ad889f9482acf3",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items6-7-rank5.pt": "b75bf3c1a4ce3ef30bee8844291e685ce983142d6ead15c6dc7450c282f3681f",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-first-step/rank6-index.json": "5045cff2ee1049af92c57a006783195f79a84572d8ac9a4ebacb1be387116978",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items4-5-rank6.pt": "adb57083724d417a8bbfc780ffbd458d6faa0fd7d6e250304c9f142011fc170c",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items6-7-rank6.pt": "e03ed6140fc6e1afc441272d0c3f0a7f59be0dd6b351296a33339bc7c7f356e2",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-first-step/rank7-index.json": "27f7008bb5de59280e19a167153a9e004b6e9a80de9907fe7bd51b8d546388c9",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items4-5-rank7.pt": "8a848f6bf28764e752462b344412ccbc9cbed6e78b975d65f371f2c39ccf4546",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-reference/items6-7-rank7.pt": "eafb43d0a1959ff664896087cd474d02d37e51f23cb1ddd7bd16c02fad43812c",
+      "nemo_rl/algorithms/loss/loss_functions.py": "44b3752ab8b96ad6e74e71a7c9ac2133a0b988b412624b3305513a1f3510ecb9",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/launcher/reference_capture/model_oracle.py": "dda3b439f64b53f5ab2aa855dc1cb2c62e53d70866dc607239c53f28d5f33e32",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/launcher/reference_capture/controller_reference.py": "7d57c3d061089466a364c590a2c7ebea70ffef17213ca07cd93499bcb617619b"
+    }
+  },
+  "probe_execution": {
+    "command": "bash session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic-independent-audit-20261010/command.txt > session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic-independent-audit-20261010/ratios.log",
+    "working_directory": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+    "exit_code": 0,
+    "command_sha256": "052971909b697b185a94b8d80811ed1bd280a75f1182a3a0278b0e7d9c78146e",
+    "output_sha256": "db9c952c10f4e575ae81ae0caa9176435272e0488fd70a43dc318b3a9967fb89",
+    "provenance": "This saved command was actually executed on the retained completed-run observations."
+  },
+  "controller": {
+    "reports": 80,
+    "training_reports": 48,
+    "evaluation_reports": 32,
+    "native_sparse_teacher_indices": [
+      0
+    ],
+    "native_dense_teacher_indices": [
+      1
+    ],
+    "all_forbidden_layout_calls_zero": true,
+    "max_dlogits_relative_l2": 0.0004322864042739216,
+    "first_step_denominators": {
+      "ce": 108,
+      "kd": 108,
+      "chunks": {
+        "0": 178
+      }
+    }
+  },
+  "optimizer_replay": {
+    "ranks": 8,
+    "microbatches_per_rank": 2,
+    "pinned_initial_forwards_bit_exact": 16,
+    "tp": 2,
+    "cp": 2,
+    "dp": 2,
+    "parameters_per_tp_rank": 98,
+    "elements_per_tp_rank": 617940992,
+    "cp_dp_owners_per_tp_rank": 4,
+    "coverage": "Independently reconstructed exact-once coverage of all actual optimizer shard ranges; each replay owned range matches its actual optimizer capture",
+    "accumulation_dtype": "torch.bfloat16",
+    "gradient_field": "decoupled_grad",
+    "gradient_metrics": {
+      "relative_l2": 0.011820028445504185,
+      "relative_norm": 0.0005727547609964771,
+      "actual_norm_including_tp_replicas": 274.2916022291802,
+      "reference_norm_including_tp_replicas": 274.4487940826408
+    },
+    "relative_l2_limit": 0.02,
+    "relative_norm_limit": 0.02,
+    "tolerances_unchanged": true
+  },
+  "independent_hash_checks": {
+    "microbatch_capture_binaries": 16,
+    "optimizer_gradient_binaries": 8,
+    "source_files": 386,
+    "launcher_files": 15,
+    "resolved_config": 1,
+    "archived_regular_members": 959,
+    "all_archives_and_advertised_actor_stderr_members_verified": true
+  },
+  "lifetime": {
+    "policies": 3,
+    "workers_per_policy": 8,
+    "all_os_identities_backend_cleanups_and_exits_confirmed": true,
+    "actual_worker_placement_records": 24,
+    "host": "pool0-01243",
+    "each_rank_present_once_per_policy": true
+  },
+  "evidence_sha256": {
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/resolved_config.yaml": "06e18f24b782eb9b51f24bd62f63cc428632a040d3e3bb3fe2931f7371c36831",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/manual-final-source-verification.json": "18c17be9604bcdc92f20bcea0a47a60207b71234aef6e54616df0a18eb23eeb1",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/controller-process-exit.json": "3407e09358316d4fbe5244e1cdde159d65949ab22a2ea4a86500123ea9adc918",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/ray-log-snapshot.json": "77410bf0446047713998e3d1e01277fef88fbca545b5666a99439728bc4eab3c",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/replay-rank0.json": "66a2de8cb3641fda2b294a24a50a7007d29bb6a588aff305b691c13ea227c118",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/replay-rank1.json": "5d22e585ab5f6b1e537b7ce38467bda61de72b5a2e49755c8f8319ee64c8f144",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/replay-rank2.json": "8683311fcda7d5d20e443cff19a09d056112ded31d3bfbf94b5d07fccb6dc1fe",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/replay-rank3.json": "116c57a10c62d30b49aacd918f589050951f2af92d6db7cecbd419ce68ee3cdf",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/replay-rank4.json": "6869c8402ec8f42de89d1c81d8fa37f725489b2f9e067c75e235dd920288828f",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/replay-rank5.json": "17067596ba1c4a21577182ba96b6351a12ee928fd7c6bfb68305c378839162eb",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/replay-rank6.json": "dfc4313c6ea761d18b744dc4434b2f5eab4372e7f811eb15a963321d071acdbc",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/replay-rank7.json": "a7a28d55e602dcaa8cd91eee7a08368fd547ea453e055640b56988efbbcecf25"
+  },
+  "larger_memory_tests": "EXCLUDED",
+  "limitations": "Actual production ratios are persisted for all first-step microbatches; all80 reports retain independent reference metrics and runtime comparison PASS. Full accumulated parameter gradients are checked for the first optimizer step; controller separately completed three steps and final evaluation. Stderr absence alone is not used as IPC counter proof."
+}

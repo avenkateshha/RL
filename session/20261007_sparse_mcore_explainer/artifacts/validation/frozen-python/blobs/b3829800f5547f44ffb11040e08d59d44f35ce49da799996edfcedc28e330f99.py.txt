@@ -1,0 +1,16 @@
+"""Require complete focused runtime coverage before actual model execution."""
+import json
+import os
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
+run = Path(os.environ["RUN_DIR"])
+runtime = json.loads((run / "runtime.json").read_text())
+cases = list(ET.parse(run / "preflight-junit.xml").getroot().iter("testcase"))
+counts = {kind: sum(case.find(kind) is not None for case in cases) for kind in ("skipped", "failure", "error")}
+expected = runtime["preflight_expected_tests"]
+passed = bool(cases) and not any(counts.values()) and (expected is None or len(cases) == expected)
+result = {"status": "PASS" if passed else "FAIL", "tests": len(cases), "expected_tests": expected, **counts, "backend": runtime["preflight_backend"], "cuda_visible": runtime["preflight_gpu"], "test_file": runtime["preflight_pytest"], "scope": "Exact cached actor interpreter, isolated from numerical capture and Ray driver address; every focused test must execute without skips", "log": "preflight-pytest.log", "junit": "preflight-junit.xml"}
+(run / "preflight-results.json").write_text(json.dumps(result, indent=2) + "\n")
+print(json.dumps(result), flush=True)
+assert passed, result

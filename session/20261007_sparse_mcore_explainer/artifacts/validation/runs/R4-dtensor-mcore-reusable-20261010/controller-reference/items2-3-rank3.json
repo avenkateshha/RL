@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "rank": 3,
+  "dp_rank": 0,
+  "tp_rank": 1,
+  "cp_rank": 1,
+  "item_ids": [
+    2,
+    3
+  ],
+  "teacher_backends": [
+    [
+      "DTensorPolicyWorkerV2.actual_forward"
+    ],
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ]
+  ],
+  "legacy_sparse_teacher_indices": [
+    0
+  ],
+  "legacy_dense_teacher_indices": [],
+  "native_sparse_teacher_indices": [
+    1
+  ],
+  "native_dense_teacher_indices": [],
+  "production_layout_calls": {
+    "cp_load_balanced_to_contiguous": 1,
+    "rebuild_teacher_sparse_logits_from_ipc": 1,
+    "rebuild_teacher_full_logits_from_ipc": 0,
+    "allgather_cp_contiguous_tensor": 2
+  },
+  "token_denominator": 108.0,
+  "kd_denominator": 108.0,
+  "chunk_denominators": {
+    "0": 178.0,
+    "1": 236.0
+  },
+  "reference_metrics": {
+    "loss": 0.2728066146373749,
+    "ce_loss": 1.39329993724823,
+    "kl_loss": 0.1334766149520874,
+    "kl_loss_scale": 1.0,
+    "accuracy": 0.3870967626571655,
+    "kl_loss_t0": 0.2100987583398819,
+    "kl_loss_t1": 0.10063855350017548,
+    "teacher_0/weighted_kl": 0.06302963197231293,
+    "teacher_1/weighted_kl": 0.07044698297977448
+  },
+  "dlogits": {
+    "relative_l2": 1.7472572881621015e-05,
+    "relative_norm": 8.475995573474117e-06,
+    "absolute_l2": 1.8577231852139093e-08,
+    "reference_norm": 0.0010632224560173415,
+    "max_absolute": 1.5512341633439064e-08
+  },
+  "gradient_kind": "actual controller loss dlogits before MCore schedule scaling and clipping",
+  "reference_kind": "Independent native teacher oracle plus retained CP1 legacy objective on identical full-sequence dense/sparse teacher values; independent CE and aggregation",
+  "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/controller-reference/items2-3-rank3.pt",
+  "capture_sha256": "901e4fca279fa2e09692676fda988d8d20da8680eea9428e00f419e20fb1b536"
+}

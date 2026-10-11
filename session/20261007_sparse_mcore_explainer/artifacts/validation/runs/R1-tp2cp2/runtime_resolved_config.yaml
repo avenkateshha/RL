@@ -1,0 +1,426 @@
+policy:
+  model_name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08
+  tokenizer:
+    name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08
+    chat_template_kwargs: null
+  train_global_batch_size: 4
+  train_micro_batch_size: 2
+  offload_optimizer_for_logprob: true
+  logprob_batch_size: 2
+  logprob_chunk_size: null
+  generation:
+    backend: vllm
+    max_new_tokens: 2048
+    temperature: 1.0
+    top_p: 1.0
+    top_k: null
+    val_temperature: 1.0
+    val_top_p: 1.0
+    val_top_k: null
+    stop_token_ids: null
+    stop_strings: null
+    colocated:
+      enabled: true
+      resources:
+        gpus_per_node: null
+        num_nodes: null
+    port_range_low: 3000
+    port_range_high: 4999
+    vllm_cfg:
+      async_engine: false
+      precision: bfloat16
+      kv_cache_dtype: auto
+      logprobs_mode: processed_logprobs
+      fp32_lm_head: false
+      refit_with_reload_api: false
+      tensor_parallel_size: 1
+      pipeline_parallel_size: 1
+      expert_parallel_size: 1
+      gpu_memory_utilization: 0.6
+      max_model_len: 2048
+      enforce_eager: false
+      use_deep_gemm: false
+      num_last_layers_in_bf16: 0
+      num_first_layers_in_bf16: 0
+      distributed_executor_backend: null
+    vllm_kwargs: {}
+  generation_batch_size: 64
+  precision: bfloat16
+  dtensor_cfg:
+    enabled: false
+    _v2: true
+    checkpoint:
+      model_save_format: safetensors
+      save_consolidated: 'false'
+      single_rank_consolidation: false
+      consolidation_timeout_minutes: 30
+    cpu_offload: false
+    sequence_parallel: false
+    activation_checkpointing: true
+    tensor_parallel_size: 2
+    context_parallel_size: 2
+    custom_parallel_plan: null
+    load_precision: bfloat16
+    shard_before_load: false
+  megatron_cfg:
+    enabled: true
+    empty_unused_memory_level: 0
+    activation_checkpointing: false
+    recompute_granularity: full
+    recompute_modules: null
+    tensor_model_parallel_size: 2
+    pipeline_model_parallel_size: 1
+    num_layers_in_first_pipeline_stage: null
+    num_layers_in_last_pipeline_stage: null
+    context_parallel_size: 2
+    pipeline_dtype: bfloat16
+    sequence_parallel: false
+    freeze_moe_router: true
+    moe_router_dtype: fp64
+    moe_router_load_balancing_type: none
+    moe_router_bias_update_rate: 0.0
+    moe_permute_fusion: true
+    expert_tensor_parallel_size: 1
+    expert_model_parallel_size: 1
+    defer_fp32_logits: false
+    apply_rope_fusion: true
+    bias_activation_fusion: true
+    force_reconvert_from_hf: false
+    moe_per_layer_logging: false
+    moe_enable_deepep: false
+    moe_token_dispatcher_type: alltoall
+    cuda_graph_impl: none
+    cuda_graph_modules: []
+    cuda_graph_warmup_steps: 3
+    moe_shared_expert_overlap: false
+    fine_grained_activation_offloading: false
+    offload_modules: null
+    use_gloo_process_groups: false
+    optimizer:
+      optimizer: adam
+      lr: 5.0e-06
+      min_lr: 5.0e-06
+      weight_decay: 0.001
+      bf16: true
+      fp16: false
+      params_dtype: float32
+      adam_beta1: 0.9
+      adam_beta2: 0.95
+      adam_eps: 1.0e-08
+      sgd_momentum: 0.9
+      use_distributed_optimizer: true
+      use_precision_aware_optimizer: true
+      clip_grad: 1.0
+      optimizer_cpu_offload: false
+      optimizer_offload_fraction: 0.0
+      overlap_cpu_optimizer_d2h_h2d: false
+    scheduler:
+      start_weight_decay: 0.001
+      end_weight_decay: 0.001
+      weight_decay_incr_style: constant
+      lr_decay_style: constant
+      lr_decay_iters: 3
+      lr_warmup_iters: 0
+      lr_warmup_init: 5.0e-06
+    distributed_data_parallel_config:
+      grad_reduce_in_fp32: false
+      overlap_grad_reduce: true
+      overlap_param_gather: true
+      use_custom_fsdp: false
+      data_parallel_sharding_strategy: optim_grads_params
+    checkpoint:
+      async_save: false
+      ckpt_assume_constant_structure: false
+    gradient_accumulation_fusion: false
+    use_fused_weighted_squared_relu: false
+    fp32_lm_head: false
+    fp8_cfg:
+      enabled: false
+      fp8: e4m3
+      fp8_recipe: blockwise
+      fp8_param: false
+  router_replay:
+    enabled: false
+  dynamic_batching:
+    enabled: false
+    train_mb_tokens: 2048
+    logprob_mb_tokens: 2048
+    sequence_length_round: 64
+  sequence_packing:
+    enabled: false
+    fuse_loss: false
+    train_mb_tokens: 2048
+    logprob_mb_tokens: 2048
+    algorithm: modified_first_fit_decreasing
+    microbatch_order: packer
+    sequence_length_round: 64
+  make_sequence_length_divisible_by: 8
+  max_total_sequence_length: 256
+  max_grad_norm: 1.0
+  freeze_parameter_patterns: null
+  optimizer:
+    name: torch.optim.AdamW
+    kwargs:
+      lr: 5.0e-05
+      weight_decay: 0.001
+      betas:
+      - 0.9
+      - 0.95
+      eps: 1.0e-08
+      foreach: false
+      fused: false
+  scheduler:
+  - name: torch.optim.lr_scheduler.LinearLR
+    kwargs:
+      start_factor: 0.02
+      end_factor: 1.0
+      total_iters: 250
+  - name: torch.optim.lr_scheduler.CosineAnnealingLR
+    kwargs:
+      T_max: 4750
+      eta_min: 0.0
+  - milestones:
+    - 250
+teachers:
+- is_cross_tokenizer: true
+  aligner:
+    projection_matrix_path: null
+    drop_first_assistant_chunk_kl: false
+    pseudo_target_path: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/guihongl/nemo_rl_mcore/projection/subtoks_llama3p2_1b_qwen3_4b_fwd.pt
+    reverse_pseudo_target_path: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/guihongl/nemo_rl_mcore/projection/subtoks_llama3p2_1b_qwen3_4b_rev.pt
+  weight: 1.0
+  model_name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c
+  tokenizer:
+    name: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c
+  train_global_batch_size: 4
+  train_micro_batch_size: 1
+  logprob_batch_size: 1
+  max_total_sequence_length: 256
+  make_sequence_length_divisible_by: 8
+  precision: bfloat16
+  logprob_chunk_size: null
+  offload_optimizer_for_logprob: false
+  dtensor_cfg:
+    enabled: false
+    _v2: true
+    checkpoint:
+      model_save_format: safetensors
+      save_consolidated: 'false'
+    cpu_offload: false
+    sequence_parallel: false
+    activation_checkpointing: true
+    tensor_parallel_size: 2
+    context_parallel_size: 2
+    custom_parallel_plan: null
+    load_precision: bfloat16
+    shard_before_load: false
+  megatron_cfg:
+    enabled: true
+    empty_unused_memory_level: 0
+    activation_checkpointing: false
+    recompute_granularity: full
+    recompute_modules: null
+    tensor_model_parallel_size: 2
+    expert_tensor_parallel_size: 1
+    expert_model_parallel_size: 1
+    pipeline_model_parallel_size: 1
+    num_layers_in_first_pipeline_stage: null
+    num_layers_in_last_pipeline_stage: null
+    context_parallel_size: 2
+    pipeline_dtype: bfloat16
+    sequence_parallel: false
+    freeze_moe_router: true
+    moe_router_dtype: fp64
+    moe_router_load_balancing_type: none
+    moe_router_bias_update_rate: 0.0
+    moe_permute_fusion: true
+    apply_rope_fusion: true
+    bias_activation_fusion: true
+    defer_fp32_logits: false
+    moe_per_layer_logging: false
+    moe_enable_deepep: false
+    moe_token_dispatcher_type: alltoall
+    moe_shared_expert_overlap: false
+    use_gloo_process_groups: false
+    gradient_accumulation_fusion: false
+    use_fused_weighted_squared_relu: false
+    checkpoint:
+      async_save: false
+      ckpt_assume_constant_structure: false
+    force_reconvert_from_hf: false
+    optimizer:
+      optimizer: adam
+      lr: 5.0e-06
+      min_lr: 5.0e-06
+      weight_decay: 0.001
+      bf16: true
+      fp16: false
+      params_dtype: float32
+      adam_beta1: 0.9
+      adam_beta2: 0.95
+      adam_eps: 1.0e-08
+      sgd_momentum: 0.9
+      use_distributed_optimizer: true
+      use_precision_aware_optimizer: true
+      optimizer_cpu_offload: false
+      optimizer_offload_fraction: 0.0
+      clip_grad: 1.0
+    scheduler:
+      start_weight_decay: 0.001
+      end_weight_decay: 0.001
+      weight_decay_incr_style: constant
+      lr_decay_style: constant
+      lr_decay_iters: 3
+      lr_warmup_iters: 0
+      lr_warmup_init: 5.0e-06
+    distributed_data_parallel_config:
+      grad_reduce_in_fp32: false
+      overlap_grad_reduce: true
+      overlap_param_gather: true
+      use_custom_fsdp: false
+      data_parallel_sharding_strategy: optim_grads_params
+    fp8_cfg:
+      enabled: false
+      fp8: e4m3
+      fp8_recipe: blockwise
+      fp8_param: false
+  max_grad_norm: 1.0
+  dynamic_batching:
+    enabled: false
+    train_mb_tokens: 2048
+    logprob_mb_tokens: 2048
+    sequence_length_round: 64
+  sequence_packing:
+    enabled: false
+    train_mb_tokens: 2048
+    logprob_mb_tokens: 2048
+    algorithm: modified_first_fit_decreasing
+    microbatch_order: packer
+    sequence_length_round: 64
+    fuse_loss: false
+  optimizer:
+    name: torch.optim.AdamW
+    kwargs:
+      lr: 5.0e-05
+      weight_decay: 0.001
+      betas:
+      - 0.9
+      - 0.95
+      eps: 1.0e-08
+      foreach: false
+      fused: false
+loss_fn:
+  temperature: 1.0
+  vocab_topk: 64
+  reverse_kl: false
+  kl_loss_weight: 1.0
+  ce_loss_scale: 0.1
+  dynamic_loss_scaling: false
+  kd_loss_mode: sum
+  normalize_teacher_by_vocab: false
+  alpha: 1.0
+  sum_weights_metric: null
+  kl_chunk_shift: true
+  common_indices_from_subtoks: true
+  prefix_bidir_v3_position_0_kl: false
+  prefix_bidir_v3_loss_fn: kl
+  prefix_bidir_v3_jsd_beta: 0.5
+  prefix_bidir_v3_last_pos_loss_fn: null
+  prefix_bidir_v3_mismatch_pos0_alpha: 0.0
+  prefix_bidir_v3_mismatch_loss_beta: 1.0
+  prefix_bidir_v3_noise_filter_topk: 0
+  teacher_topk_ipc_k: 64
+  teacher_topk_ipc_support_mode: row_topk
+  teacher_topk_ipc_keep_realized: true
+  kl_type: mixed
+  mixed_kl_weight: 0.5
+  zero_outside_topk: false
+data:
+  max_input_seq_length: 256
+  shuffle: true
+  num_workers: 0
+  train:
+    dataset_name: arrow_text
+    split: train
+    processor: kd_data_processor
+    split_validation_size: 0.0
+    seed: 1234
+    data_files: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/examples.jsonl
+    text_key: text
+    characters_per_sample: null
+  validation:
+    dataset_name: arrow_text
+    split: train
+    processor: kd_data_processor
+    split_validation_size: 0.0
+    seed: 1234
+    data_files: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/examples.jsonl
+    text_key: text
+    characters_per_sample: null
+  default:
+    prompt_file: examples/prompts/cot.txt
+    system_prompt_file: null
+    env_name: math
+collator:
+  mode: text
+  include_thinking_in_loss: false
+  native_thinking_alignment: false
+  kd_alignment_regions: null
+  num_packed_rows: 1
+distillation:
+  num_prompts_per_step: 4
+  max_num_steps: 3
+  max_num_epochs: 6
+  seed: 1234
+  val_period: 0
+  val_at_start: false
+  val_at_end: true
+  offload_student_after_step: true
+  num_generations_per_prompt: 1
+  max_rollout_turns: 1
+  val_batch_size: 64
+  max_val_samples: 512
+  topk_logits_k: 64
+logger:
+  log_dir: /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/training-logs
+  wandb_enabled: false
+  swanlab_enabled: false
+  tensorboard_enabled: false
+  mlflow_enabled: false
+  wandb:
+    project: x_token
+    name: xtoken-off-policy-distillation
+    log_nemo_gym_full_result_tables: false
+  tensorboard:
+    log_dir: tb_logs-xtoken-off-policy-distillation
+  swanlab:
+    project: x_token
+    name: xtoken-off-policy-distillation
+  mlflow:
+    experiment_name: distillation-dev
+    run_name: distillation-math-cl-logger
+    tracking_uri: http://localhost:5000
+  monitor_gpus: false
+  gpu_monitoring:
+    collection_interval: 10
+    flush_interval: 10
+  num_val_samples_to_print: 0
+cluster:
+  gpus_per_node: 4
+  num_nodes: 1
+  master_port_range_low: 1400
+  master_port_range_high: 1999
+  segment_size: null
+checkpointing:
+  enabled: false
+  checkpoint_dir: checkpoints/xtoken-off-policy-distillation
+  metric_name: train:loss
+  higher_is_better: false
+  save_period: 600
+  keep_top_k: 3
+  checkpoint_must_save_by: null
+  save_optimizer: true
+teacher: null
+env:
+  math:
+    num_workers: 8

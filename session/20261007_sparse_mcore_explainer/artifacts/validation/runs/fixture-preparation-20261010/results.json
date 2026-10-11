@@ -1,0 +1,105 @@
+{
+  "status": "PASS",
+  "started_utc": "2026-10-10T19:51:23.299048+00:00",
+  "python": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/.venv/bin/python3",
+  "torch": "2.11.0+cu130",
+  "builder_sha256": "1b6314ce7ef39dcde749436fcd94cca96cab51f278acf3c514fc2aeaea81e4ca",
+  "builder_options": {
+    "N_max": 8,
+    "use_exact_match": true,
+    "use_special_role_map": true,
+    "canonicalize": true
+  },
+  "tables": [
+    {
+      "teacher": "teacher_b",
+      "direction": "fwd",
+      "source": "student",
+      "destination": "teacher_b",
+      "source_revision": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "destination_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/tables/subtoks_llama3p2_1b_smollm2_1p7b_fwd.pt",
+      "sha256": "cea74664f31b8fa7ef93ec20392964e8a181761757f179fb2d6799e8747b24ed",
+      "rows": 128256,
+      "mapped_rows": 127996,
+      "status": "PASS"
+    },
+    {
+      "teacher": "teacher_b",
+      "direction": "rev",
+      "source": "teacher_b",
+      "destination": "student",
+      "source_revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "destination_revision": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/tables/subtoks_llama3p2_1b_smollm2_1p7b_rev.pt",
+      "sha256": "9e5eb1c9e0ce5b26092df622df2f1d31d00101ba54478977b22c3d40b53000f2",
+      "rows": 49152,
+      "mapped_rows": 49136,
+      "status": "PASS"
+    },
+    {
+      "teacher": "teacher_a",
+      "direction": "fwd",
+      "source": "student",
+      "destination": "teacher_a",
+      "source_revision": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "destination_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "historical_exact_subtoks_match": true,
+      "historical_exact_lengths_match": true,
+      "historical_rows_different": 0,
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/guihongl/nemo_rl_mcore/projection/subtoks_llama3p2_1b_qwen3_4b_fwd.pt",
+      "sha256": "2863369b43f250983b5109b5bd8c367503c24dbd98ceac6ae6233cce49d400ac",
+      "rows": 128256,
+      "mapped_rows": 128001,
+      "status": "PASS"
+    },
+    {
+      "teacher": "teacher_a",
+      "direction": "rev",
+      "source": "teacher_a",
+      "destination": "student",
+      "source_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "destination_revision": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "historical_exact_subtoks_match": true,
+      "historical_exact_lengths_match": true,
+      "historical_rows_different": 0,
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/guihongl/nemo_rl_mcore/projection/subtoks_llama3p2_1b_qwen3_4b_rev.pt",
+      "sha256": "bf2401d4a00e27b070f9a3c512bd2b081305f0ae716c149ad1b626361e2cc76f",
+      "rows": 151669,
+      "mapped_rows": 151644,
+      "status": "PASS"
+    }
+  ],
+  "tokenizer_fingerprints": "PASS",
+  "completed_utc": "2026-10-10T19:51:39.974262+00:00",
+  "production_collator": {
+    "status": "PASS",
+    "corpus_rows": 16,
+    "artifact": "collated_corpus.json",
+    "mode": "text",
+    "sequence_length_limit": 256,
+    "pad_divisibility": {
+      "student": 8,
+      "teacher_a": 8,
+      "teacher_b": 16,
+      "teacher_c": 8
+    },
+    "sample_ids": "Original fixture id carried through sample_id; production adapter resolves id equivalently.",
+    "aligners": "Independent Qwen and SmolLM2 TokenAligner, same-tokenizer direct reuse",
+    "sha256": "98e2632982adbc3aead495709f92b6cd68b9305c45b8e9433565e0f80e291b6b",
+    "padded_shapes": {
+      "student": [
+        16,
+        24
+      ],
+      "teacher_a": [
+        16,
+        24
+      ],
+      "teacher_b": [
+        16,
+        32
+      ]
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "root_head": "09de9ec5558f6768aab8bf105e933528432f1d37",
+  "recorded_utc": "2026-10-10T20:09:10.864153+00:00",
+  "file_sha256": {
+    "nemo_rl/distributed/selected_logprobs.py": "a24479ec817ae1b0edc2e5a71f9b2766f85a40f074eeda881a63bc16157e41e0",
+    "nemo_rl/distributed/sparse_topk.py": "907af32e81e3cae6d22e9717503c515b5d45cb7365d0b390ec821f9de0e0f22e",
+    "nemo_rl/algorithms/x_token/sparse_teacher.py": "69ac0df3e1291017a9978bd22fb4469823002c8e54c1bed9cde5552e976d0ec3",
+    "tests/unit/distributed/test_native_sparse_primitives.py": "b5fbd1503135a3b2adbcadae550503e493b5637b776ea907f3081bf8c4cf1f40",
+    "tests/unit/distributed/test_native_sparse_reader.py": "45ec6d3ae9fe3b1400aef6ff421bb9cc81969d04cb378fb56c93ee6827f4a392"
+  },
+  "dependency_source_provenance": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/runtime/source-provenance.json",
+  "test_count": 39,
+  "expected_cuda_nccl_cases": 4,
+  "tp_cp_grids": [
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      1
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      2
+    ]
+  ],
+  "tolerances": {
+    "value_atol": 1e-06,
+    "preclip_gradient_atol": 2e-06
+  },
+  "scope": "Distributed sparse topK/logZ and selected probability/gradient primitives plus tensor-backed reader; actual CUDA IPC deferred Stage3."
+}

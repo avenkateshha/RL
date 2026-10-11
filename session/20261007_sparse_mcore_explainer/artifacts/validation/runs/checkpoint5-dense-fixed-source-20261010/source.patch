@@ -1,0 +1,624 @@
+diff --git a/nemo_rl/algorithms/x_token/loss_utils.py b/nemo_rl/algorithms/x_token/loss_utils.py
+index 9dac57efb..31c1341fd 100644
+--- a/nemo_rl/algorithms/x_token/loss_utils.py
++++ b/nemo_rl/algorithms/x_token/loss_utils.py
+@@ -58,6 +58,10 @@ from nemo_rl.distributed.model_utils import (
+     vocab_parallel_argmax,
+ )
+ from nemo_rl.distributed.selected_logprobs import cp_native_global_positions
++from nemo_rl.utils.reusable_cuda_ipc import (
++    ReusableCudaIPCDescriptor,
++    open_reusable_cuda_ipc,
++)
+ 
+ if TYPE_CHECKING:
+     from nemo_automodel.components.distributed.context_parallel import (
+@@ -564,12 +568,25 @@ def collect_overlapping_teacher_shards(
+     return matches
+ 
+ 
++def _open_dense_teacher_ipc_storage(payload: Any, device: int) -> torch.Tensor:
++    """Map a dense slab while retaining its owner in every returned tensor view."""
++    if isinstance(payload, ReusableCudaIPCDescriptor):
++        if payload.dtype != torch.float32 or len(payload.shape) not in (2, 4):
++            raise ValueError(
++                "Reusable dense teacher IPC requires an FP32 2D or 4D slab"
++            )
++        return open_reusable_cuda_ipc(payload, device).detach()
++    # Policy utils imports loss utilities through worker modules; keep this deferred.
++    from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
++
++    return rebuild_cuda_tensor_from_ipc(payload, device).detach()
++
++
+ def _rebuild_compact_teacher_ipc_storage(
+     handle: Mapping[str, Any], device: int
+ ) -> tuple[torch.Tensor, tuple[int, int, int, int]]:
+     """Map and validate one compact producer slab without copying it."""
+     from nemo_rl.models.policy.utils import (
+-        rebuild_cuda_tensor_from_ipc,
+         validate_compact_teacher_ipc_handle,
+     )
+ 
+@@ -579,7 +596,7 @@ def _rebuild_compact_teacher_ipc_storage(
+     _token_offset, stored_seq_len, _used_tokens, _local_vocab_size = compact_geometry
+     if stored_seq_len <= 0:
+         raise ValueError("A zero-length compact IPC row has no storage to rebuild.")
+-    src_full = rebuild_cuda_tensor_from_ipc(handle["payload_ipc"], device).detach()
++    src_full = _open_dense_teacher_ipc_storage(handle["payload_ipc"], device)
+     expected_storage_shape = tuple(int(value) for value in handle["storage_shape"])
+     if tuple(src_full.shape) != expected_storage_shape or src_full.ndim != 2:
+         raise ValueError(
+@@ -599,7 +616,6 @@ def _rebuild_compact_teacher_ipc_storage(
+ def _rebuild_teacher_ipc_row(handle: Mapping[str, Any], device: int) -> torch.Tensor:
+     """Return the physically stored ``[T_stored, V_local]`` row view."""
+     from nemo_rl.models.policy.utils import (
+-        rebuild_cuda_tensor_from_ipc,
+         validate_compact_teacher_ipc_handle,
+     )
+ 
+@@ -611,7 +627,7 @@ def _rebuild_teacher_ipc_row(handle: Mapping[str, Any], device: int) -> torch.Te
+         src_full, _ = _rebuild_compact_teacher_ipc_storage(handle, device)
+         return src_full[token_offset : token_offset + stored_seq_len, :local_vocab_size]
+ 
+-    src_full = rebuild_cuda_tensor_from_ipc(handle["payload_ipc"], device).detach()
++    src_full = _open_dense_teacher_ipc_storage(handle["payload_ipc"], device)
+     actual_shape = handle["actual_shape"]
+     if (
+         not isinstance(actual_shape, (list, tuple, torch.Size))
+@@ -701,8 +717,6 @@ def _try_zero_copy_teacher_logits(
+     """
+     if not per_sample_entries:
+         return None
+-    from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
+-
+     first_shards = per_sample_entries[0]["teacher_shards"]
+     if not first_shards:
+         return None
+@@ -798,7 +812,7 @@ def _try_zero_copy_teacher_logits(
+         ):
+             return None
+ 
+-    src_full = rebuild_cuda_tensor_from_ipc(payload, device).detach()
++    src_full = _open_dense_teacher_ipc_storage(payload, device)
+     seq_lo = student_seq_start - teacher_seq_start
+     seq_hi = student_seq_end - teacher_seq_start
+     return src_full[buf_idx, : len(chosen), seq_lo:seq_hi, :full_vocab_size]
+@@ -867,6 +881,52 @@ def rebuild_teacher_sparse_logits_from_ipc(
+     """Rebuild full-sequence sparse teacher payloads from per-CP-shard IPC."""
+     from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
+ 
++    # A rebuild is one teacher's one loss invocation. Cache whole mappings only
++    # inside this call; descriptors include owner/device/storage identity.
++    opened: dict[ReusableCudaIPCDescriptor, torch.Tensor] = {}
++
++    def read_field(shard: dict[str, Any], field: str) -> torch.Tensor:
++        handle = shard[field]
++        if not isinstance(handle, ReusableCudaIPCDescriptor):
++            return rebuild_cuda_tensor_from_ipc(handle, device).detach()
++        sample_index = shard.get("ipc_sample_index")
++        shape = tuple(shard["topk_shape"])
++        if (
++            type(sample_index) is not int
++            or sample_index < 0
++            or len(shape) != 2
++            or any(type(size) is not int or size <= 0 for size in shape)
++        ):
++            raise ValueError(
++                "Reusable legacy sparse IPC requires a valid sample index and top-k shape"
++            )
++        rank = 3 if field in ("topk_logits_ipc", "topk_indices_ipc") else 2
++        allowed_dtypes = {
++            "topk_logits_ipc": (torch.float32,),
++            "topk_indices_ipc": (torch.int32,),
++            "log_z_ipc": (torch.float32,),
++            "gt_in_topk_ipc": (torch.int32, torch.bool),
++        }
++        if handle.dtype not in allowed_dtypes[field]:
++            raise ValueError("Reusable legacy sparse IPC has an invalid field dtype")
++        if (
++            len(handle.shape) != rank
++            or sample_index >= handle.shape[0]
++            or shape[0] > handle.shape[1]
++            or (rank == 3 and shape[1] > handle.shape[2])
++        ):
++            raise ValueError(
++                "Reusable legacy sparse IPC slice exceeds its backing slab"
++            )
++        if handle not in opened:
++            opened[handle] = open_reusable_cuda_ipc(handle, device)
++        source = opened[handle]
++        return (
++            source[sample_index, : shape[0], : shape[1]]
++            if rank == 3
++            else source[sample_index, : shape[0]]
++        ).detach()
++
+     if not per_sample_entries:
+         raise ValueError("Sparse teacher IPC payload is empty.")
+ 
+@@ -914,44 +974,26 @@ def rebuild_teacher_sparse_logits_from_ipc(
+ 
+         per_sample_logits.append(
+             torch.cat(
+-                [
+-                    rebuild_cuda_tensor_from_ipc(
+-                        shard["topk_logits_ipc"], device
+-                    ).detach()
+-                    for shard in shards
+-                ],
++                [read_field(shard, "topk_logits_ipc") for shard in shards],
+                 dim=0,
+             )
+         )
+         per_sample_indices.append(
+             torch.cat(
+-                [
+-                    rebuild_cuda_tensor_from_ipc(
+-                        shard["topk_indices_ipc"], device
+-                    ).detach()
+-                    for shard in shards
+-                ],
++                [read_field(shard, "topk_indices_ipc") for shard in shards],
+                 dim=0,
+             )
+         )
+         per_sample_log_z.append(
+             torch.cat(
+-                [
+-                    rebuild_cuda_tensor_from_ipc(shard["log_z_ipc"], device).detach()
+-                    for shard in shards
+-                ],
++                [read_field(shard, "log_z_ipc") for shard in shards],
+                 dim=0,
+             )
+         )
+         if has_gt_in_topk:
+             per_sample_gt_in_topk.append(
+                 torch.cat(
+-                    [
+-                        rebuild_cuda_tensor_from_ipc(
+-                            shard["gt_in_topk_ipc"], device
+-                        ).detach()
+-                        for shard in shards
+-                    ],
++                    [read_field(shard, "gt_in_topk_ipc") for shard in shards],
+                     dim=0,
+                 )
+             )
+diff --git a/nemo_rl/algorithms/x_token/native_same_tokenizer.py b/nemo_rl/algorithms/x_token/native_same_tokenizer.py
+index ea15a62a4..689f21300 100644
+--- a/nemo_rl/algorithms/x_token/native_same_tokenizer.py
++++ b/nemo_rl/algorithms/x_token/native_same_tokenizer.py
+@@ -251,7 +251,7 @@ def compute_native_same_tokenizer_kl(
+     )
+     batch, sequence = torch.nonzero(mask != 0, as_tuple=True)
+     if not full_vocab and k == 0:
+-        return logits.sum() * 0
++        return logits.sum(dtype=torch.float32) * 0
+     geometry = _KLGeometry(
+         temperature=temperature,
+         reverse=loss_fn.reverse_kl,
+diff --git a/nemo_rl/algorithms/xtoken_off_policy_distillation.py b/nemo_rl/algorithms/xtoken_off_policy_distillation.py
+index 69f689b0f..8af89e04b 100644
+--- a/nemo_rl/algorithms/xtoken_off_policy_distillation.py
++++ b/nemo_rl/algorithms/xtoken_off_policy_distillation.py
+@@ -2110,8 +2110,9 @@ def export_teacher_logits_and_pack(
+     student steps and are released at enclosing train/validation exit or error.
+     Shared by the train loop and ``validate`` so the forward+pack sequence can't
+     drift between them. ``reusable_dense_ipc`` is an internal capability of the
+-    native student consumer; eligible same-tokenizer Megatron teachers retain
+-    their dense row layout while exporting explicitly owned reusable handles.
++    native student consumer; eligible Megatron teachers retain their dense row
++    layout while exporting explicitly owned reusable handles to same-tokenizer
++    or legacy cross-tokenizer readers.
+     """
+     occurrence_ids = batch.get("batch_item_id")
+     if batch_uid is not None:
+@@ -2204,7 +2205,6 @@ def export_teacher_logits_and_pack(
+             packing_side_id=f"teacher_{i}" if packing_plan is not None else None,
+             reusable_dense_ipc=(
+                 reusable_dense_ipc
+-                and same_vocab
+                 and packing_plan is None
+                 and _supports_native_xtoken_rows(teacher_policy)
+             ),
+diff --git a/nemo_rl/distributed/worker_groups.py b/nemo_rl/distributed/worker_groups.py
+index 0f70c55ca..db4025bfa 100644
+--- a/nemo_rl/distributed/worker_groups.py
++++ b/nemo_rl/distributed/worker_groups.py
+@@ -1231,7 +1231,9 @@ class RayWorkerGroup:
+         """Capture OS identities before exposing reusable IPC to healthy workers.
+ 
+         Ray's built-in ``__ray_call__`` executes in each actor without requiring
+-        a new worker API. Failure to capture every worker raises before any IPC
++        a new worker API. Pass the callback by name because driver metadata for
++        actors with isolated dependencies may contain only **kwargs. Failure
++        to capture every worker raises before any IPC
+         consumer may start. Call again before a new lifetime if workers change.
+         """
+         if not self._workers:
+@@ -1248,7 +1250,7 @@ class RayWorkerGroup:
+         # Retain their earlier identity snapshot for failure cleanup.
+         processes = ray.get(
+             [
+-                worker.__ray_call__.remote(capture_worker_process)
++                worker.__ray_call__.remote(fn=capture_worker_process)
+                 for worker in self._workers
+             ],
+             timeout=timeout,
+diff --git a/nemo_rl/models/policy/lm_policy.py b/nemo_rl/models/policy/lm_policy.py
+index 940d57050..d2fb043e8 100644
+--- a/nemo_rl/models/policy/lm_policy.py
++++ b/nemo_rl/models/policy/lm_policy.py
+@@ -889,9 +889,10 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
+         Packed xToken callers must supply the controller-owned plan and side ID;
+         this method never recomputes membership locally.
+ 
+-        Native same-tokenizer consumers opt into reusable producer-owned handles
+-        through the internal ``reusable_ipc`` argument. Dense values and shard
+-        layout are unchanged; the legacy export remains the default.
++        Compatible native and legacy dense consumers opt into reusable
++        producer-owned handles through the internal ``reusable_ipc`` argument.
++        Dense values and shard layout are unchanged; Torch IPC remains the
++        default export.
+         """
+         if self.use_dynamic_batches:
+             raise NotImplementedError(
+diff --git a/nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py b/nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py
+index 4a5cc5f66..152e0d4c1 100644
+--- a/nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py
++++ b/nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py
+@@ -71,7 +71,6 @@ from nemo_rl.models.policy.interfaces import (
+ from nemo_rl.models.policy.utils import (
+     ensure_teacher_ipc_buffer,
+     extract_batch_item_ids,
+-    get_handle_from_tensor,
+     get_runtime_env_for_policy_worker,
+ )
+ from nemo_rl.models.policy.workers.base_policy_worker import AbstractPolicyWorker
+@@ -88,6 +87,10 @@ from nemo_rl.telemetry.setup import (
+     traced_worker_init,
+ )
+ from nemo_rl.utils.grad_norm import warn_if_inf_grad_norm
++from nemo_rl.utils.reusable_cuda_ipc import (
++    allocate_reusable_cuda_tensor,
++    get_reusable_cuda_ipc_handle,
++)
+ from nemo_rl.utils.nsys import wrap_with_nvtx_name
+ from nemo_rl.utils.packed_tensor import packed_broadcast_producer
+ from nemo_rl.utils.timer import Timer
+@@ -1169,6 +1172,16 @@ class DTensorPolicyWorkerV2Impl(
+ 
+         if not output_logits:
+             raise RuntimeError("No valid microbatches produced sparse teacher logits.")
++        tp_rank = self.tp_mesh.get_local_rank()
++        dp_rank = self.dp_mesh.get_local_rank()
++        if tp_rank != 0:
++            # All ranks completed forward/top-k/CP collectives above. Only TP0
++            # is collected by Policy; other ranks must not allocate or export.
++            return {
++                "per_sample_handles": [],
++                "dp_rank": dp_rank,
++                "sparse_ipc_publisher": False,
++            }
+         final_logits = torch.cat(output_logits, dim=0)
+         final_indices = torch.cat(output_indices, dim=0)
+         final_log_z = torch.cat(output_log_z, dim=0)
+@@ -1198,7 +1211,9 @@ class DTensorPolicyWorkerV2Impl(
+                 or storage.device != source.device
+             )
+             if needs_reallocation:
+-                storage = torch.empty_like(source)
++                storage = allocate_reusable_cuda_tensor(
++                    tuple(source.shape), dtype=source.dtype, device=source.device
++                )
+             target = storage[tuple(slice(0, size) for size in source.shape)]
+             target.copy_(source)
+             sparse_storage.append(storage)
+@@ -1234,17 +1249,20 @@ class DTensorPolicyWorkerV2Impl(
+         )
+ 
+         cp_rank = self.cp_mesh.get_local_rank()
+-        dp_rank = self.dp_mesh.get_local_rank()
+         global_seq_start = cp_rank * final_logits.shape[1]
++        descriptors = [
++            get_reusable_cuda_ipc_handle(storage) for storage in sparse_storage
++        ]
+         per_sample_handles: list[dict[str, Any]] = []
+         for sample_idx in range(final_logits.shape[0]):
+             logits_sample = final_logits[sample_idx]
+             indices_sample = final_indices[sample_idx]
+             log_z_sample = final_log_z[sample_idx]
+             handle: dict[str, Any] = {
+-                "topk_logits_ipc": get_handle_from_tensor(logits_sample),
+-                "topk_indices_ipc": get_handle_from_tensor(indices_sample),
+-                "log_z_ipc": get_handle_from_tensor(log_z_sample),
++                "topk_logits_ipc": descriptors[0],
++                "topk_indices_ipc": descriptors[1],
++                "log_z_ipc": descriptors[2],
++                "ipc_sample_index": sample_idx,
+                 "topk_shape": tuple(logits_sample.shape),
+                 "topk_dtype": logits_sample.dtype,
+                 "indices_dtype": indices_sample.dtype,
+@@ -1258,12 +1276,16 @@ class DTensorPolicyWorkerV2Impl(
+                 gt_sample = final_gt_in_topk[sample_idx]
+                 handle.update(
+                     {
+-                        "gt_in_topk_ipc": get_handle_from_tensor(gt_sample),
++                        "gt_in_topk_ipc": descriptors[3],
+                         "gt_in_topk_dtype": gt_sample.dtype,
+                     }
+                 )
+             per_sample_handles.append(handle)
+-        return {"per_sample_handles": per_sample_handles, "dp_rank": dp_rank}
++        return {
++            "per_sample_handles": per_sample_handles,
++            "dp_rank": dp_rank,
++            "sparse_ipc_publisher": True,
++        }
+ 
+     def release_ipc_buffer(self) -> None:
+         """Free the persistent teacher-logit IPC storage. Called once at end of training/validation."""
+diff --git a/nemo_rl/models/policy/workers/megatron_policy_worker.py b/nemo_rl/models/policy/workers/megatron_policy_worker.py
+index 845933906..aa930b03e 100644
+--- a/nemo_rl/models/policy/workers/megatron_policy_worker.py
++++ b/nemo_rl/models/policy/workers/megatron_policy_worker.py
+@@ -3082,9 +3082,10 @@ class MegatronPolicyWorkerImpl(
+         by :class:`FullLogitsPostProcessor` and streamed directly into the
+         persistent IPC slab.
+ 
+-        ``reusable_ipc`` opts native dense readers into producer-owned raw CUDA
+-        slabs and reusable descriptors. Values, layout and row metadata stay
+-        identical; legacy consumers retain the default Torch IPC transport.
++        ``reusable_ipc`` opts compatible static dense readers into producer-owned
++        raw CUDA slabs and reusable descriptors. Native and contiguous readers
++        retain identical values, layout and row metadata. The default transport
++        remains Torch IPC for callers outside this supported configuration.
+         """
+         if reusable_ipc and (
+             self.cfg["sequence_packing"]["enabled"]
+diff --git a/tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py b/tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py
+new file mode 100644
+index 000000000..382398b7b
+--- /dev/null
++++ b/tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py
+@@ -0,0 +1,238 @@
++# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++# http://www.apache.org/licenses/LICENSE-2.0
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++"""Reusable dense IPC retains legacy row geometry and zero-copy ownership."""
++
++import gc
++from dataclasses import replace
++
++import pytest
++import torch
++import torch.multiprocessing as mp
++
++from nemo_rl.algorithms.x_token import loss_utils
++from nemo_rl.models.policy.utils import DENSE_TEACHER_IPC_FLAT_LAYOUT
++from nemo_rl.utils import reusable_cuda_ipc as ipc
++
++
++def _descriptor(tensor, identity=1):
++    return ipc.ReusableCudaIPCDescriptor(
++        identity.to_bytes(64, "little"),
++        tuple(tensor.shape),
++        tensor.dtype,
++        tensor.numel() * tensor.element_size(),
++        b"u" * 16,
++        123,
++        "00000000-0000-0000-0000-000000000001",
++    )
++
++
++def _entries(
++    payload,
++    shape,
++    *,
++    compact,
++    batch=2,
++    full_seq=8,
++    vocab=5,
++    stored_seq=None,
++    offset=3,
++    vocab_start=0,
++    full_vocab=None,
++):
++    stored_seq = full_seq if stored_seq is None else stored_seq
++    entries = []
++    for sample in range(batch):
++        shard = {
++            "payload_ipc": payload,
++            "buf_idx": 0,
++            "sample_index_in_buf": sample,
++            "actual_shape": (full_seq, vocab),
++            "vocab_start_index": vocab_start,
++            "vocab_end_index": vocab_start + vocab,
++            "global_seq_start": 0,
++            "full_seq_len": full_seq,
++            "full_vocab_size": vocab if full_vocab is None else full_vocab,
++            "dtype": torch.float32,
++        }
++        if compact:
++            shard.update(
++                {
++                    "ipc_layout": DENSE_TEACHER_IPC_FLAT_LAYOUT,
++                    "storage_shape": shape,
++                    "storage_token_offset": offset + sample * stored_seq,
++                    "storage_used_tokens": offset + batch * stored_seq,
++                    "storage_capacity_tokens": shape[0],
++                    "stored_seq_len": stored_seq,
++                    "valid_seq_len": stored_seq,
++                }
++            )
++        entries.append({"teacher_shards": [shard]})
++    return entries
++
++
++def _storage(*, compact, device="cpu"):
++    shape = (23, 5) if compact else (1, 3, 10, 7)
++    storage = torch.arange(
++        torch.tensor(shape).prod().item(), dtype=torch.float32, device=device
++    ).reshape(shape)
++    expected = storage[3:19].reshape(2, 8, 5) if compact else storage[0, :2, :8, :5]
++    return storage, expected
++
++
++@pytest.mark.parametrize("compact", [False, True])
++@pytest.mark.parametrize("cp_rank", [0, 1])
++def test_raw_zero_copy_keeps_capacity_and_cp_slice(monkeypatch, compact, cp_rank):
++    storage, expected = _storage(compact=compact)
++    handle = _descriptor(storage)
++    calls = []
++
++    def open_raw(payload, device):
++        calls.append(payload)
++        return storage
++
++    monkeypatch.setattr(loss_utils, "open_reusable_cuda_ipc", open_raw)
++    monkeypatch.setattr(
++        "nemo_rl.models.policy.utils.rebuild_cuda_tensor_from_ipc",
++        lambda *a: pytest.fail("raw payload used Torch counter"),
++    )
++    entries = _entries(handle, tuple(storage.shape), compact=compact)
++    result = loss_utils._try_zero_copy_teacher_logits(
++        entries, student_cp_rank=cp_rank, student_cp_size=2, device=0
++    )
++    assert len(calls) == 1
++    expected = expected[:, cp_rank * 4 : (cp_rank + 1) * 4]
++    assert result.untyped_storage().data_ptr() == storage.untyped_storage().data_ptr()
++    torch.testing.assert_close(result, expected)
++    result[0, 0, 0] = -17
++    assert expected[0, 0, 0] == -17
++
++
++@pytest.mark.parametrize("cp_rank", [0, 1])
++def test_raw_compact_tp_assembly_preserves_short_prefix_and_zero_suffix(
++    monkeypatch, cp_rank
++):
++    whole = torch.arange(8 * 6, dtype=torch.float32).reshape(8, 6)
++    backing, shards = {}, []
++    for tp_rank in range(2):
++        storage = torch.full((10, 3), -99.0)
++        storage[2:8].copy_(whole[:6, tp_rank * 3 : (tp_rank + 1) * 3])
++        handle = _descriptor(storage, identity=tp_rank + 1)
++        backing[handle] = storage
++        entry = _entries(
++            handle,
++            tuple(storage.shape),
++            compact=True,
++            batch=1,
++            vocab=3,
++            stored_seq=6,
++            offset=2,
++            vocab_start=tp_rank * 3,
++            full_vocab=6,
++        )[0]
++        shards.extend(entry["teacher_shards"])
++    monkeypatch.setattr(
++        loss_utils, "open_reusable_cuda_ipc", lambda payload, device: backing[payload]
++    )
++    result = loss_utils.assemble_teacher_logits_from_shards(
++        shards, student_cp_rank=cp_rank, student_cp_size=2, device="cpu"
++    )
++    expected = whole.clone()
++    expected[6:] = 0
++    torch.testing.assert_close(result, expected[cp_rank * 4 : (cp_rank + 1) * 4])
++
++
++def test_raw_compact_zero_length_row_does_not_open(monkeypatch):
++    entries = _entries(None, (1, 5), compact=True, batch=1, stored_seq=0, offset=0)
++    monkeypatch.setattr(
++        loss_utils,
++        "open_reusable_cuda_ipc",
++        lambda *a: pytest.fail("empty row opened storage"),
++    )
++    result, fallback = loss_utils.rebuild_teacher_full_logits_from_ipc(
++        entries, cp_group=None, device="cpu"
++    )
++    assert fallback == 1
++    torch.testing.assert_close(result, torch.zeros(1, 8, 5))
++
++
++@pytest.mark.parametrize(
++    "invalid", ["dtype", "rank", "compact_shape", "rectangle_slice"]
++)
++def test_raw_dense_rejects_invalid_metadata(monkeypatch, invalid):
++    compact = invalid == "compact_shape"
++    storage, _ = _storage(compact=compact)
++    handle = _descriptor(storage)
++    if invalid == "dtype":
++        handle = replace(handle, dtype=torch.int32)
++    if invalid == "rank":
++        handle = replace(handle, shape=(storage.numel(),))
++    entry = _entries(handle, tuple(storage.shape), compact=compact)[0][
++        "teacher_shards"
++    ][0]
++    if invalid == "compact_shape":
++        # Preserve valid metadata, but the actual mapped slab has a different capacity.
++        storage = storage[:22]
++    if invalid == "rectangle_slice":
++        entry["sample_index_in_buf"] = 3
++    monkeypatch.setattr(loss_utils, "open_reusable_cuda_ipc", lambda *a: storage)
++    with pytest.raises(
++        ValueError,
++        match="Reusable dense|unexpected storage shape|outside rebuilt storage",
++    ):
++        loss_utils._rebuild_teacher_ipc_row(entry, device=0)
++
++
++def _consumer(rank, entries, expected):
++    torch.cuda.set_device(1)
++    closed = []
++    original_close = ipc._CudaArrayOwner.close
++
++    def counted_close(owner):
++        pointer = owner.pointer
++        original_close(owner)
++        if pointer and owner.imported:
++            closed.append(pointer)
++
++    ipc._CudaArrayOwner.close = counted_close
++    stream = torch.cuda.Stream(device=1)
++    for iteration in range(2):
++        result, fallback = loss_utils.rebuild_teacher_full_logits_from_ipc(
++            entries, cp_group=None, device=1
++        )
++        assert fallback == 0
++        alias = result[:, :, 1:]
++        del result
++        gc.collect()
++        assert len(closed) == iteration
++        with torch.cuda.stream(stream):
++            copied = alias.clone()
++        del alias
++        gc.collect()
++        assert len(closed) == iteration + 1
++        torch.testing.assert_close(copied.cpu(), torch.tensor(expected)[:, :, 1:])
++
++
++@pytest.mark.skipif(torch.cuda.device_count() < 2, reason="two CUDA devices required")
++@pytest.mark.parametrize("compact", [False, True])
++def test_cuda_legacy_dense_zero_copy_alias_retains_imported_owner(compact):
++    torch.cuda.set_device(0)
++    values, expected = _storage(compact=compact, device="cuda:0")
++    storage = ipc.allocate_reusable_cuda_tensor(
++        tuple(values.shape), dtype=values.dtype, device=values.device
++    )
++    storage.copy_(values)
++    torch.cuda.synchronize()
++    handle = ipc.get_reusable_cuda_ipc_handle(storage)
++    entries = _entries(handle, tuple(storage.shape), compact=compact)
++    mp.spawn(_consumer, args=(entries, expected.cpu().tolist()), nprocs=2, join=True)
++    del storage
++    gc.collect()

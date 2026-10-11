@@ -1,0 +1,260 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "verify_dense_cross_oracle.py",
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "--offline",
+        "python",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_dense_cross_oracle.py"
+      ],
+      "exit_code": 0,
+      "seconds": 85.1
+    },
+    {
+      "name": "verify_model_oracle.py",
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "--offline",
+        "python",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_model_oracle.py"
+      ],
+      "exit_code": 0,
+      "seconds": 24.082
+    },
+    {
+      "name": "verify_controller_capture.py",
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "--offline",
+        "python",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_capture.py"
+      ],
+      "exit_code": 0,
+      "seconds": 4.482
+    }
+  ],
+  "source_hashes_before_after": "PASS",
+  "scope": "Artifact-only CPU retained dense CP1 objective dispatch, independent CE/aggregation and derivative checks; no model, CUDA IPC or distributed optimizer acceptance. Frozen R6 attempt and its original error are preserved.",
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "",
+    "UV_CACHE_DIR": "/tmp/xtoken-port-uv-cache",
+    "PYTHONPATH": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/experiments/xtoken-smoke/xtoken-distillation/xtoken-offset-rebased-2n100-20260928-092950/runtime/python"
+  },
+  "dense_cases": 48,
+  "same_tokenizer_cases": 48,
+  "native_position_zero_guards": 2,
+  "invalid_dense_index_guards": 4,
+  "position_zero_pairs": [
+    {
+      "routing": "dense_only",
+      "mode": "sum",
+      "dynamic": false,
+      "reverse": false,
+      "kd_difference": 0.06902682781219482,
+      "gradient_difference_norm": 0.007207239046692848
+    },
+    {
+      "routing": "dense_only",
+      "mode": "sum",
+      "dynamic": false,
+      "reverse": true,
+      "kd_difference": 0.06902673840522766,
+      "gradient_difference_norm": 0.007207239978015423
+    },
+    {
+      "routing": "dense_only",
+      "mode": "sum",
+      "dynamic": true,
+      "reverse": false,
+      "kd_difference": 0.06902682781219482,
+      "gradient_difference_norm": 0.021793078631162643
+    },
+    {
+      "routing": "dense_only",
+      "mode": "sum",
+      "dynamic": true,
+      "reverse": true,
+      "kd_difference": 0.06902673840522766,
+      "gradient_difference_norm": 0.03651351109147072
+    },
+    {
+      "routing": "dense_only",
+      "mode": "averaged_logits",
+      "dynamic": false,
+      "reverse": false,
+      "kd_difference": 0.06902682781219482,
+      "gradient_difference_norm": 0.007207239046692848
+    },
+    {
+      "routing": "dense_only",
+      "mode": "averaged_logits",
+      "dynamic": false,
+      "reverse": true,
+      "kd_difference": 0.06902673840522766,
+      "gradient_difference_norm": 0.007207239978015423
+    },
+    {
+      "routing": "dense_only",
+      "mode": "averaged_logits",
+      "dynamic": true,
+      "reverse": false,
+      "kd_difference": 0.06902682781219482,
+      "gradient_difference_norm": 0.021793078631162643
+    },
+    {
+      "routing": "dense_only",
+      "mode": "averaged_logits",
+      "dynamic": true,
+      "reverse": true,
+      "kd_difference": 0.06902673840522766,
+      "gradient_difference_norm": 0.03651351109147072
+    },
+    {
+      "routing": "dense_same",
+      "mode": "sum",
+      "dynamic": false,
+      "reverse": false,
+      "kd_difference": 0.07458227872848511,
+      "gradient_difference_norm": 0.007787293288856745
+    },
+    {
+      "routing": "dense_same",
+      "mode": "sum",
+      "dynamic": false,
+      "reverse": true,
+      "kd_difference": 0.07458209991455078,
+      "gradient_difference_norm": 0.007787293288856745
+    },
+    {
+      "routing": "dense_same",
+      "mode": "sum",
+      "dynamic": true,
+      "reverse": false,
+      "kd_difference": 0.07458227872848511,
+      "gradient_difference_norm": 0.014398879371583462
+    },
+    {
+      "routing": "dense_same",
+      "mode": "sum",
+      "dynamic": true,
+      "reverse": true,
+      "kd_difference": 0.07458209991455078,
+      "gradient_difference_norm": 0.018635161221027374
+    },
+    {
+      "routing": "dense_same",
+      "mode": "averaged_logits",
+      "dynamic": false,
+      "reverse": false,
+      "kd_difference": 0.06902682781219482,
+      "gradient_difference_norm": 0.007207239046692848
+    },
+    {
+      "routing": "dense_same",
+      "mode": "averaged_logits",
+      "dynamic": false,
+      "reverse": true,
+      "kd_difference": 0.06902670860290527,
+      "gradient_difference_norm": 0.007207239046692848
+    },
+    {
+      "routing": "dense_same",
+      "mode": "averaged_logits",
+      "dynamic": true,
+      "reverse": false,
+      "kd_difference": 0.06902682781219482,
+      "gradient_difference_norm": 0.014075610786676407
+    },
+    {
+      "routing": "dense_same",
+      "mode": "averaged_logits",
+      "dynamic": true,
+      "reverse": true,
+      "kd_difference": 0.06902670860290527,
+      "gradient_difference_norm": 0.017946459352970123
+    },
+    {
+      "routing": "same_dense",
+      "mode": "sum",
+      "dynamic": false,
+      "reverse": false,
+      "kd_difference": 0.07458227872848511,
+      "gradient_difference_norm": 0.007787293288856745
+    },
+    {
+      "routing": "same_dense",
+      "mode": "sum",
+      "dynamic": false,
+      "reverse": true,
+      "kd_difference": 0.07458209991455078,
+      "gradient_difference_norm": 0.007787294220179319
+    },
+    {
+      "routing": "same_dense",
+      "mode": "sum",
+      "dynamic": true,
+      "reverse": false,
+      "kd_difference": 0.07458227872848511,
+      "gradient_difference_norm": 0.014398878440260887
+    },
+    {
+      "routing": "same_dense",
+      "mode": "sum",
+      "dynamic": true,
+      "reverse": true,
+      "kd_difference": 0.07458209991455078,
+      "gradient_difference_norm": 0.018635157495737076
+    },
+    {
+      "routing": "same_dense",
+      "mode": "averaged_logits",
+      "dynamic": false,
+      "reverse": false,
+      "kd_difference": 0.06902682781219482,
+      "gradient_difference_norm": 0.007207239046692848
+    },
+    {
+      "routing": "same_dense",
+      "mode": "averaged_logits",
+      "dynamic": false,
+      "reverse": true,
+      "kd_difference": 0.06902670860290527,
+      "gradient_difference_norm": 0.007207239978015423
+    },
+    {
+      "routing": "same_dense",
+      "mode": "averaged_logits",
+      "dynamic": true,
+      "reverse": false,
+      "kd_difference": 0.06902682781219482,
+      "gradient_difference_norm": 0.014075611717998981
+    },
+    {
+      "routing": "same_dense",
+      "mode": "averaged_logits",
+      "dynamic": true,
+      "reverse": true,
+      "kd_difference": 0.06902670860290527,
+      "gradient_difference_norm": 0.017946461215615273
+    }
+  ],
+  "position_zero_summary": {
+    "all_pairs_change_kd_and_gradient": true,
+    "pair_count": 24,
+    "min_kd_difference": 0.06902670860290527,
+    "min_gradient_difference_norm": 0.007207239046692848
+  },
+  "quality": {
+    "ruff_default": "PASS",
+    "ruff_imports": "PASS",
+    "ruff_format": "PASS"
+  }
+}

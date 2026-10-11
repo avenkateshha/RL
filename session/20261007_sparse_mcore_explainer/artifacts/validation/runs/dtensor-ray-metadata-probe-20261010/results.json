@@ -1,0 +1,8 @@
+{
+  "status": "PASS_METADATA_REPORTS_STEP_CANCELLED_AFTER_OUTPUT",
+  "reports": [
+    "observer-disabled.json",
+    "observer-enabled.json"
+  ],
+  "scope": "Both with/without observer metadata outputs completed; owning successful R1 job ended and cancelled diagnostic process teardown. No model/actor test claimed."
+}

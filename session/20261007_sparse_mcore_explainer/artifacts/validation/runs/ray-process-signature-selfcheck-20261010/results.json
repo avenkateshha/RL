@@ -1,0 +1,57 @@
+{
+  "status": "PASS_REPRODUCTION",
+  "ray_version": "2.56.1",
+  "ray_commit": "06729817574615e25afe8f20902b37660c2e6962",
+  "cases": [
+    {
+      "case": "healthy",
+      "ray_method_signature": "[<Parameter \"fn\">, <Parameter \"*args\">, <Parameter \"_ray_trace_ctx=None\">, <Parameter \"**kwargs\">]",
+      "positional_error": null,
+      "keyword_fn": "PASS"
+    },
+    {
+      "case": "driver_placeholder",
+      "ray_method_signature": "[<Parameter \"_ray_trace_ctx=None\">, <Parameter \"**kwargs\">]",
+      "positional_error": "too many positional arguments",
+      "keyword_fn": "PASS"
+    }
+  ],
+  "sources": [
+    {
+      "function": "FunctionActorManager._load_actor_class_from_gcs",
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/.venv/lib/python3.13/site-packages/ray/_private/function_manager.py",
+      "line": 669,
+      "sha256": "261b5ebe4982578821f96618bffb27343af74c555daf620f0b450b92cbff431a",
+      "upstream": "https://github.com/ray-project/ray/blob/06729817574615e25afe8f20902b37660c2e6962/python/ray/_private/function_manager.py#L669"
+    },
+    {
+      "function": "FunctionActorManager._create_fake_actor_class",
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/.venv/lib/python3.13/site-packages/ray/_private/function_manager.py",
+      "line": 646,
+      "sha256": "261b5ebe4982578821f96618bffb27343af74c555daf620f0b450b92cbff431a",
+      "upstream": "https://github.com/ray-project/ray/blob/06729817574615e25afe8f20902b37660c2e6962/python/ray/_private/function_manager.py#L646"
+    },
+    {
+      "function": "_ActorClassMethodMetadata.create",
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/.venv/lib/python3.13/site-packages/ray/actor.py",
+      "line": 1207,
+      "sha256": "c7af32157f768ed104dd80311b1ae67a275183bb32836b19c987561e7cc0562a",
+      "upstream": "https://github.com/ray-project/ray/blob/06729817574615e25afe8f20902b37660c2e6962/python/ray/actor.py#L1207"
+    },
+    {
+      "function": "_modify_class",
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/.venv/lib/python3.13/site-packages/ray/actor.py",
+      "line": 2648,
+      "sha256": "c7af32157f768ed104dd80311b1ae67a275183bb32836b19c987561e7cc0562a",
+      "upstream": "https://github.com/ray-project/ray/blob/06729817574615e25afe8f20902b37660c2e6962/python/ray/actor.py#L2648"
+    },
+    {
+      "function": "extract_signature",
+      "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/.venv/lib/python3.13/site-packages/ray/_common/signature.py",
+      "line": 58,
+      "sha256": "223d0f826bd11ca81aa4f0247bb0ca7fe9aa07ed628b56165ef321ad3b058c34",
+      "upstream": "https://github.com/ray-project/ray/blob/06729817574615e25afe8f20902b37660c2e6962/python/ray/_common/signature.py#L58"
+    }
+  ],
+  "scope": "Actual Ray metadata/signature code only; no actors, models or GPU. Establishes placeholder positional binding failure and compatible explicit fn keyword; actual DTensor driver import fallback still needs runtime evidence."
+}

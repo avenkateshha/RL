@@ -1,0 +1,358 @@
+{
+  "status": "PASS",
+  "rank": 6,
+  "tp": 2,
+  "cp": 2,
+  "dp": 2,
+  "capture_index": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/optimizer-first-step/rank6-index.json",
+  "capture_index_sha256": "99677cfb697307de35ae374215537199545185ec19366ba41d6d56931c9dfc02",
+  "microbatches": [
+    {
+      "ordinal": 0,
+      "item_ids": [
+        4,
+        5
+      ],
+      "pinned_initial_student_forward": {
+        "relative_l2": 0.0,
+        "relative_norm": 0.0,
+        "absolute_l2": 0.0,
+        "reference_norm": 9463.940215809465,
+        "max_absolute": 0.0
+      },
+      "dlogits": {
+        "relative_l2": 5.146210058558234e-06,
+        "relative_norm": 3.5790779844655292e-06,
+        "absolute_l2": 9.257207330533367e-07,
+        "reference_norm": 0.17988397724143568,
+        "max_absolute": 3.2782554626464844e-07
+      },
+      "teacher_backends": [
+        [
+          "MegatronPolicyWorker.actual_dense_forward"
+        ]
+      ]
+    },
+    {
+      "ordinal": 1,
+      "item_ids": [
+        6,
+        7
+      ],
+      "pinned_initial_student_forward": {
+        "relative_l2": 0.0,
+        "relative_norm": 0.0,
+        "absolute_l2": 0.0,
+        "reference_norm": 9125.786561660498,
+        "max_absolute": 0.0
+      },
+      "dlogits": {
+        "relative_l2": 8.18822180581685e-06,
+        "relative_norm": 7.620632648116497e-06,
+        "absolute_l2": 1.1436453652913165e-06,
+        "reference_norm": 0.1396695634794455,
+        "max_absolute": 6.407499313354492e-07
+      },
+      "teacher_backends": [
+        [
+          "MegatronPolicyWorker.actual_dense_forward"
+        ]
+      ]
+    }
+  ],
+  "expected_microbatches": 2,
+  "accumulation_dtypes": {
+    "embedding.word_embeddings.weight": "torch.bfloat16",
+    "decoder.layers.0.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.0.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.0.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.0.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.0.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.0.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.1.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.1.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.1.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.1.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.1.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.1.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.2.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.2.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.2.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.2.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.2.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.2.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.3.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.3.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.3.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.3.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.3.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.3.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.4.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.4.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.4.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.4.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.4.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.4.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.5.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.5.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.5.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.5.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.5.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.5.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.6.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.6.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.6.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.6.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.6.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.6.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.7.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.7.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.7.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.7.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.7.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.7.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.8.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.8.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.8.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.8.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.8.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.8.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.9.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.9.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.9.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.9.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.9.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.9.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.10.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.10.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.10.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.10.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.10.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.10.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.11.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.11.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.11.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.11.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.11.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.11.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.12.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.12.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.12.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.12.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.12.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.12.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.13.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.13.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.13.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.13.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.13.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.13.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.14.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.14.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.14.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.14.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.14.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.14.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.layers.15.self_attention.linear_proj.weight": "torch.bfloat16",
+    "decoder.layers.15.self_attention.linear_qkv.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.15.self_attention.linear_qkv.weight": "torch.bfloat16",
+    "decoder.layers.15.mlp.linear_fc1.layer_norm_weight": "torch.bfloat16",
+    "decoder.layers.15.mlp.linear_fc1.weight": "torch.bfloat16",
+    "decoder.layers.15.mlp.linear_fc2.weight": "torch.bfloat16",
+    "decoder.final_layernorm.weight": "torch.bfloat16"
+  },
+  "normalization": "Sum all MB VJPs, then CP+DP SUM; schedule factors cancel and token-finalization factor is one",
+  "range_coverage": "PASS: every TP-local element owned exactly once across CP+DP",
+  "covered_parameter_elements_per_tp_rank": 617940992,
+  "actual_optimizer_preclip_gradients": {
+    "relative_l2": 0.011993976524124551,
+    "relative_norm": 0.0012897273196123434,
+    "actual_norm_including_tp_replicas": 461.04854022652626,
+    "reference_norm_including_tp_replicas": 460.45467924725773
+  },
+  "owned_shards": [
+    {
+      "name": "decoder.layers.14.mlp.linear_fc1.weight",
+      "start": 2882048,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.015625
+    },
+    {
+      "name": "decoder.layers.13.self_attention.linear_qkv.weight",
+      "start": 2621440,
+      "end": 3145728,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.0078125
+    },
+    {
+      "name": "decoder.layers.13.self_attention.linear_proj.weight",
+      "start": 0,
+      "end": 2097152,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.001953125
+    },
+    {
+      "name": "decoder.layers.12.mlp.linear_fc2.weight",
+      "start": 0,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.001953125
+    },
+    {
+      "name": "decoder.layers.11.mlp.linear_fc1.weight",
+      "start": 4979712,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.001953125
+    },
+    {
+      "name": "decoder.layers.10.self_attention.linear_qkv.weight",
+      "start": 2621440,
+      "end": 3145728,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.0054931640625
+    },
+    {
+      "name": "decoder.layers.10.self_attention.linear_proj.weight",
+      "start": 0,
+      "end": 2097152,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.001953125
+    },
+    {
+      "name": "decoder.layers.9.mlp.linear_fc2.weight",
+      "start": 0,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.0048828125
+    },
+    {
+      "name": "decoder.layers.8.mlp.linear_fc1.weight",
+      "start": 4979712,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.009765625
+    },
+    {
+      "name": "decoder.layers.7.self_attention.linear_qkv.weight",
+      "start": 2621440,
+      "end": 3145728,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.0068359375
+    },
+    {
+      "name": "decoder.layers.7.self_attention.linear_proj.weight",
+      "start": 0,
+      "end": 2097152,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.0078125
+    },
+    {
+      "name": "decoder.layers.6.mlp.linear_fc2.weight",
+      "start": 0,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.0029296875
+    },
+    {
+      "name": "decoder.layers.5.mlp.linear_fc1.weight",
+      "start": 4979712,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.005615234375
+    },
+    {
+      "name": "decoder.layers.4.self_attention.linear_qkv.weight",
+      "start": 2621440,
+      "end": 3145728,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.01953125
+    },
+    {
+      "name": "decoder.layers.4.self_attention.linear_proj.weight",
+      "start": 0,
+      "end": 2097152,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.005859375
+    },
+    {
+      "name": "decoder.layers.3.mlp.linear_fc2.weight",
+      "start": 0,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.0078125
+    },
+    {
+      "name": "decoder.layers.2.mlp.linear_fc1.weight",
+      "start": 4979712,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.00390625
+    },
+    {
+      "name": "decoder.layers.1.self_attention.linear_qkv.weight",
+      "start": 2621440,
+      "end": 3145728,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.0546875
+    },
+    {
+      "name": "decoder.layers.1.self_attention.linear_proj.weight",
+      "start": 0,
+      "end": 2097152,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.005859375
+    },
+    {
+      "name": "decoder.layers.0.mlp.linear_fc2.weight",
+      "start": 0,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.21875
+    },
+    {
+      "name": "embedding.word_embeddings.weight",
+      "start": 92994560,
+      "end": 131334144,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.00390625
+    },
+    {
+      "name": "decoder.layers.13.self_attention.linear_qkv.layer_norm_weight",
+      "start": 0,
+      "end": 2048,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.00390625
+    },
+    {
+      "name": "decoder.layers.10.self_attention.linear_qkv.layer_norm_weight",
+      "start": 0,
+      "end": 2048,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.009765625
+    },
+    {
+      "name": "decoder.layers.7.self_attention.linear_qkv.layer_norm_weight",
+      "start": 0,
+      "end": 2048,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.015625
+    },
+    {
+      "name": "decoder.layers.4.self_attention.linear_qkv.layer_norm_weight",
+      "start": 0,
+      "end": 2048,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.015625
+    },
+    {
+      "name": "decoder.layers.1.self_attention.linear_qkv.layer_norm_weight",
+      "start": 0,
+      "end": 2048,
+      "gradient_dtype": "torch.bfloat16",
+      "max_absolute": 0.03125
+    }
+  ],
+  "scope": "Actual first optimizer step after prepare_grads before clipping/update; all MBs and owned parameter ranges compared to independent-reference VJP at pinned initial weights."
+}

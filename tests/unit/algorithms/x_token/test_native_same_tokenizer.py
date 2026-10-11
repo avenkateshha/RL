@@ -248,6 +248,43 @@ def test_native_same_tokenizer_direct(k, reverse, full_vocab):
     assert torch.count_nonzero(logits.grad[..., 16:]) == 0
 
 
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+def test_native_same_tokenizer_empty_k_fp16(device):
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA regression requires a visible GPU")
+    fixture = make_same_tokenizer_fixture()
+    logits = torch.full(
+        fixture.student_logits.shape,
+        400.0,
+        device=device,
+        dtype=torch.float16,
+        requires_grad=True,
+    )
+    # The inputs are finite, but their FP16 sum overflows before multiplication
+    # by zero. Empty support must still return a finite, gradient-connected zero.
+    assert bool(torch.isfinite(logits).all())
+    assert not bool(torch.isfinite(logits.sum()))
+    teacher = torch.zeros(
+        (*logits.shape[:2], fixture.student_vocab_size),
+        device=device,
+        requires_grad=True,
+    )
+    loss = compute_native_same_tokenizer_kl(
+        make_same_tokenizer_loss_fn(fixture, ObjectiveSettings(k=0)),
+        make_native_student(fixture, logits),
+        teacher,
+        global_valid_toks=torch.tensor(fixture.global_valid_tokens, device=device),
+        tp_group=None,
+        cp_group=None,
+    )
+    assert loss.dtype == torch.float32
+    assert bool(torch.isfinite(loss)) and loss.item() == 0
+    loss.backward()
+    assert logits.grad is not None and bool(torch.isfinite(logits.grad).all())
+    assert torch.count_nonzero(logits.grad) == 0
+    assert teacher.grad is None
+
+
 @pytest.mark.parametrize("count", [-1.0, float("nan"), float("inf")])
 def test_native_same_tokenizer_invalid_normalizer(count):
     fixture = make_same_tokenizer_fixture()

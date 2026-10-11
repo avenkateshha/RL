@@ -1,0 +1,12 @@
+{
+  "status": "FAIL",
+  "job_id": "19990609",
+  "imports": "PASS",
+  "actual_pinned_model_forward_and_export": {
+    "teacher_a": "PASS on4TP2CP2ranks, sparse[2,12,64]",
+    "teacher_b": "PASS on4TP2CP2ranks, sparse[2,16,64]"
+  },
+  "failure": "Test fixture attempted to reopen a CUDA IPC allocation inside its own producer process; CUDA invalid device context. New separate-process consumer fixture is in runtime-dtensor-consumers-20261010.",
+  "source_hashes": "PASS before and after8unchangedfiles",
+  "lifetime": "Producer warnings occurred after fixture exception; no clean IPC acceptance claimed."
+}

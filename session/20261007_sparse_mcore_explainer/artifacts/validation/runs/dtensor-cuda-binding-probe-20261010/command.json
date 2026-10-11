@@ -1,0 +1,19 @@
+{
+  "command": [
+    "srun",
+    "--jobid=19992929",
+    "--overlap",
+    "--no-container-mount-home",
+    "--mpi=pmix",
+    "--nodes=1",
+    "--ntasks=1",
+    "--gres=none",
+    "--container-image=/lustre/fsw/portfolios/coreai/users/avenkateshha/nemo_rl/nemo_rl_main_20260803_amd64.sqsh",
+    "--container-mounts=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha,/lustre/fsw/portfolios/coreai/users/avenkateshha:/lustre/fsw/portfolios/coreai/users/avenkateshha,/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/guihongl:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/guihongl",
+    "--container-workdir=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+    "/opt/ray_venvs/nemo_rl.models.policy.workers.dtensor_policy_worker_v2.DTensorPolicyWorkerV2/bin/python",
+    "-c",
+    "import json; from cuda.bindings import runtime; print(json.dumps({'status':'PASS','module':runtime.__name__,'file':runtime.__file__,'has_malloc':hasattr(runtime,'cudaMalloc'),'has_ipc_export':hasattr(runtime,'cudaIpcGetMemHandle'),'has_ipc_open':hasattr(runtime,'cudaIpcOpenMemHandle')}))"
+  ],
+  "utc": "2026-10-10T22:41:59.513531+00:00"
+}

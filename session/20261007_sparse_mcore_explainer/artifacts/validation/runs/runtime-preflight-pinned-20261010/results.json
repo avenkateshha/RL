@@ -1,0 +1,48 @@
+{
+  "status": "FAIL",
+  "job_id": "19989499",
+  "runtime_imports": "PASS",
+  "cpu_gloo_normalization": {
+    "status": "PASS",
+    "grids": [
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        2
+      ]
+    ],
+    "log": "normalization.log"
+  },
+  "schedule_compensation_wrapper": {
+    "status": "PASS",
+    "passed": 1,
+    "log": "focused-pytest.log"
+  },
+  "split_guards": {
+    "status": "NOT_RUN_IN_FIRST_PYTEST",
+    "reason": "Repository conftest filters mcore tests without --mcore-only; retry19989617"
+  },
+  "model_provider_config_conversion": "PASS: all4 pinned models at TP2/CP2/PP1",
+  "actual_model_forward": {
+    "status": "FAIL",
+    "reason": "Standalone provider default gradient_accumulation_fusion=true requires unavailable APEX; retry uses exemplar false.",
+    "log": "student-model-forward.log"
+  },
+  "launcher_exit": {
+    "status": "FAIL",
+    "reason": "Late edit of running driver caused shell EOF; new19989617 script frozen before submit."
+  },
+  "full_R1_R6": "NOT_RUN",
+  "reason": "Individual import and normalization tests passed; overall batch includes failed default-fusion model construction and launcher EOF."
+}

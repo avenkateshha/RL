@@ -1,0 +1,42 @@
+{
+  "status": "FAIL_REFERENCE_SUPPORT_MISMATCH_RETRY_REQUIRED",
+  "job_id": "19991885",
+  "slurm_state": "FAILED",
+  "exit_code": "1:0",
+  "elapsed": "00:06:53",
+  "tp": 2,
+  "cp": 2,
+  "dp": 2,
+  "first_failure": {
+    "location": "launcher/reference_capture/controller_reference.py:_check_loss",
+    "relative_l2": 0.07588149439613343,
+    "relative_norm": 0.0019307043322467337,
+    "absolute_l2": 0.0004312460305042411,
+    "reference_norm": 0.005683151523782002,
+    "max_absolute": 0.0002999840589836822,
+    "tolerance_relative_l2": 0.02
+  },
+  "scalar_checks_before_dlogits": "PASS for failing microbatch",
+  "completed_numerical_reports": 4,
+  "completed_report_ranks": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "completed_report_item_ids": [
+    0,
+    1
+  ],
+  "independent_source_verification": {
+    "status": "PASS",
+    "scope": "Independent post-run source/config/launcher verification against frozen pre-submission hashes",
+    "source_files": 386,
+    "owned_files": 16,
+    "mismatches": []
+  },
+  "diagnosis": "Actual GPU probe on saved teacher logits confirms CPU and CUDA torch.topk choose different tied common-K columns for DP1: CPU602 versus CUDA26 at cutoff14.5625. DP0 supports match. Artifact oracle must perform discrete selection on the actual runtime device; numerical retry remains required with unchanged tolerances.",
+  "raw_log": "driver-logs/19991885-logs/ray-driver.log",
+  "larger_memory_tests": "EXCLUDED",
+  "diagnostic_run": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-topk-probe-20261010"
+}

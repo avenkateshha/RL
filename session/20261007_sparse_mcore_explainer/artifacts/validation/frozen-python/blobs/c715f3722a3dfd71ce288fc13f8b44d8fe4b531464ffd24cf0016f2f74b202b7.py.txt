@@ -1,0 +1,12 @@
+"""Fail explicitly if a focused test's implementation changes during the run."""
+import hashlib
+import json
+import os
+from pathlib import Path
+run=Path(os.environ['PREFLIGHT_RUN'])
+repo=Path(os.environ['REPO_ROOT'])
+manifest=json.loads((run/'source-manifest.json').read_text())
+for name,expected in manifest['file_sha256'].items():
+    actual=hashlib.sha256((repo/name).read_bytes()).hexdigest()
+    assert actual==expected,(name,expected,actual)
+print('Focused source hashes verified.',flush=True)

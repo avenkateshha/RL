@@ -1,0 +1,20 @@
+{
+  "command": [
+    "sbatch",
+    "--nodes=1",
+    "--gres=gpu:8",
+    "--exclusive",
+    "--account=coreai_dlalgo_genai",
+    "--partition=interactive",
+    "--time=00:45:00",
+    "--job-name=xtoken-small-R6-dense-cross",
+    "--output=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/slurm-%j.out",
+    "--chdir=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+    "--parsable",
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/launcher/ray-runtime.sub"
+  ],
+  "utc": "2026-10-10T22:50:32.262627+00:00",
+  "returncode": 0,
+  "stdout": "19993412\n",
+  "stderr": ""
+}

@@ -1,0 +1,28 @@
+{
+  "status": "PASS_CPU_REGRESSION",
+  "checks": [
+    {
+      "script": "verify_model_oracle.py",
+      "command": "PYTHONPATH=\"$PWD\" UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline python session/20261007_sparse_mcore_explainer/artifacts/validation/verify_model_oracle.py",
+      "exit_code": 0,
+      "comparisons": 48
+    },
+    {
+      "script": "verify_controller_capture.py",
+      "command": "PYTHONPATH=\"$PWD\" UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline python session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_capture.py",
+      "exit_code": 0,
+      "comparisons": 1
+    }
+  ],
+  "source_sha256": {
+    "model_oracle.py": "ccd544629fc447168a7e5fbd80b8c2acc4bb1b5870081b4f5fdbb499b6344799",
+    "verify_model_oracle.py": "4aedfcd8f0171b2bd6d123572548ce00d26d61a86eeeac9e3e3018dfd3e821c7",
+    "verify_controller_capture.py": "cba8e97143589b4f1159f40d1a82cef2dd310e68f6c493445bf3026799b72f93",
+    "probe_same_topk.py": "66edac861ba2a8de222267b42a14893895459b3e60f2506fef63667903619faa"
+  },
+  "scope": "48 independent same-tokenizer scalar/gradient/metric CPU checks and AST-isolated controller capture plumbing. No model, optimizer, distributed or CUDA loss acceptance.",
+  "support_fix": "Independent CPU full-microbatch importance; discrete torch.topk uses explicit actual controller device; CPU support validity checks; loss and gradients remain independent CPU calculations. Production and tolerances unchanged.",
+  "gpu_probe_evidence": "../R3-topk-probe-20261010/results.json",
+  "gpu_probe_finding": "Frozen R3 DP1 IDs4,5 have63 columns above14.5625 and four tied candidates26,387,602,3878; CPU selects602, CUDA selects26. DP0 support is identical.",
+  "acceptance": "R3 actual controller/replay rerun required; original failed case retained."
+}

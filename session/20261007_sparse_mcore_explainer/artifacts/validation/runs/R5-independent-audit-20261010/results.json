@@ -1,0 +1,124 @@
+{
+  "status": "PASS",
+  "recorded_utc": "2026-10-10T23:44:59.483510+00:00",
+  "scope": "Independent read-only audit of completed R5 true averaged-logits actual controller and first-step optimizer replay. No extra model or GPU execution.",
+  "job": {
+    "id": "19994428",
+    "slurm_state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:07:05"
+  },
+  "objective_probe": {
+    "status": "PASS",
+    "scope": "Independent CPU expressions on actual captured first-step tensors; this probe does not execute a model or GPU test.",
+    "item_ids": [
+      0,
+      1
+    ],
+    "weighted_logits_full_vocab_kl": 0.04232988506555557,
+    "captured_reference_kl": 0.04232988506555557,
+    "weighted_individual_full_vocab_kls": 0.06274683102965355,
+    "averaged_logits_common64_kl": 0.022611605003476143,
+    "teacher_raw_logits_l2_difference": 10115.255859375,
+    "teacher_real_vocab": [
+      128256,
+      128256
+    ],
+    "teacher_models": [
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062"
+    ],
+    "input_and_source_sha256": {
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/controller-reference/items0-1-rank0.pt": "f4b084145f4bba668e21f90c9996330a9e9a29381592c28919a8fc51d71aa6fe",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/teacher-observations/teacher0/0.pt": "ec9c9af4e5c0af56770afdfe2dd9d1d3115f5ecb61ab3164c83c0276290edb79",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/teacher-observations/teacher1/0.pt": "394db0439151486f77aed7d218fdf878fce99d2d71629f634a38fd7acf23ef16",
+      "nemo_rl/algorithms/loss/loss_functions.py": "44b3752ab8b96ad6e74e71a7c9ac2133a0b988b412624b3305513a1f3510ecb9",
+      "nemo_rl/algorithms/x_token/native_same_tokenizer.py": "c4ea66ab4a8ef67e7d2247a6be7b0300c22c61f2778da4ca1fbc7f62373a576b",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/launcher/reference_capture/model_oracle.py": "dda3b439f64b53f5ab2aa855dc1cb2c62e53d70866dc607239c53f28d5f33e32",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/launcher/reference_capture/controller_reference.py": "7d57c3d061089466a364c590a2c7ebea70ffef17213ca07cd93499bcb617619b"
+    }
+  },
+  "probe_execution": {
+    "command": "bash session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-independent-audit-20261010/command.txt > session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-independent-audit-20261010/contrast.log",
+    "working_directory": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+    "exit_code": 0,
+    "command_sha256": "37a4126dfef720270c1434f5731bfdb0106bd52b97a3a14003bcb0b83e2f6a89",
+    "output_sha256": "eb43e19bad8746425ec1a477daefed0a23d245e1b057e5fa77adedaa1f326657",
+    "provenance": "This saved command was actually executed after the earlier exploratory inline probe and reproduces its contrast."
+  },
+  "controller": {
+    "reports": 80,
+    "training_reports": 48,
+    "evaluation_reports": 32,
+    "native_dense_teacher_indices": [
+      0,
+      1
+    ],
+    "all_forbidden_layout_calls_zero": true,
+    "per_teacher_metrics": "0.3 and0.7 shares of combined averaged-logit KL; not individual teacher KLs",
+    "max_dlogits_relative_l2": 6.185474013182217e-05,
+    "first_step_ranks": 8,
+    "first_step_microbatches_per_rank": 2,
+    "first_step_denominators": {
+      "ce": 108,
+      "kd": 108,
+      "chunks": {}
+    }
+  },
+  "optimizer_replay": {
+    "ranks": 8,
+    "microbatches_per_rank": 2,
+    "pinned_initial_forwards_bit_exact": 16,
+    "tp": 2,
+    "cp": 2,
+    "dp": 2,
+    "parameters_per_tp_rank": 98,
+    "elements_per_tp_rank": 617940992,
+    "cp_dp_owners_per_tp_rank": 4,
+    "coverage": "Independently reconstructed exact-once coverage of every parameter element from actual optimizer shard ranges; all replay ranges match captures",
+    "accumulation_dtype": "torch.bfloat16",
+    "gradient_field": "decoupled_grad",
+    "gradient_metrics": {
+      "relative_l2": 0.011181625719670891,
+      "relative_norm": 0.0007001578373215611,
+      "actual_norm_including_tp_replicas": 18.792053529106187,
+      "reference_norm_including_tp_replicas": 18.778905331362115
+    },
+    "relative_l2_limit": 0.02,
+    "relative_norm_limit": 0.02,
+    "tolerances_unchanged": true
+  },
+  "independent_hash_checks": {
+    "microbatch_capture_binaries": 16,
+    "optimizer_gradient_binaries": 8,
+    "source_files": 386,
+    "launcher_files": 15,
+    "resolved_config": 1,
+    "archived_regular_members": 924,
+    "all_archives_and_advertised_actor_stderr_members_verified": true
+  },
+  "lifetime": {
+    "policies": 3,
+    "workers_per_policy": 8,
+    "all_os_identities_backend_cleanups_and_exits_confirmed": true,
+    "actual_worker_placement_records": 24,
+    "host": "pool0-01462",
+    "each_rank_present_once_per_policy": true
+  },
+  "evidence_sha256": {
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/resolved_config.yaml": "763cc1ee11290afc961ca2db835cc98269317b07394a3e0b4e81514ef78c6b08",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/manual-final-source-verification.json": "18c17be9604bcdc92f20bcea0a47a60207b71234aef6e54616df0a18eb23eeb1",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/controller-process-exit.json": "1513c6a837254c5eb72681e5162dc256343736a2b570b7a4a9a79af63f73685c",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/ray-log-snapshot.json": "bb0fd90097bfcd75b5f9581b15c1d169d6e1a2eaa3dd30e682d1b113619eacf4",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/replay-rank0.json": "8a8c244074fefca6c7898225f52e666fec84d5718753ef6a2499397e5f3e3bf4",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/replay-rank1.json": "39132aae518f015e667de6b707f0ee98000b493b5657ecbe2a88451963fc6834",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/replay-rank2.json": "a1daec0bb35ab9a2c2a2b742d2e7c24c0edf0bab0ffb1165da42e8beedf7de1d",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/replay-rank3.json": "b11f2d9dff7da33251f5b55be1d469a23321955e2f1db5da5a91ee0b8e93d10b",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/replay-rank4.json": "1fa6616f52371d65da2b75ef95161dfbe1de3e625df422e5d8d8c06191da1481",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/replay-rank5.json": "419e0e901af1b5f93fdcae71e00c4dce00728571e0898e40179f3454f468cbf7",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/replay-rank6.json": "fb04007fdf6306e9c9ef50278759cc00e88808f47859b7269fce62af1615df24",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/replay-rank7.json": "3a1f11de93aec20b632367a130c636148096d6cd5857b836bcc0270d5baebc4f"
+  },
+  "larger_memory_tests": "EXCLUDED",
+  "limitations": "Full accumulated parameter gradients are checked for the first optimizer step at pinned initial weights; the controller separately completed three steps and final evaluation. Absence of actor warnings alone is not used as IPC counter proof."
+}

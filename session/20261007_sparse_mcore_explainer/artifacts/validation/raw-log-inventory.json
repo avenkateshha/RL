@@ -1,0 +1,1603 @@
+{
+  "local_only_logs": [
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-optimizer-replay-tp1cp1-20261010/slurm-19991459.out",
+      "bytes": 12588,
+      "sha256": "abe8a199cf03829d35582d5fb1b27991086e25826897e1ef926eb96d9b75503c",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-optimizer-replay-tp1cp1-20261010/slurm-19991459.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp1cp1-20261010/slurm-19991091.out",
+      "bytes": 18809,
+      "sha256": "4934c132ea4af429a0ef9326cff12e87ca541e4c701a9c047bbe72837fa86e3f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp1cp1-20261010/slurm-19991091.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp1cp1-devicefix-20261010/slurm-19991125.out",
+      "bytes": 20149,
+      "sha256": "4dba7563c2d692195d61e8955b8c8f913692762d1ff48a69ead3c19252bf7a29",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp1cp1-devicefix-20261010/slurm-19991125.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp1cp1-freshgraph-20261010/slurm-19991170.out",
+      "bytes": 14042,
+      "sha256": "f39158b3802c8aefcc4390d3f7c1dccc072b0e0ead7a983aa37e3104845982b1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp1cp1-freshgraph-20261010/slurm-19991170.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp2cp2-20261010/preflight-pytest.log",
+      "bytes": 4036,
+      "sha256": "6893a1107f1ece09fe1c173c23ad28e37b9335411822c6a3a1e76d7626f8883d",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp2cp2-20261010/preflight-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp2cp2-20261010/slurm-19991376.out",
+      "bytes": 49753,
+      "sha256": "c0b1667ba5394b40409a5f205406187d7f9400ebcad05e24f98036c0869bedc2",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-reference-tp2cp2-20261010/slurm-19991376.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp1/driver-logs/19991383-logs/ray-driver.log",
+      "bytes": 122669,
+      "sha256": "94649313e15b7a08eb3848e1edeabfcf4f4ba26d7aa2ef71038c16bdeed1a790",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp1/driver-logs/19991383-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp1/driver-logs/19991383-logs/ray-head.log",
+      "bytes": 18028,
+      "sha256": "35e260b1f0f7cc0f6607e97d996fadca91aff99c30a4b4e6cd46cb845e3a23fa",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp1/driver-logs/19991383-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp1/slurm-19991383.out",
+      "bytes": 106108,
+      "sha256": "8e6c17ad73dbd302fcea25b0ec0fd31892227183953efa5a2fb7822456d37fc1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp1/slurm-19991383.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp2/driver-logs/19991553-logs/ray-driver.log",
+      "bytes": 123074,
+      "sha256": "35c78b807775f8409e49ef19cb61866d2bfaffdc172244c510a467f7fd4f4d01",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp2/driver-logs/19991553-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp2/driver-logs/19991553-logs/ray-head.log",
+      "bytes": 18028,
+      "sha256": "4de84a42fe11285e8db6dd3ed658f5d1d8e9ae1a1110b706b136bc3d24f0f797",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp2/driver-logs/19991553-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp2/optimizer-replay.log",
+      "bytes": 23247,
+      "sha256": "062a5130da9879a4ff11135854476627c11303515a77dbbb610ec6457a722c44",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp2/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp2/slurm-19991553.out",
+      "bytes": 110632,
+      "sha256": "d1ccceaef14911e2c9c43e21e6989ac2f970c888b848b2396cb8291a1e45ff06",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp1cp2/slurm-19991553.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__driver-logs__19992100-logs__ray.tar.gz",
+      "bytes": 224541,
+      "sha256": "7d71a73e1414aa5b4f624b132d966c3a399f690e3bc62cda118887554932faea",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__driver-logs__19992100-logs__ray.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__driver-logs__19992100-logs__ray.json",
+      "members": 754
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__ray-final-logs.tar.gz",
+      "bytes": 216468,
+      "sha256": "6244390a4536fe9032ec777d2336b8415bbafdc54ed1934e703b5ac2b321c13c",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__ray-final-logs.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__ray-final-logs.json",
+      "members": 754
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/driver-logs/19992100-logs/ray-driver.log",
+      "bytes": 124391,
+      "sha256": "02e7a3c9e954f82c2d307deef2c62c6f9827c687b6acba0f1967032f9718f509",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/driver-logs/19992100-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/driver-logs/19992100-logs/ray-head.log",
+      "bytes": 212309,
+      "sha256": "5baef7e8d455e7816e2c4c9038f59e206ef504a8e39d63aa3740915a394218e0",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/driver-logs/19992100-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/optimizer-replay.log",
+      "bytes": 23344,
+      "sha256": "5cbc7fea2d1e3efa94810c2ce59d188cc7627ea58115d23eaace4cf6330fe60b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/slurm-19992100.out",
+      "bytes": 108254,
+      "sha256": "25a1190d3f371627c27f9dd47023f914c034683dfdc8a36449e7c7f684e09c2b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/slurm-19992100.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/driver-logs/19992724-logs/ray-driver.log",
+      "bytes": 129956,
+      "sha256": "811303e5c173b24332f9d9424f4f55bfaaef7d6d03a1b058bd5db2aea16d095a",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/driver-logs/19992724-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/driver-logs/19992724-logs/ray-head.log",
+      "bytes": 18017,
+      "sha256": "cfe0e9af449c3b72af701d5efecc9aa77c09d5f84568d7bfcd46d1d8b55f4902",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/driver-logs/19992724-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/optimizer-replay.log",
+      "bytes": 45018,
+      "sha256": "d277e729d565cce954e41317e1676255f22d8423c386895558250cf271ac8380",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/preflight-pytest.log",
+      "bytes": 4255,
+      "sha256": "ceec764dba8dc6fad02371641dc309371f7e9d0e99eaa6516882766ab4ca0f17",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/preflight-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/ray-final-logs/53d86f364d3cbc4714b60b57b4bbe7d67f37eb9d955c8acaab98b3f8/session_2026-10-10_15-25-14_741276_676360.tar.gz",
+      "bytes": 283845,
+      "sha256": "44d58a8f3d6bd6e97ee14c357c0a4c967de95bcfaad71fdfc67c0d4876cf970b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/ray-final-logs/53d86f364d3cbc4714b60b57b4bbe7d67f37eb9d955c8acaab98b3f8/session_2026-10-10_15-25-14_741276_676360.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/ray-final-logs/53d86f364d3cbc4714b60b57b4bbe7d67f37eb9d955c8acaab98b3f8/session_2026-10-10_15-25-14_741276_676360.members.json",
+      "members": 779
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/slurm-19992724.out",
+      "bytes": 114230,
+      "sha256": "a18cf8743e0bb60084357c77f5bd49dd1bcdb3eef3432c551cbef6c96feea4d3",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/slurm-19992724.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-optimizer-replay-20261010/slurm-19994298.out",
+      "bytes": 175813,
+      "sha256": "71073a6e609908d439aa4a22beb34d62c4d6b893564353e38b1dc5d0e502c92f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-optimizer-replay-20261010/slurm-19994298.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/driver-logs/19993994-logs/ray-driver.log",
+      "bytes": 194823,
+      "sha256": "1f13e0ac6d753828262110bcf409da47165037e0e09f04d8f227053a47b5a143",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/driver-logs/19993994-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/driver-logs/19993994-logs/ray-head.log",
+      "bytes": 18542,
+      "sha256": "1ad1e50e2acb5c3c45cc45a7d3587f2850542a6515fa5fa8fb961d8b13d8574b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/driver-logs/19993994-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/driver-logs/19993994-logs/ray-worker-0.log",
+      "bytes": 16084,
+      "sha256": "bc07b7fa446c5f7cff965248a47068d6372aad72173eaf6296e92b2cfa0db197",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/driver-logs/19993994-logs/ray-worker-0.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/89703f590067b898d9cd46913f629b285622e3d1609b34a31e30264d/session_2026-10-10_16-19-57_905171_3479445.tar.gz",
+      "bytes": 423064,
+      "sha256": "6d241f16161d56da0a47513f79fe3d844e2942477f672948183987860fedc168",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/89703f590067b898d9cd46913f629b285622e3d1609b34a31e30264d/session_2026-10-10_16-19-57_905171_3479445.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/89703f590067b898d9cd46913f629b285622e3d1609b34a31e30264d/session_2026-10-10_16-19-57_905171_3479445.members.json",
+      "members": 205
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/b00bc04be5da5565c5509bbea17d8a2e0c5c485aa9bbb8d2c394e376/session_2026-10-10_16-19-57_905171_3479445.tar.gz",
+      "bytes": 573253,
+      "sha256": "cdcec3b0a79cd8b805682c54bdd0da6dfd66837a200dd8751568d94f612d369c",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/b00bc04be5da5565c5509bbea17d8a2e0c5c485aa9bbb8d2c394e376/session_2026-10-10_16-19-57_905171_3479445.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/b00bc04be5da5565c5509bbea17d8a2e0c5c485aa9bbb8d2c394e376/session_2026-10-10_16-19-57_905171_3479445.members.json",
+      "members": 879
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/slurm-19993994.out",
+      "bytes": 134602,
+      "sha256": "7a4352bee850681f50f93b1b5ca2940cfb788f7c484af75cc6997a09ca19ec9c",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/slurm-19993994.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/driver-logs/19992929-logs/ray-driver.log",
+      "bytes": 185330,
+      "sha256": "6abc9d15f17fe92c1e4cdafae25e22e1026984851098c352caf76bad99392eab",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/driver-logs/19992929-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/driver-logs/19992929-logs/ray-head.log",
+      "bytes": 18023,
+      "sha256": "4632a1b236bb193d5d87fcbb47a4883fbd20d96603c8c90ac9866e9f45598d96",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/driver-logs/19992929-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "55a1dda36134e1a094a684f18678725d1655f37f30af2385c388b1cda96bf69f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/ray-final-logs/2c976cd16d44f22c58313349e14d3ed90e1a000b225d7796cd170c9b/session_2026-10-10_15-34-16_892410_1749439.tar.gz",
+      "bytes": 534529,
+      "sha256": "7265ca62ecd14defe8063a8443052df7aad9b7ce962ef11b9be75f6adeb7dd80",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/ray-final-logs/2c976cd16d44f22c58313349e14d3ed90e1a000b225d7796cd170c9b/session_2026-10-10_15-34-16_892410_1749439.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/ray-final-logs/2c976cd16d44f22c58313349e14d3ed90e1a000b225d7796cd170c9b/session_2026-10-10_15-34-16_892410_1749439.members.json",
+      "members": 889
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/slurm-19992929.out",
+      "bytes": 120775,
+      "sha256": "b9168383e0dfcd913c93cf495321ed2eea8fed2a978304e015e048e3c3d301dd",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2/slurm-19992929.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/driver-logs/19994688-logs/ray-driver.log",
+      "bytes": 184594,
+      "sha256": "719589dfd777094b04aad1a0512e8a79d13a9ab1c75a9405410cbc1e650e693b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/driver-logs/19994688-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/driver-logs/19994688-logs/ray-head.log",
+      "bytes": 18068,
+      "sha256": "0087703eea3421c38e728e12429a7c1840d74200335e45f34a84ab0f6d87cc52",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/driver-logs/19994688-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "a553e711036a1b31f3f98549ee285723f84a89762d6843ec7cd34b3874b78d39",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/ray-final-logs/3081571c71a5d7b0bf1e140470e9d3c80f462d39e6a47deeb8cccfdd/session_2026-10-10_16-51-04_807533_2482200.tar.gz",
+      "bytes": 566357,
+      "sha256": "3644f892773349b73091cee694494d45e53a1e7fef0d0f79c77405e2393e48cd",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/ray-final-logs/3081571c71a5d7b0bf1e140470e9d3c80f462d39e6a47deeb8cccfdd/session_2026-10-10_16-51-04_807533_2482200.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/ray-final-logs/3081571c71a5d7b0bf1e140470e9d3c80f462d39e6a47deeb8cccfdd/session_2026-10-10_16-51-04_807533_2482200.members.json",
+      "members": 889
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/slurm-19994688.out",
+      "bytes": 122364,
+      "sha256": "e590d8b01d55ce6b35d3ac1dc65d1602e1dc0052602a1b14bc0192968b172dd3",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-tp2cp2-reversed/slurm-19994688.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/driver-logs/19994429-logs/ray-driver.log",
+      "bytes": 182794,
+      "sha256": "ca2c78a3b7f1040ea67e6fb5d647e53d357b3cd649618af2cf379c34a08f6c59",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/driver-logs/19994429-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/driver-logs/19994429-logs/ray-head.log",
+      "bytes": 18028,
+      "sha256": "adf85ff535452588b23377a58927c501fdb1444fcceaefacfeff1c67d555c2e3",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/driver-logs/19994429-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "79bd898a1d78f2dcf516d8448d3a4164990abeaf1de7838276be13ef02c1b0ba",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/ray-final-logs/3e599d2b4f108ee6bb1e62caa654bb506ce618dc4295cbcb34c81126/session_2026-10-10_16-35-06_934988_2222697.tar.gz",
+      "bytes": 635065,
+      "sha256": "901c610da088210c602aab81c0ee55473301629f6df7eb04d7e8d77c28dc8811",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/ray-final-logs/3e599d2b4f108ee6bb1e62caa654bb506ce618dc4295cbcb34c81126/session_2026-10-10_16-35-06_934988_2222697.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/ray-final-logs/3e599d2b4f108ee6bb1e62caa654bb506ce618dc4295cbcb34c81126/session_2026-10-10_16-35-06_934988_2222697.members.json",
+      "members": 959
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/slurm-19994429.out",
+      "bytes": 113670,
+      "sha256": "575d7b81f4c473787fa8f01a9e4ba061b47035431b6e28b1a701266a8d87e030",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic/slurm-19994429.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic-independent-audit-20261010/ratios.log",
+      "bytes": 8289,
+      "sha256": "db9c952c10f4e575ae81ae0caa9176435272e0488fd70a43dc318b3a9967fb89",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic-independent-audit-20261010/ratios.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__driver-logs__19991885-logs__ray.tar.gz",
+      "bytes": 601974,
+      "sha256": "f6c379a15681ac912870f3276223309d3b15997f99521978d59465794c581eb6",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__driver-logs__19991885-logs__ray.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__driver-logs__19991885-logs__ray.json",
+      "members": 959
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__ray-final-logs.tar.gz",
+      "bytes": 515380,
+      "sha256": "c789da2c8a147c38479bf9069a17d71d32370a4282136e5cb0eeceda657d6aa2",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__ray-final-logs.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__ray-final-logs.json",
+      "members": 959
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/driver-logs/19991885-logs/ray-driver.log",
+      "bytes": 183230,
+      "sha256": "67399aa37ebe1f1880ce89cfe180cb45a78145ad6cd66117fff991423a0f572f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/driver-logs/19991885-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/driver-logs/19991885-logs/ray-head.log",
+      "bytes": 372490,
+      "sha256": "bd1ac5540fecb6bb822d0baf4c7c985f40d413e236128194509dc8fe8dde5c3f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/driver-logs/19991885-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/slurm-19991885.out",
+      "bytes": 111570,
+      "sha256": "53e3cd76fa8feb3742727956689c384cf4b52408c263edfe8b44bf11385cb74e",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/slurm-19991885.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/archived-raw-logs/runs__R3-fixed-cuda-support-20261010__driver-logs__19992163-logs__ray.tar.gz",
+      "bytes": 266038,
+      "sha256": "cadbfa6c8fc3ade80894224263e27bb189bfecac41015c1481da0013965f0be4",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/archived-raw-logs/runs__R3-fixed-cuda-support-20261010__driver-logs__19992163-logs__ray.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/archived-raw-logs/runs__R3-fixed-cuda-support-20261010__driver-logs__19992163-logs__ray.json",
+      "members": 825
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/driver-logs/19992163-logs/ray-driver.log",
+      "bytes": 179167,
+      "sha256": "2e2a3e0bb0bfe2da76dc0ddd6d62a58612ee93bc5532590e4397096b686acccf",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/driver-logs/19992163-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/driver-logs/19992163-logs/ray-head.log",
+      "bytes": 2886150,
+      "sha256": "25e6724a7b2c160ff3cf5a57a59ef2ccfb2bb774f774850a21bc79d6fbf857bc",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/driver-logs/19992163-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/slurm-19992163.out",
+      "bytes": 111658,
+      "sha256": "a8f28cb9561a8ebb542b2091eeadbc577cbdfc885f5a2569a1a38c7737424de3",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/slurm-19992163.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/driver-logs/19992723-logs/ray-driver.log",
+      "bytes": 181651,
+      "sha256": "f65ca0b64577f5f7e4dd09da59d08947647a059ae64e931e65ace1b668d5e217",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/driver-logs/19992723-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/driver-logs/19992723-logs/ray-head.log",
+      "bytes": 18103,
+      "sha256": "f126312200e070d2c9f3491cc6578ad87ed9bc2c05837065d62930a827b9b620",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/driver-logs/19992723-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "d7d008bac4994d4ab4a9fa0c22111139488b6fb24cb36881a19025e899ed5111",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/ray-final-logs/c62bf9e1ebfcca1de5f53d367d46e921a6c776b117b6b8117c039527/session_2026-10-10_15-25-01_827603_2442219.tar.gz",
+      "bytes": 588243,
+      "sha256": "f86b74f689f26c12ea120b58a34fa4f0ddb7f67acd19b4693fd265aac52e92a7",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/ray-final-logs/c62bf9e1ebfcca1de5f53d367d46e921a6c776b117b6b8117c039527/session_2026-10-10_15-25-01_827603_2442219.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/ray-final-logs/c62bf9e1ebfcca1de5f53d367d46e921a6c776b117b6b8117c039527/session_2026-10-10_15-25-01_827603_2442219.members.json",
+      "members": 924
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/slurm-19992723.out",
+      "bytes": 120160,
+      "sha256": "b13b5913aa8e430219b3983ad6d47715780023a9f43f8c2fa0c34c9cb35442d5",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-tar-logs-20261010/slurm-19992723.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-oracle-support-device-selfcheck-20261010/verify_controller_capture.log",
+      "bytes": 329,
+      "sha256": "327b23f0e6cf98df8be1be8732f5b5da8d43383aa90675b7b7d562aca62cfb94",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-oracle-support-device-selfcheck-20261010/verify_controller_capture.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-oracle-support-device-selfcheck-20261010/verify_model_oracle.log",
+      "bytes": 231,
+      "sha256": "cbc7acfb2c05c66733170ef70a8964e7c59b91688f1fc2ee21af1a78bed12339",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-oracle-support-device-selfcheck-20261010/verify_model_oracle.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-topk-probe-20261010/probe.log",
+      "bytes": 4991,
+      "sha256": "ef588752c1a9169e43b2b151cc1e895d3dd077bf53eec8d20103cec29f7ec191",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-topk-probe-20261010/probe.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__driver-logs__19991907-logs__ray.tar.gz",
+      "bytes": 595627,
+      "sha256": "3fab9fd61c59a2d2ff508388cf9b078547d5552627451904edc041d65c7523d5",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__driver-logs__19991907-logs__ray.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__driver-logs__19991907-logs__ray.json",
+      "members": 959
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__ray-final-logs.tar.gz",
+      "bytes": 592318,
+      "sha256": "f2b6bc8af55f2f397558deaab1a11e6017b9be4ecbe5332d09eba8974559e693",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__ray-final-logs.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__ray-final-logs.json",
+      "members": 959
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/driver-logs/19991907-logs/ray-driver.log",
+      "bytes": 173571,
+      "sha256": "96cc201d5dd9eefbc7b0710428305b70191cd061625f41fc5970a1ceafe9dae5",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/driver-logs/19991907-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/driver-logs/19991907-logs/ray-head.log",
+      "bytes": 388190,
+      "sha256": "d0e80f4eea3fede9773344fb3324681ed4bc28ec7635a0e29e546d2894014074",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/driver-logs/19991907-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/slurm-19991907.out",
+      "bytes": 120744,
+      "sha256": "d21a3abf9f8de6cd4b86f3a2dd965cb7bfbdff133298971da9d30fcde7cc080c",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/slurm-19991907.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/driver-logs/19992921-logs/ray-driver.log",
+      "bytes": 165306,
+      "sha256": "54fd99e809dea0351ac2d24c5bb0a7effceed7ac0005e750a8709ec1864e1423",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/driver-logs/19992921-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/driver-logs/19992921-logs/ray-head.log",
+      "bytes": 18153,
+      "sha256": "5b66c485a9c2b90525014593065648a21add7913d46876e633113d5278b72597",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/driver-logs/19992921-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/legacy-ipc-verification.log",
+      "bytes": 2422,
+      "sha256": "775aa5366d0222962e180be36912496028bb29742f1bbfc72f331446294673f7",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/legacy-ipc-verification.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "c0ec7bc7913ef08b7f7cbf89e806dff8a08240e4b887a1455fa891cd0a1eec93",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/ray-final-logs/6d1c970faf3d2efe6739195cabf82ecd58d773cfeba1bd2b9749bd7b/session_2026-10-10_15-33-44_898765_2848707.tar.gz",
+      "bytes": 545145,
+      "sha256": "bb1bc33c568c21330e03e01ad932818211bfa21c931c2b54952d5aa455ccbdc5",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/ray-final-logs/6d1c970faf3d2efe6739195cabf82ecd58d773cfeba1bd2b9749bd7b/session_2026-10-10_15-33-44_898765_2848707.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/ray-final-logs/6d1c970faf3d2efe6739195cabf82ecd58d773cfeba1bd2b9749bd7b/session_2026-10-10_15-33-44_898765_2848707.members.json",
+      "members": 889
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/slurm-19992921.out",
+      "bytes": 126494,
+      "sha256": "3881103f5f44e83b72ba723e40265b525281f79b1d975315a573ec9ae66e977e",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/slurm-19992921.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/driver-logs/19993411-logs/ray-driver.log",
+      "bytes": 166219,
+      "sha256": "59725bf0d962473fe2614068e54e6f1258677fa3d8ec777bd29d913eb8e8358a",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/driver-logs/19993411-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/driver-logs/19993411-logs/ray-head.log",
+      "bytes": 18153,
+      "sha256": "f757d2de60dae789923055d173bb257d9fb017dcc684be384e9a2a29d122c4e1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/driver-logs/19993411-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/legacy-ipc-verification.log",
+      "bytes": 3191,
+      "sha256": "f3ca9b074abb09a6ed1ecb2da8a5708496848d32a0249c5a91b928e005a9c555",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/legacy-ipc-verification.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "a340973623e93943ecc6720a37328c4bcaba899908e27c68001dd2e5ecc05b7b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/preflight-pytest.log",
+      "bytes": 21743,
+      "sha256": "220f6e5c4f71b246df4f1ff97eeb46c835cbb076f5a90f07ce760732c374dd3c",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/preflight-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/ray-final-logs/8cd890dc32d713bdc64503e16dc2d1aa2a22b53ac0583d571527a9fa/session_2026-10-10_15-51-56_207468_4070938.tar.gz",
+      "bytes": 608645,
+      "sha256": "35873b6809b4de2c96a75da88db9587d9d09c3f60bfb1cb1af67c92394c84645",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/ray-final-logs/8cd890dc32d713bdc64503e16dc2d1aa2a22b53ac0583d571527a9fa/session_2026-10-10_15-51-56_207468_4070938.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/ray-final-logs/8cd890dc32d713bdc64503e16dc2d1aa2a22b53ac0583d571527a9fa/session_2026-10-10_15-51-56_207468_4070938.members.json",
+      "members": 959
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/slurm-19993411.out",
+      "bytes": 130044,
+      "sha256": "4dc2ae3490b03357584974b7c49cff773c16d51dc7b922e2750a75b3ff823d3c",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/slurm-19993411.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor/driver-logs/19991476-logs/ray-driver.log",
+      "bytes": 161871,
+      "sha256": "d48319a3934952a38c7da3696647052b78810d90297c336e3ac84103883dc79e",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor/driver-logs/19991476-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor/driver-logs/19991476-logs/ray-head.log",
+      "bytes": 18058,
+      "sha256": "338b017483807b25700ef5811cefecf36e33a12482e39e50a247ee848ae2ee43",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor/driver-logs/19991476-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor/slurm-19991476.out",
+      "bytes": 115542,
+      "sha256": "130801695e61319b2ce86a49546a5e3003dc8eb2951580b2e0d9b5f45a947173",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor/slurm-19991476.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/driver-logs/19993796-logs/ray-driver.log",
+      "bytes": 164158,
+      "sha256": "8f2cf39924f1b29fb222d74e7f81a4dffbfd32bd45dc5c8dd45fd0e9ee2586c4",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/driver-logs/19993796-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/driver-logs/19993796-logs/ray-head.log",
+      "bytes": 18148,
+      "sha256": "d896045a750e3fc36c6b1ff0010632a00c22a029c14753f145050c07a31761f7",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/driver-logs/19993796-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/legacy-ipc-verification.log",
+      "bytes": 3295,
+      "sha256": "afa7c906ee1f140adaad607dac5a92f1c09968dc568b41bfd8da8f5acd8bc82b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/legacy-ipc-verification.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "666e4026146b90c3013c336009422c07cbbb4b4c3a0b2b8043af2a11dd1ff5dd",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/ray-final-logs/d96002f05ca1a79f650bfbd0809bec6f2bdff3f4aff330e91885c765/session_2026-10-10_16-09-56_303555_1910633.tar.gz",
+      "bytes": 650900,
+      "sha256": "9f3f8a8cf7101487d22e2b3a8cac5e2a485784af1e4e1b6494f485f7ee084080",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/ray-final-logs/d96002f05ca1a79f650bfbd0809bec6f2bdff3f4aff330e91885c765/session_2026-10-10_16-09-56_303555_1910633.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/ray-final-logs/d96002f05ca1a79f650bfbd0809bec6f2bdff3f4aff330e91885c765/session_2026-10-10_16-09-56_303555_1910633.members.json",
+      "members": 959
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/slurm-19993796.out",
+      "bytes": 122894,
+      "sha256": "f4e8e7c8d940079a801db77464464426132c2cc395ca70bce86f6b9797fc2729",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/slurm-19993796.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-optimizer-replay-mcore-dtensor-20261010/slurm-19991626.out",
+      "bytes": 88544,
+      "sha256": "8c33ce00eef0e9d30d234cd4648b2ce00d696c35e25373eeea5d97adf3489409",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-optimizer-replay-mcore-dtensor-20261010/slurm-19991626.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/driver-logs/19994428-logs/ray-driver.log",
+      "bytes": 175040,
+      "sha256": "b2f97164fd69842786a3024dad0f6e1eeecbef5854859d7e412cc9a1076852ae",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/driver-logs/19994428-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/driver-logs/19994428-logs/ray-head.log",
+      "bytes": 18037,
+      "sha256": "be71a016180b9151b060a6eb5d0a3a2719e101dabea543b2f1693b7c28b1be5f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/driver-logs/19994428-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "06d200ad64c0ffe18869974d5b16eb3258b775a5d1b7b8162412a056fffb32bd",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/ray-final-logs/fa4ecd1b968c54eebb09a0b68d1a8436bf495384a01b745b380f4a3e/session_2026-10-10_16-35-08_886037_3930678.tar.gz",
+      "bytes": 592555,
+      "sha256": "61aad509e45a00408972e110d38f353828b21e68c32e12a862a269e0f68f2db9",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/ray-final-logs/fa4ecd1b968c54eebb09a0b68d1a8436bf495384a01b745b380f4a3e/session_2026-10-10_16-35-08_886037_3930678.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/ray-final-logs/fa4ecd1b968c54eebb09a0b68d1a8436bf495384a01b745b380f4a3e/session_2026-10-10_16-35-08_886037_3930678.members.json",
+      "members": 924
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/slurm-19994428.out",
+      "bytes": 110341,
+      "sha256": "175d024cc02b6bf1cb738d0dff05780a4844aa878b71bf3c62cc228e1eaf3e1c",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged/slurm-19994428.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/driver-logs/19994716-logs/ray-driver.log",
+      "bytes": 125158,
+      "sha256": "f61984b0e5f21852f0ddb50307168c071752a6d483d4201d9d4a60970963c5c1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/driver-logs/19994716-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/driver-logs/19994716-logs/ray-head.log",
+      "bytes": 18022,
+      "sha256": "d147b4ba5204a84930220e718a72e857d5c573bdd9678f0588224d372a68c0a0",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/driver-logs/19994716-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "8c85a4703ad7b369c619c98cdc23eda2d68ef011c227c9cfbb47c6710d4432e3",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+      "bytes": 423937,
+      "sha256": "2ee7b407e24da8b7b64934a46c7ab93fd18642e528f35df30870377ced3c5b8a",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.members.json",
+      "members": 839
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/slurm-19994716.out",
+      "bytes": 105050,
+      "sha256": "f01d584e8b4f8f5e9bf2f1bf139c4708302dafdd839e269225c2bd95af00d83d",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/slurm-19994716.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/driver-logs/19994577-logs/ray-driver.log",
+      "bytes": 126700,
+      "sha256": "a0f879ca9ffe16365ac7b93f90e29ea48ac57f32a8c18885cf7db016a27bd7e1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/driver-logs/19994577-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/driver-logs/19994577-logs/ray-head.log",
+      "bytes": 18012,
+      "sha256": "fe25ee669ee1b9a5009b4f574865f11e219392df842c8e3571257299bfcfac80",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/driver-logs/19994577-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "093ae9bea158029044f73ef4b4d40a65bcdcdbf9fd45f94e4fdcb8405868fc5f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/ray-final-logs/d3a16d1d4c3bf950deab6997cb088680ad980dafe5d7700ff3fd26bb/session_2026-10-10_16-43-59_014799_3672680.tar.gz",
+      "bytes": 451601,
+      "sha256": "486f2a92812759ae9b0ab1e570cd36ed87d6b53a9af3b5e367804243a2e8d2cd",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/ray-final-logs/d3a16d1d4c3bf950deab6997cb088680ad980dafe5d7700ff3fd26bb/session_2026-10-10_16-43-59_014799_3672680.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/ray-final-logs/d3a16d1d4c3bf950deab6997cb088680ad980dafe5d7700ff3fd26bb/session_2026-10-10_16-43-59_014799_3672680.members.json",
+      "members": 874
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/slurm-19994577.out",
+      "bytes": 108338,
+      "sha256": "dee86c2f3220c51adf25238252afbf0ebdb2c3270b3a8741060a8b46f2b830eb",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-fixed/slurm-19994577.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-independent-audit-20261010/contrast.log",
+      "bytes": 2141,
+      "sha256": "eb43e19bad8746425ec1a477daefed0a23d245e1b057e5fa77adedaa1f326657",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-independent-audit-20261010/contrast.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/driver-logs/19993412-logs/ray-driver.log",
+      "bytes": 127365,
+      "sha256": "1e3b93e72f87a10d31fb48c87dafd339f9f6bb9eb34fe4ab8ee8d3352e99e5cb",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/driver-logs/19993412-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/driver-logs/19993412-logs/ray-head.log",
+      "bytes": 18053,
+      "sha256": "4b5ca22fba2917c5c9f61af42f5141032e7f33f03b94a3feefd730149b1358b9",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/driver-logs/19993412-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/legacy-ipc-verification.log",
+      "bytes": 3067,
+      "sha256": "6ded96479e47ec8a73f4d4eae93c3aafbe27fb53b277f91869ef75ccf9d0574b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/legacy-ipc-verification.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/ray-final-logs/527daafb032216073b30d7cf2e136a19edaa4de18dea770b28482aae/session_2026-10-10_15-51-54_723375_26846.tar.gz",
+      "bytes": 413211,
+      "sha256": "8db15a1f81037d87e5c0edeb1db103c65d7121cf0fdd4082970bcbe70a9b23c7",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/ray-final-logs/527daafb032216073b30d7cf2e136a19edaa4de18dea770b28482aae/session_2026-10-10_15-51-54_723375_26846.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/ray-final-logs/527daafb032216073b30d7cf2e136a19edaa4de18dea770b28482aae/session_2026-10-10_15-51-54_723375_26846.members.json",
+      "members": 874
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/slurm-19993412.out",
+      "bytes": 101796,
+      "sha256": "eedb993214f70637539c713cc7f040f288e4c1bccdd08b9985ffbcb86d0e215f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/slurm-19993412.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/driver-logs/19993795-logs/ray-driver.log",
+      "bytes": 132017,
+      "sha256": "c662ac9295bd2c1312493592a8c88467296b3110781f1773045d5e7dec9902af",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/driver-logs/19993795-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/driver-logs/19993795-logs/ray-head.log",
+      "bytes": 18143,
+      "sha256": "65e9813deebcf31b70bbd157ee573e74f8aae0b70286807a47f8be354b3ac6d5",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/driver-logs/19993795-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/legacy-ipc-verification.log",
+      "bytes": 3162,
+      "sha256": "5e0a0e76c1342818be492018585ae5f74bb80089642723fc88efef480340e0f1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/legacy-ipc-verification.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "8a70c06baaf6cffebcdd2ca5e7f9e6915925989b3602aa940e30d083a49821d9",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/preflight-pytest.log",
+      "bytes": 15189,
+      "sha256": "c4fd1bd7c37a77eab6607c79261ddf1dba5695a8924c63dfa074ceef7031399d",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/preflight-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/ray-final-logs/5a2a4b2cc8f480c1e1d7404c15bca38b7423ed5d247175ab88160659/session_2026-10-10_16-09-04_718995_3564291.tar.gz",
+      "bytes": 462575,
+      "sha256": "df94727b100a40f66b1539b8c9fe2bbc22cd864e68e2a0ef2493e9d6e4203795",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/ray-final-logs/5a2a4b2cc8f480c1e1d7404c15bca38b7423ed5d247175ab88160659/session_2026-10-10_16-09-04_718995_3564291.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/ray-final-logs/5a2a4b2cc8f480c1e1d7404c15bca38b7423ed5d247175ab88160659/session_2026-10-10_16-09-04_718995_3564291.members.json",
+      "members": 874
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/slurm-19993795.out",
+      "bytes": 116320,
+      "sha256": "8eb0b936ee57edae21efa9a28ee5b6a0ea7f423631b5a5a1832194b2663f9671",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/slurm-19993795.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/driver-logs/19994584-logs/ray-driver.log",
+      "bytes": 109450,
+      "sha256": "c3ef90936b6eaf2d5814b2493b37e5cc95275f654ab98711f1e256f034cf559f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/driver-logs/19994584-logs/ray-driver.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/driver-logs/19994584-logs/ray-head.log",
+      "bytes": 18063,
+      "sha256": "a1868215a76d650dd81e117b70291e6a190ddf3f111cc7dafc28923ffb415bdc",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/driver-logs/19994584-logs/ray-head.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/legacy-ipc-verification.log",
+      "bytes": 3191,
+      "sha256": "f3ca9b074abb09a6ed1ecb2da8a5708496848d32a0249c5a91b928e005a9c555",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/legacy-ipc-verification.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/optimizer-replay.log",
+      "bytes": 88366,
+      "sha256": "017e1c86c58926975cf2a83bb41289ae35f73b7a9bbe20f17326e339bd0b2307",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/optimizer-replay.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/ray-final-logs/58882024261cbdba957e60c0bea7178b3329411cabcda66789c55103/session_2026-10-10_16-44-03_250932_3482961.tar.gz",
+      "bytes": 396232,
+      "sha256": "8d0125cff188d20f5baa972df78536c9ae18251bb1041c08fe23c7571111ac49",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/ray-final-logs/58882024261cbdba957e60c0bea7178b3329411cabcda66789c55103/session_2026-10-10_16-44-03_250932_3482961.tar.gz",
+      "kind": "verified_raw_log_archive",
+      "member_manifest": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/ray-final-logs/58882024261cbdba957e60c0bea7178b3329411cabcda66789c55103/session_2026-10-10_16-44-03_250932_3482961.members.json",
+      "members": 839
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/slurm-19994584.out",
+      "bytes": 114056,
+      "sha256": "2f7dc9e8059e4c047d6d7c08473966ae9290d5af765de6398d25b40e4e6423fb",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dtensor-sparse/slurm-19994584.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-oracle-position-zero-20261010/verify_controller_capture.py.log",
+      "bytes": 329,
+      "sha256": "327b23f0e6cf98df8be1be8732f5b5da8d43383aa90675b7b7d562aca62cfb94",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-oracle-position-zero-20261010/verify_controller_capture.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-oracle-position-zero-20261010/verify_dense_cross_oracle.py.log",
+      "bytes": 9243,
+      "sha256": "07e20bf23890c1a8001dca7ee76db787ca620371099c9f27f6322efbfaa8a111",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-oracle-position-zero-20261010/verify_dense_cross_oracle.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-oracle-position-zero-20261010/verify_model_oracle.py.log",
+      "bytes": 416,
+      "sha256": "cef3fbc6be984e33e88bbe1748fb8707c36b464bc8e9eb44d4fff9c33f0f25f4",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-oracle-position-zero-20261010/verify_model_oracle.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-packed-dense-regression/pytest.log",
+      "bytes": 9615,
+      "sha256": "b0b94f42fa123438d0140cc2c22bd193ad4462781badb8e6fed639704f4c0ab0",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-packed-dense-regression/pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint2-primitives-20261010/pytest.log",
+      "bytes": 17587,
+      "sha256": "7104a442c0a4d80b637ba8cc15555f4e170423a3138cb104681e4e22e264b1a9",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint2-primitives-20261010/pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint2-primitives-20261010/slurm-19989749.out",
+      "bytes": 64,
+      "sha256": "44d83f58b251f981fcae04f612ac7188163197c19175543b10b1bf6521cf9c63",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint2-primitives-20261010/slurm-19989749.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/dense_adapter.log",
+      "bytes": 9866,
+      "sha256": "7daab9d57a9635f9372559aca130bcb984b8061f7f453c4b4113d839355aa34f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/dense_adapter.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/dense_cuda.log",
+      "bytes": 6101,
+      "sha256": "b7301ff55f92d80f1112f5748695efd0166759704592ef97113f66decb7b0bd8",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/dense_cuda.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/lifetime.log",
+      "bytes": 4821,
+      "sha256": "081954f7de8b3ffc85108d385275a63c85788c162ca97174b43727ab1ae81488",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/lifetime.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/orchestration.log",
+      "bytes": 112108,
+      "sha256": "4efd9f3829e3c17fc35addb2123f4e040ce1600ea879c5b724ac333882552c70",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/orchestration.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/policy.log",
+      "bytes": 7591,
+      "sha256": "d460fe8fe5711cd561c11b5e2b2a7d02b883169d5da37dbae6d6cab78f635ed5",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/policy.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/primitives.log",
+      "bytes": 17698,
+      "sha256": "8a236493fbb393b9ffbfa3b80f84d055151c40aabab65fd831a84235c7403e15",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/primitives.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/producer.log",
+      "bytes": 19821,
+      "sha256": "0b3a89887d70d0792f086c2eabae3200ace7da5068c604cfdcef50ba18aae172",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/producer.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/raw.log",
+      "bytes": 3897,
+      "sha256": "319a1de76a182fee5b4d137c6cb4b2907245e1f35118c07109b3aef793d84910",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/raw.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/slurm-19990413.out",
+      "bytes": 64,
+      "sha256": "44d83f58b251f981fcae04f612ac7188163197c19175543b10b1bf6521cf9c63",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/slurm-19990413.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/wrapper.log",
+      "bytes": 18213,
+      "sha256": "b21b57f44614de17562ecc82463a5979b725c890472edb1923bbb25d0b4af867",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/wrapper.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/megatron-pytest.log",
+      "bytes": 23169,
+      "sha256": "58c6435555f1007b757b7a992a3fae779736aabbb0ff4d9a064536e8c3000bb0",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/megatron-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/padding-host-environment-error.log",
+      "bytes": 13438,
+      "sha256": "8f26f1d50a53d92ca9ebd979c48152b14b209cd10e83b74f4d8869a9eee980a5",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/padding-host-environment-error.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/policy-pytest.log",
+      "bytes": 4690,
+      "sha256": "4066b46557e6bc021ccd20e16ab07ca282e2af1a7ec3e62ac68b28576b828de7",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/policy-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/slurm-19989936.out",
+      "bytes": 64,
+      "sha256": "44d83f58b251f981fcae04f612ac7188163197c19175543b10b1bf6521cf9c63",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/slurm-19989936.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/utils-host.log",
+      "bytes": 2966,
+      "sha256": "4f42f84561f49e130e22cf39137056ff044d9bb1364ec30d9768dce2847ab33d",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/utils-host.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/utils-pytest.log",
+      "bytes": 11454,
+      "sha256": "4d6f4097d0c7a97cc99744ff604a4c6580e9ba324e3dc20868ba7b79170492a2",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-integration-20261010/utils-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/controller.log",
+      "bytes": 120666,
+      "sha256": "67764f211c96bd8b20078197a7afb53ab67b863742cff2f5de4899de9698c926",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/controller.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/dense_cuda.log",
+      "bytes": 6101,
+      "sha256": "c4a94b7a3ad5a6a61e12c6d86a59121b11e49172d9ca2599e79bc2636d0c9a4f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/dense_cuda.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/dispatch.log",
+      "bytes": 111138,
+      "sha256": "c2c6787ff14905dbd210b29e9f3f7a29a9a8c460e1e61e1c321e684c087c4ba8",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/dispatch.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/native_math.log",
+      "bytes": 121460,
+      "sha256": "51040793062e2353ee9f163e1effa55f2345f00274634c52c95c32413997eb2f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/native_math.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/slurm-19991092.out",
+      "bytes": 154,
+      "sha256": "a07236913a46d452fdf233536ac206caae87930d1168a565627cee2f255543ae",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/slurm-19991092.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/wrapper.log",
+      "bytes": 17598,
+      "sha256": "bc60ea095424f41901fc0ff2c8247014cc1f3ea59af58dc66a9e463b6f537248",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4-final-gpu-20261010/wrapper.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/native-sparse-loss-vectorized.log",
+      "bytes": 58834,
+      "sha256": "efd1cab59dac2b093fc4504ee8f7d7062d82307e4be1e78583c806c3a0dadf3f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/native-sparse-loss-vectorized.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/source-after-check.log",
+      "bytes": 583,
+      "sha256": "7bc2c9112ea68f42681b9ba7c48599d51c499f78418eb5d5ea81407bb25ea6be",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/source-after-check.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-loss-contract-final.log",
+      "bytes": 12096,
+      "sha256": "ddd55abae7563d0c330866be6559d35e3d645b92ae8c51272606f03719d16994",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-loss-contract-final.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-loss-regression.log",
+      "bytes": 124564,
+      "sha256": "e275819e5b5531109d481ed862e03317afdaea561f4244977f329e0289b0028b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-loss-regression.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-sparse-dispatch-verified.log",
+      "bytes": 34944,
+      "sha256": "d61be9f330d12ffc5757854cd87de105290e72bae9117ea85aca4a5f3db589cb",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-sparse-dispatch-verified.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-sparse-legacy-mix-verified.log",
+      "bytes": 34948,
+      "sha256": "ea309aaabc1d4057172da46e54abbfd56d80e9c5aedc7883709905eb856ae0ec",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-sparse-legacy-mix-verified.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-student-tests.log",
+      "bytes": 2090,
+      "sha256": "d0275dbe1dd1e06f3aae2df3d0e9349f1c24dd5342d01b74ae55b04b48dc5f70",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4a-cpu-20261010/xtoken-native-student-tests.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/native-same-final-cpu.log",
+      "bytes": 62422,
+      "sha256": "b028618e2c09aa8042d6ca2bd55f370ff3046aaa59d617e1e64bf0dac3ba13ef",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/native-same-final-cpu.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/source-after-check.log",
+      "bytes": 457,
+      "sha256": "ede3220ec137c69fde92a0d8eab28658582a60917da5f303d2568c6459054078",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/source-after-check.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-controller4b-selector-tests.log",
+      "bytes": 8420,
+      "sha256": "58c4d84eae726630a9bc34556910777b5aef6b448138bb3f95ad78716e7473ec",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-controller4b-selector-tests.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-controller4b-tests.log",
+      "bytes": 127726,
+      "sha256": "815e0de68a032eb67b5cb2950dae6cfa495b40db797baeee6f5efa0fa628120e",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-controller4b-tests.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-native-dense-contract-final.log",
+      "bytes": 16236,
+      "sha256": "c8f78b15dddb46b05ff900ef06564c13e217f27324316406e49a40fccafef79a",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-native-dense-contract-final.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-native-dense-early-regression.log",
+      "bytes": 16002,
+      "sha256": "06a32a9dc7a6993ebd6d6bf37531bc7f9d32c1a1742f03b7e275f0b4bd248f5e",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-native-dense-early-regression.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-same-mixed-cpu.log",
+      "bytes": 69251,
+      "sha256": "22b90a1b3b3ea32e7b7e54a385db141c4f6aae2114864d449619e6756f8104ae",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint4b-cpu-20261010/xtoken-same-mixed-cpu.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-final-quality-20261010/ruff-0.log",
+      "bytes": 178,
+      "sha256": "374bd4b056bd09249d61353f6720d9e2ef06997d85fe24ce479250245ce954c6",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-final-quality-20261010/ruff-0.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-final-quality-20261010/ruff-1.log",
+      "bytes": 178,
+      "sha256": "374bd4b056bd09249d61353f6720d9e2ef06997d85fe24ce479250245ce954c6",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-final-quality-20261010/ruff-1.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-final-quality-20261010/ruff-2.log",
+      "bytes": 186,
+      "sha256": "64ba9c71b35d421aecdfbe3fdd70c7447abc403793ee85abbc66602d7fbc1315",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-final-quality-20261010/ruff-2.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-publication-quality-20261010/ruff-0.log",
+      "bytes": 178,
+      "sha256": "374bd4b056bd09249d61353f6720d9e2ef06997d85fe24ce479250245ce954c6",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-publication-quality-20261010/ruff-0.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-publication-quality-20261010/ruff-1.log",
+      "bytes": 178,
+      "sha256": "374bd4b056bd09249d61353f6720d9e2ef06997d85fe24ce479250245ce954c6",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-publication-quality-20261010/ruff-1.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-publication-quality-20261010/ruff-2.log",
+      "bytes": 186,
+      "sha256": "c49847f5f788d51a805156caa12c6d4e065095d33e0e139eb4397d1cab990a49",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-publication-quality-20261010/ruff-2.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-types-20261010/native-same.log",
+      "bytes": 666,
+      "sha256": "3abc0b3a583fe397a104ad04f81e3461ac44131b3abc01671baa8098ee5694b4",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-types-20261010/native-same.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-types-20261010/project.log",
+      "bytes": 3148,
+      "sha256": "5b8fde2172af30f87d0af8e9244bc1611aee1ea36c32846cedcb8d8762723ee7",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint5-types-20261010/project.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_controller_capture.log",
+      "bytes": 294,
+      "sha256": "6695d87442e4c0af960a15ada546e84ef797582ba146c20c03a5df46b709ef81",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_controller_capture.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_controller_observations.log",
+      "bytes": 257,
+      "sha256": "d3df1f276289a0a1e2ea3e51b19f0bd4a354270d359492068c58cb6447e3987e",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_controller_observations.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_model_oracle.log",
+      "bytes": 416,
+      "sha256": "cef3fbc6be984e33e88bbe1748fb8707c36b464bc8e9eb44d4fff9c33f0f25f4",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_model_oracle.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-teardown-identity-selfcheck-20261010/selfcheck.log",
+      "bytes": 342,
+      "sha256": "46afa1bb6c5ed2be0ea33331600811f8cb389e2656cc96ed63b32bc4cb78d9a3",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-teardown-identity-selfcheck-20261010/selfcheck.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-teardown-selfcheck-20261010/selfcheck.log",
+      "bytes": 304,
+      "sha256": "561d86c92885e7fd3ec7d98f70e447c628288010b8b82682adf41ba4ac792b8a",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-teardown-selfcheck-20261010/selfcheck.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dense-reference-selfcheck-20261010/capture-plumbing.log",
+      "bytes": 329,
+      "sha256": "327b23f0e6cf98df8be1be8732f5b5da8d43383aa90675b7b7d562aca62cfb94",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dense-reference-selfcheck-20261010/capture-plumbing.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dense-reference-selfcheck-20261010/combined-selfcheck.log",
+      "bytes": 4404,
+      "sha256": "9212870908fab3dbdb1a5fdac5153814c57fd5fa634b6c931f611a73fb63128d",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dense-reference-selfcheck-20261010/combined-selfcheck.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dense-reference-selfcheck-20261010/retained-dense-oracle.log",
+      "bytes": 3820,
+      "sha256": "8533174e6318a5c570f4b3398f5c17a05ef64c4f05925bc101fb37d8bfdee9bc",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dense-reference-selfcheck-20261010/retained-dense-oracle.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dense-reference-selfcheck-20261010/same-oracle.log",
+      "bytes": 231,
+      "sha256": "cbc7acfb2c05c66733170ef70a8964e7c59b91688f1fc2ee21af1a78bed12339",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dense-reference-selfcheck-20261010/same-oracle.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/direct-log-archive-selfcheck-20261010/verify_controller_teardown.log",
+      "bytes": 342,
+      "sha256": "46afa1bb6c5ed2be0ea33331600811f8cb389e2656cc96ed63b32bc4cb78d9a3",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/direct-log-archive-selfcheck-20261010/verify_controller_teardown.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/direct-log-archive-selfcheck-20261010/verify_ray_log_archives.log",
+      "bytes": 248,
+      "sha256": "ae490939c1ff9333f0bb4aaadba94d19808239308e1b7aa0095efecb49b19bea",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/direct-log-archive-selfcheck-20261010/verify_ray_log_archives.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-cuda-binding-probe-20261010/image-filesystem.log",
+      "bytes": 2527,
+      "sha256": "2ba0dbde318aa4779ef299e1a9ce769ab2a7299a272ee9035f574386025e64cb",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-cuda-binding-probe-20261010/image-filesystem.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-cuda-binding-probe-20261010/probe.log",
+      "bytes": 408,
+      "sha256": "c981bc5778c1d389b1303f866804b6a6f1e3041c9e4e83e62946444371f9b4e9",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-cuda-binding-probe-20261010/probe.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-driver-import-probe-20261010/probe.log",
+      "bytes": 6405,
+      "sha256": "6cdc1baa484f3d297370e62aeb7afa4f94d45b9577619ddd9038fd0570b00e37",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-driver-import-probe-20261010/probe.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-ray-metadata-probe-20261010/probe.log",
+      "bytes": 14016,
+      "sha256": "4b93bcaebb0a481ad2f6b1c0a6b8a4aecadbdeea598f1921ec0e683ccc5b354f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-ray-metadata-probe-20261010/probe.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-sparse-reusable-host-20261010/focused.log",
+      "bytes": 9479,
+      "sha256": "c170b2d6dfd9e209d34565de6409e0f1fefc8d1efc814af94971c59812ee8b78",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-sparse-reusable-host-20261010/focused.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-sparse-reusable-host-20261010/legacy-compat.log",
+      "bytes": 10384,
+      "sha256": "4d4d087ce5cc08d3932b1f367b0af6874d35c7470c111a6bd664bce57d8c1f50",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-sparse-reusable-host-20261010/legacy-compat.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-sparse-reusable-host-20261010/observer-selfcheck.log",
+      "bytes": 462,
+      "sha256": "b53c8d7971480132cf20d766fc04922cdce8045ea3c71f3350d57bb23296ecb7",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/dtensor-sparse-reusable-host-20261010/observer-selfcheck.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/final-legacy-regressions-20261010/pytest.log",
+      "bytes": 38656,
+      "sha256": "f4bc74291c770ba6f59499881ffa1c8eba94b60f9abcda2d877c40390be4a8db",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/final-legacy-regressions-20261010/pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/build.log",
+      "bytes": 9619,
+      "sha256": "ac1c6ab2e64f6dce67aab332bfb430b4b42a6da4fbf164ae9c2362655e43a310",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/build.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/corpus.log",
+      "bytes": 437,
+      "sha256": "ac0b3b1d5729f0d239ad413136daa9eedea12d2e229ddfcb04f98b1d489a08cd",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/corpus.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/ipc-counter-probe-20261010/probe.log",
+      "bytes": 7101,
+      "sha256": "0a84334530ded80edaf46af0d18fdb4d8418df1cff5ea1e39868f6e0c085581b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/ipc-counter-probe-20261010/probe.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/ipc-counter-probe-20261010/slurm-19990150.out",
+      "bytes": 64,
+      "sha256": "44d83f58b251f981fcae04f612ac7188163197c19175543b10b1bf6521cf9c63",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/ipc-counter-probe-20261010/slurm-19990150.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/ipc-counter-probe-20261010/wrapper-pytest.log",
+      "bytes": 18213,
+      "sha256": "33ebdf4d3f249205eb4531b06b9519dd8d07d0ba4d8f52c889bb4bbe921676d6",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/ipc-counter-probe-20261010/wrapper-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/legacy-dense-controller-host-20261010/pytest.log",
+      "bytes": 131252,
+      "sha256": "e74bb2c89ddc1761e34eebdd92b59ace74fbe3bb05dd6654440d16e0adf3dd5b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/legacy-dense-controller-host-20261010/pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/legacy-dense-reusable-host-20261010/pytest.log",
+      "bytes": 13096,
+      "sha256": "77ed2fb0ea1f6845f4f3df030e3e3a86c414519b31e7706e9f260464fd525590",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/legacy-dense-reusable-host-20261010/pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/legacy-lifetime-gate-selfcheck-20261010/selfcheck.log",
+      "bytes": 43,
+      "sha256": "cf284db93c8417c4d19200eb86ddf3de923c1f872cc9372301ee77c24875e119",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/legacy-lifetime-gate-selfcheck-20261010/selfcheck.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/model-oracle-selfcheck-import-environment-error.log",
+      "bytes": 756,
+      "sha256": "56b7a5011e1d337f5fa6a43a12ec9c6a34dcb1aac2881249734e11856c326108",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/model-oracle-selfcheck-import-environment-error.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/model-oracle-selfcheck-legacy.log",
+      "bytes": 5646,
+      "sha256": "c4fea1c98bf1d5f790aac51780dae46ef3f68a16e25fa26a143607e1d4606ff6",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/model-oracle-selfcheck-legacy.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/model-oracle-selfcheck.log",
+      "bytes": 459,
+      "sha256": "c95bf51da1eb783aedc6529ffd826d2ed07d4bd1483e99a822d0c8ac14509e4a",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/model-oracle-selfcheck.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/process-lifetime-keyword-20261010/pytest.log",
+      "bytes": 3471,
+      "sha256": "5957bdd87e4f8dadfeddd7687e4d934f9419cfb90dc1492d0d1da0c9eaba5037",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/process-lifetime-keyword-20261010/pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/public-recipe-validation-20261010/minimize-check.log",
+      "bytes": 159,
+      "sha256": "47b1d893cca7db2d483c902f33d7eeb3525efcbabb126dbcf112740202723feb",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/public-recipe-validation-20261010/minimize-check.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/public-recipe-validation-20261010/native-sparse-recipe-validation.log",
+      "bytes": 5345,
+      "sha256": "b9af80f8a31bfa8dc904b27ea7d1d4f6994523465c725378061d1e44f0d98bce",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/public-recipe-validation-20261010/native-sparse-recipe-validation.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/public-recipe-validation-20261010/shell_dryrun.log",
+      "bytes": 42,
+      "sha256": "8fe158e1cd74a07836284ad2a0421fff3a4f9fa09e291e45d18cc1d696eb899d",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/public-recipe-validation-20261010/shell_dryrun.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/public-recipe-validation-20261010/shell_syntax.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/public-recipe-validation-20261010/shell_syntax.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/legacy_ipc_counter_observer_selfcheck.py.log",
+      "bytes": 593,
+      "sha256": "3341a1d184f682255a5aeeb7fb20f6d1465e0bb3174d184682129dc9c169728e",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/legacy_ipc_counter_observer_selfcheck.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/package-final-check.log",
+      "bytes": 1908,
+      "sha256": "b504a1a500967f649671e217af01247d9e0a462f96bd6a6de1a12469b4e29379",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/package-final-check.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_controller_capture.py.log",
+      "bytes": 329,
+      "sha256": "327b23f0e6cf98df8be1be8732f5b5da8d43383aa90675b7b7d562aca62cfb94",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_controller_capture.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_controller_observations.py.log",
+      "bytes": 319,
+      "sha256": "c58514535ef958f2f0649b32351fe6f2defedd59a3e16c4d3fbd10d835bb6c2b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_controller_observations.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_dense_cross_oracle.py.log",
+      "bytes": 3936,
+      "sha256": "a93d3fb5c9a32110fa6aab90eaad4c769e943fda3767c83f6b899477e0db8ec8",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_dense_cross_oracle.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_frozen_python_package.py.log",
+      "bytes": 434,
+      "sha256": "1932643e7f292ee22b10a98650c410a8898c69721f545a089ac2c941dd2bd327",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_frozen_python_package.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_model_oracle.py.log",
+      "bytes": 416,
+      "sha256": "cef3fbc6be984e33e88bbe1748fb8707c36b464bc8e9eb44d4fff9c33f0f25f4",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/publication-quality-20261010/verify_model_oracle.py.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/ray-process-signature-selfcheck-20261010/selfcheck.log",
+      "bytes": 3373,
+      "sha256": "87ff8922191ed910eeed17fddb2269c170717624b84530ddd2d68ed126e1766b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/ray-process-signature-selfcheck-20261010/selfcheck.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/recipe-route-validation4b.log",
+      "bytes": 5194,
+      "sha256": "aa7167c34ea0613891e9d2c53b8fe701b76fc55ad35b56037416cb509399dca1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/recipe-route-validation4b.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/recipe-schema-validation.log",
+      "bytes": 5194,
+      "sha256": "aa7167c34ea0613891e9d2c53b8fe701b76fc55ad35b56037416cb509399dca1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/recipe-schema-validation.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/legacy_probe.log",
+      "bytes": 7102,
+      "sha256": "ba6e2575709fd5541fcd359c2d0f7dc29f86ff60c203106bddabf7b7c8c635df",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/legacy_probe.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/orchestration.log",
+      "bytes": 111755,
+      "sha256": "2973a3737643d1b8ddf65256c9fc25f83dbb6e2a76c22be3cc7a9d5308097441",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/orchestration.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/policy.log",
+      "bytes": 7591,
+      "sha256": "962c7e563713e9c65e4cc673117d236484eb54fd9e0b369f3464baba18f27974",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/policy.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/raw.log",
+      "bytes": 3764,
+      "sha256": "a7c2a5af4a25323a6fca926736f3ab045e67577d43c4111e86fbfca92735823f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/raw.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/slurm-19990303.out",
+      "bytes": 64,
+      "sha256": "44d83f58b251f981fcae04f612ac7188163197c19175543b10b1bf6521cf9c63",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/slurm-19990303.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/wrapper.log",
+      "bytes": 18213,
+      "sha256": "2d1a62283a7faf523a7c5fe1eaf8b05f00de722eeb2658cdea5f07c32802146a",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/reusable-ipc-early-20261010/wrapper.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/import.log",
+      "bytes": 2534,
+      "sha256": "1a2b7956a1aa50599e8e51d7d679a2a52bdecc8a7ea4c559d5ab202326289c55",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/import.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/slurm-19990683.out",
+      "bytes": 64,
+      "sha256": "44d83f58b251f981fcae04f612ac7188163197c19175543b10b1bf6521cf9c63",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/slurm-19990683.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/teacher_a.log",
+      "bytes": 36603,
+      "sha256": "d995b81de3e5f02e0a70567a04a5612fbdcc75ed7b946e7c94ce0c6370b30b6b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/teacher_a.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/teacher_b.log",
+      "bytes": 37799,
+      "sha256": "8f398963cd3803e9864c3eb245cbf1d5dadb3e006c85a85dac901656dbd2f7bc",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/teacher_b.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-preflight-20261010/import.log",
+      "bytes": 2534,
+      "sha256": "1a2b7956a1aa50599e8e51d7d679a2a52bdecc8a7ea4c559d5ab202326289c55",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-preflight-20261010/import.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-preflight-20261010/slurm-19990609.out",
+      "bytes": 158,
+      "sha256": "377715324eadc35a3b64537136312d8c1854325006dedf83a5e086ed697e7cf5",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-preflight-20261010/slurm-19990609.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-preflight-20261010/teacher_a.log",
+      "bytes": 40942,
+      "sha256": "5d6cf6a0f379adca0fd4bd6b1d538eec7585ef6e7ad0053312f1e0f066421226",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-preflight-20261010/teacher_a.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-preflight-20261010/teacher_b.log",
+      "bytes": 41951,
+      "sha256": "8ed5a50841d169dcadbbcfbe1de5a62643c79e1e60f39bb5cd22e3cd6fcdf79b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-preflight-20261010/teacher_b.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/slurm-19989617.out",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/slurm-19989617.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/split-guards.log",
+      "bytes": 12551,
+      "sha256": "24902ae37f2c28a655bf0dad461e2b70e1d2b77cdffc5a4754804aa23d8e3375",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/split-guards.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/student-model-forward.log",
+      "bytes": 43115,
+      "sha256": "6d40c5419e01ad431d981945a9dd2f9fa523efdd44cc1e4d431f5c45400978e7",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/student-model-forward.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_a-model-forward.log",
+      "bytes": 42960,
+      "sha256": "f60e0dbd906c26abcf4f45d3ea915010336d8c7de0c22897e9e99def617eb296",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_a-model-forward.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_b-model-forward.log",
+      "bytes": 43117,
+      "sha256": "764503b7b1930dc597bef32d5567d4f7cfc6769dcb74652fc97d671c5f2fca5a",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_b-model-forward.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_c_same_tokenizer-model-forward.log",
+      "bytes": 43140,
+      "sha256": "c6cc078ecd8afea3c2e6b30ec1844014f6534901c2c160b396e0bae908fe1c88",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_c_same_tokenizer-model-forward.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-20261010/focused-pytest.log",
+      "bytes": 377,
+      "sha256": "482f45635d51d63e00ff2adcc5721f1a6178e2bdcda172d79980548c611d4687",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-20261010/focused-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-20261010/normalization.log",
+      "bytes": 640,
+      "sha256": "7e3add85cd535139ab4a185f4787cbf80df5e4c470515a83e204c5feaf2ad4bd",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-20261010/normalization.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-20261010/slurm-19989358.out",
+      "bytes": 39149,
+      "sha256": "5d5d9110c311cdd6bbedb39494f9743380dd2e8f14bbf92607027e29baaa7117",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-20261010/slurm-19989358.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-current-20261010/focused-pytest.log",
+      "bytes": 13601,
+      "sha256": "8b221cc45293c3c9c601b666afc1d263838843ef1a83a21f2d6ad7936902675d",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-current-20261010/focused-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-current-20261010/model-provider.log",
+      "bytes": 12550,
+      "sha256": "8aa799b2a644ed22a61b6b0ca43e4c2ef56e799fb8c3f6d4f3018bb39f91a05f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-current-20261010/model-provider.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-current-20261010/normalization.log",
+      "bytes": 18673,
+      "sha256": "f79c77d8baeaec1beb2db6871a9682295902148c8f71f46c734a514eba1ed1e6",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-current-20261010/normalization.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-current-20261010/slurm-19989442.out",
+      "bytes": 16671,
+      "sha256": "26aee8283b0212c63714632ab73f7686422510095ddc57ae0ac3289fc1be85b1",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-current-20261010/slurm-19989442.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/focused-pytest.log",
+      "bytes": 13368,
+      "sha256": "ecb9c21949008e84e7bbe5912cfb2c296179fd01b796e7f7dd72be7a360e5b77",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/focused-pytest.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/model-provider.log",
+      "bytes": 12233,
+      "sha256": "8b142a485d79ac70861322acb4ebb85d0acef3fa2d9f76d5fa43df4d9bd27885",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/model-provider.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/normalization.log",
+      "bytes": 29428,
+      "sha256": "45441672ebcacb9b44b2e01683167cb05d3d51a2d19fe8ca0fe7fedb3e21a7e4",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/normalization.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/slurm-19989499.out",
+      "bytes": 13674,
+      "sha256": "dfd2a53110bf433882c50c793f377c83230ac6601e8295d6e1d444359c2bb88b",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/slurm-19989499.out"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/split-guards.log",
+      "bytes": 310,
+      "sha256": "47161739de08d902e9bed03db50e27d4ea089db59b0c8c7a392ee95707b68c32",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/split-guards.log"
+    },
+    {
+      "path": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/student-model-forward.log",
+      "bytes": 61266,
+      "sha256": "f0d7c01d272f4e3d65b5bb37b694decfed7d8f9f3fe0236bec8e651f93285c6f",
+      "local_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/student-model-forward.log"
+    }
+  ]
+}

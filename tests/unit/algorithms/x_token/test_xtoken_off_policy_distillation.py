@@ -1875,18 +1875,18 @@ def test_unpacked_export_rejects_stale_batch_occurrence_ids():
 
 
 @pytest.mark.parametrize(
-    "cross_tokenizer,mcore,pp,dynamic,packed,requested,expected",
+    "mcore,pp,dynamic,packed,requested,expected",
     [
-        (False, True, 1, False, False, True, True),
-        (False, True, 1, False, False, False, False),
-        (True, True, 1, False, False, True, False),
-        (False, False, 1, False, False, True, False),
-        (False, True, 2, False, False, True, False),
-        (False, True, 1, True, False, True, False),
-        (False, True, 1, False, True, True, False),
+        (True, 1, False, False, True, True),
+        (True, 1, False, False, False, False),
+        (False, 1, False, False, True, False),
+        (True, 2, False, False, True, False),
+        (True, 1, True, False, True, False),
+        (True, 1, False, True, True, False),
     ],
 )
-def test_reusable_dense_export_is_native_same_teacher_specific(
+@pytest.mark.parametrize("cross_tokenizer", [False, True])
+def test_reusable_dense_export_requires_compatible_teacher(
     cross_tokenizer, mcore, pp, dynamic, packed, requested, expected
 ):
     teacher = MagicMock()

@@ -1,0 +1,10 @@
+{
+  "status": "FAIL_TEST_HARNESS_TE_GRAPH_REUSE",
+  "job_id": "19991125",
+  "failure": "TE2.15 restore_from_func_ctx: ctx must have .tensor_objects to restore saved tensors on second backward despite retain_graph=True",
+  "scope": "Real weights/teacher sparse payload, CE/teacher/combined metrics and dlogits parity passed; first actual parameter VJP completed; second reference VJP failed before comparison",
+  "production_defect": false,
+  "source_hash_checks": "PASS before and after failure",
+  "retry": "R1-reference-tp1cp1-freshgraph-20261010",
+  "fix": "Fresh deterministic reference forward with same weights/input and saved CPU/CUDA/MCore RNG; assert logits match then reference backward"
+}

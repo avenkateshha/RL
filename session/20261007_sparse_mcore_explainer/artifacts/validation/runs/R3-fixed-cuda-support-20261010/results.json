@@ -1,0 +1,20 @@
+{
+  "status": "FAIL_PROJECT_INODE_QUOTA_RETRY_REQUIRED",
+  "job_id": "19992163",
+  "slurm_state": "FAILED",
+  "exit_code": "1:0",
+  "cause": "OSError122 Disk quota exceeded creating controller-reference/items2-3-rank0.json; project10046 inode quota157286400 nearlyexhausted. Byte/userquotas haveheadroom.",
+  "numerical_reports_saved": 14,
+  "saved_report_status": "AllPASS",
+  "max_saved_dlogits_relative_l2": 0.00016381601707560949,
+  "previous_topk_failure": "Resolved for saved DP1IDs4,5: former rank6 error7.6% now2.52e-5 with identicalobjective/tolerance. Complete training/replay stillrequired.",
+  "independent_source_verification": {
+    "status": "PASS",
+    "scope": "Independent post-run source/config/launcher verification against frozen pre-submission hashes; temporarily saved on /tmp because project inode quota prevents creating run result file",
+    "source_files": 386,
+    "owned_files": 16,
+    "mismatches": []
+  },
+  "recovery_run": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/metadata-quota-recovery-20261010",
+  "larger_memory_tests": "EXCLUDED"
+}

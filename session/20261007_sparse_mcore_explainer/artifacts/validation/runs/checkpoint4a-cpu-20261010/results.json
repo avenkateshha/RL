@@ -1,0 +1,64 @@
+{
+  "status": "PASS_CPU_ONLY",
+  "scope": "Checkpoint4a CPU correctness/regression. Full CUDA and actual R1-R6 model acceptance remain pending. Suites overlap; no summed unique test count is claimed.",
+  "checks": {
+    "native_dispatch": {
+      "status": "PASS",
+      "exit_code": 0,
+      "pytest_cases": 4,
+      "numerical_loss_and_gradient_comparisons": 144,
+      "duration_seconds": 143.33,
+      "log": "xtoken-native-sparse-dispatch-verified.log",
+      "exit_status_provenance": "root agent confirmation"
+    },
+    "native_legacy_mix": {
+      "status": "PASS",
+      "exit_code": 0,
+      "pytest_cases": 4,
+      "numerical_loss_and_gradient_comparisons": 96,
+      "duration_seconds": 141.0,
+      "log": "xtoken-native-sparse-legacy-mix-verified.log",
+      "exit_status_provenance": "root agent confirmation"
+    },
+    "native_sparse_loss": {
+      "status": "PASS",
+      "exit_code": 0,
+      "pytest_passed": 20,
+      "cuda_deselected": 4,
+      "log": "native-sparse-loss-vectorized.log",
+      "exit_status_provenance": "transport agent confirmation"
+    },
+    "native_student": {
+      "status": "PASS_CPU_ONLY",
+      "pytest_passed": 7,
+      "cuda_skipped": 4,
+      "log": "xtoken-native-student-tests.log",
+      "result_provenance": "pytest terminal summary and normalization agent explicit completion confirmation",
+      "exit_code": 0
+    },
+    "loss_contract": {
+      "status": "PASS",
+      "pytest_passed": 18,
+      "log": "xtoken-native-loss-contract-final.log",
+      "result_provenance": "pytest terminal summary and normalization agent explicit completion confirmation",
+      "exit_code": 0
+    },
+    "loss_regression": {
+      "status": "PASS",
+      "pytest_passed": 204,
+      "log": "xtoken-native-loss-regression.log",
+      "result_provenance": "pytest terminal summary and normalization agent explicit completion confirmation",
+      "exit_code": 0,
+      "source_scope_note": "Earlier Stage4a regression suite, before removing the speculative alias test; standalone final contract18 and root final verified dispatch/mixed grids cover the final source. Do not attribute all204 tests to the final frozen hash manifest."
+    }
+  },
+  "source_fingerprints": "PASS;11 source/config/test files matched before and after final verified root suites; see source-before.sha256,source-after.sha256,source-after-check.log",
+  "gpu_execution": "NOT_RUN",
+  "legacy_reference_contract": "Native independent oracle plus retained CP1 legacy loss on identical full-sequence sparse rows replicated across CP, preserving legacy support/objective",
+  "excluded": [
+    "larger memory tests",
+    "staged K ladder",
+    "production-size VRAM-fit gate"
+  ],
+  "checkpoint_commit": "6bf7cb1c616ba026db808d6808158bedd55ed80f"
+}

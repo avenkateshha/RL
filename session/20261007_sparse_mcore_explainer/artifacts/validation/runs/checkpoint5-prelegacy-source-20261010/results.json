@@ -1,0 +1,29 @@
+{
+  "status": "PASS",
+  "scope": "Exact uncommitted Stage5 FP16K0/Ray-keyword fixes used by the four listed completed runs, before subsequent legacy transport fixes. Apply to recorded baseline checkout to reproduce those source files.",
+  "baseline_commit": "fcc943c5eab4690a4faa1892d80b9d56cb8d1564",
+  "patch": "source.patch",
+  "patch_sha256": "bf3d34306b5208ba3a67bb2917be665ce0e6173e0eb45d2fe201b69945462286",
+  "source_sha256": {
+    "nemo_rl/algorithms/x_token/native_same_tokenizer.py": "c4ea66ab4a8ef67e7d2247a6be7b0300c22c61f2778da4ca1fbc7f62373a576b",
+    "nemo_rl/distributed/worker_groups.py": "f61cc928ff54f296413ebdd27afa02e8cf2955605947f21e4efbb6a92cb696af",
+    "tests/unit/distributed/test_process_lifetime.py": "d68f5479c849c676e3a517ec9a8256d1b7299c05dbb034eba0ea6b18edac084e"
+  },
+  "verified_against": "../R1-tp2cp2/runtime.json:source_sha256_at_submission",
+  "note": "Only these three explicit source/test files are captured; the complete run manifests identify all remaining inputs. No working-tree mutation was performed.",
+  "complete_manifest_baseline_check": {
+    "source_files": 387,
+    "baseline_differences_exactly_captured": [
+      "nemo_rl/algorithms/x_token/native_same_tokenizer.py",
+      "nemo_rl/distributed/worker_groups.py",
+      "tests/unit/distributed/test_process_lifetime.py"
+    ],
+    "status": "PASS"
+  },
+  "applicable_runs": [
+    "R1-tp2cp2",
+    "R3-fixed-tar-logs-20261010",
+    "R2-tp2cp2",
+    "R4-dtensor-mcore-observed-20261010"
+  ]
+}

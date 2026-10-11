@@ -1,0 +1,250 @@
+"""Test-only post-controller process-exit proof and closed actor-log snapshot.
+
+Retain ordinary Policy instances until the successful controller returns. Then
+use their actual cleanup and existing OS process observers, student first, and
+copy Ray logs after worker exit. Training and its IPC lifetime context are not
+replaced. This helper is never invoked for teardown after a failed controller.
+"""
+
+import inspect
+import json
+from functools import wraps
+from pathlib import Path
+
+
+class ControllerTeardown:
+    def __init__(self, run: Path):
+        self.run = run
+        self.policies = []
+        self.reports = []
+        self.policy_class = None
+        self.original_initialize = None
+
+    def install(self):
+        from nemo_rl.models.policy.lm_policy import Policy
+
+        original = Policy.__init__
+        signature = inspect.signature(original)
+
+        @wraps(original)
+        def initialize(policy, *args, **kwargs):
+            bound = signature.bind(policy, *args, **kwargs)
+            bound.apply_defaults()
+            original(policy, *args, **kwargs)
+            self.policies.append(
+                (
+                    policy,
+                    bound.arguments["name_prefix"],
+                    str(bound.arguments["config"]["model_name"]),
+                )
+            )
+
+        Policy.__init__ = initialize
+        self.policy_class = Policy
+        self.original_initialize = original
+
+    def verify_and_shutdown(self):
+        errors = []
+        try:
+            assert self.policies, "No actual policies were recorded"
+            ordered = sorted(self.policies, key=lambda item: item[1] != "student")
+            for policy, name, model in ordered:
+                group = policy.worker_group
+                report = {
+                    "policy": name,
+                    "model_name": model,
+                    "workers": len(group.workers),
+                    "os_identity_captured": False,
+                    "actual_backend_cleanup": False,
+                    "os_process_exit_confirmed": False,
+                    "errors": [],
+                }
+                # The successful training invocation has already completed all
+                # consumers and its original IPC lifetime context. Attempt every
+                # policy's cleanup even when one teardown verification fails.
+                try:
+                    assert report["workers"] > 0, (
+                        "Workers exited before identity capture"
+                    )
+                    group.record_worker_processes(timeout=30.0)
+                    report["os_identity_captured"] = True
+                except Exception as error:
+                    report["errors"].append(
+                        f"identity capture: {type(error).__name__}: {error}"
+                    )
+                try:
+                    report["actual_backend_cleanup"] = bool(policy.shutdown())
+                except Exception as error:
+                    report["errors"].append(
+                        f"backend cleanup: {type(error).__name__}: {error}"
+                    )
+                finally:
+                    try:
+                        shutdown_verified = bool(
+                            group.shutdown(wait_for_termination=True, timeout=30.0)
+                        )
+                        # Empty groups can return success after ordinary
+                        # cleanup. Without a captured OS identity that result
+                        # cannot establish the original process has exited.
+                        report["os_process_exit_confirmed"] = (
+                            report["os_identity_captured"] and shutdown_verified
+                        )
+                    except Exception as error:
+                        report["errors"].append(
+                            f"OS exit wait: {type(error).__name__}: {error}"
+                        )
+                self.reports.append(report)
+                try:
+                    self._write_result()
+                except OSError as error:
+                    report["errors"].append(
+                        f"report write: {type(error).__name__}: {error}"
+                    )
+                if not (
+                    report["os_identity_captured"]
+                    and report["actual_backend_cleanup"]
+                    and report["os_process_exit_confirmed"]
+                    and not report["errors"]
+                ):
+                    errors.append(report)
+        finally:
+            self.restore()
+        assert not errors, errors
+
+    def restore(self):
+        """Restore initialization even when the controller raised before teardown."""
+        if self.policy_class is not None:
+            assert self.original_initialize is not None
+            self.policy_class.__init__ = self.original_initialize
+
+    def _write_result(self):
+        result = {
+            "status": "PASS"
+            if len(self.reports) == len(self.policies)
+            and all(
+                item["os_identity_captured"]
+                and item["actual_backend_cleanup"]
+                and item["os_process_exit_confirmed"]
+                and not item["errors"]
+                for item in self.reports
+            )
+            else "INCOMPLETE",
+            "scope": "Successful actual controller returned from its IPC lifetime context; explicit original backend cleanup then existing node-pinned OS process-exit observer, student before teachers",
+            "policies": self.reports,
+        }
+        (self.run / "controller-process-exit.json").write_text(
+            json.dumps(result, indent=2) + "\n"
+        )
+
+    def copy_ray_logs(self, ray_log_root="/tmp/ray"):
+        import ray
+        from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
+        def snapshot_node(run_path, node_id, log_root):
+            import hashlib
+            import json
+            import tarfile
+            from pathlib import Path
+
+            def sha256_file(path):
+                digest = hashlib.sha256()
+                with path.open("rb") as stream:
+                    for block in iter(lambda: stream.read(1048576), b""):
+                        digest.update(block)
+                return digest.hexdigest()
+
+            destination = Path(run_path) / "ray-final-logs" / node_id
+            destination.mkdir(parents=True, exist_ok=True)
+            archives = []
+            actor_stderr_members = []
+            for session in sorted(Path(log_root).glob("session_[0-9]*")):
+                source = session / "logs"
+                if not source.is_dir():
+                    continue
+                target = destination / (session.name + ".tar.gz")
+                with tarfile.open(target, "w:gz", compresslevel=1) as archive:
+                    archive.add(source, arcname=session.name + "/logs")
+                members = []
+                with tarfile.open(target, "r:gz") as archive:
+                    for member in archive:
+                        if not member.isfile():
+                            continue
+                        stream = archive.extractfile(member)
+                        assert stream is not None
+                        digest = hashlib.sha256()
+                        for block in iter(lambda: stream.read(1048576), b""):
+                            digest.update(block)
+                        members.append(
+                            {
+                                "path": member.name,
+                                "bytes": member.size,
+                                "sha256": digest.hexdigest(),
+                            }
+                        )
+                        if Path(member.name).name.startswith(
+                            "worker-"
+                        ) and member.name.endswith(".err"):
+                            actor_stderr_members.append(
+                                {
+                                    "archive": str(target.relative_to(Path(run_path))),
+                                    "member": member.name,
+                                }
+                            )
+                metadata = {
+                    "archive_path": str(target),
+                    "archive_sha256": sha256_file(target),
+                    "archive_bytes": target.stat().st_size,
+                    "members": members,
+                    "scope": "Raw Ray log snapshot stored directly as one archive; each archived regular-file member was read back and fingerprinted",
+                }
+                manifest = target.with_name(session.name + ".members.json")
+                manifest.write_text(json.dumps(metadata, indent=2) + "\n")
+                archives.append(
+                    {
+                        "path": str(target.relative_to(Path(run_path))),
+                        "sha256": metadata["archive_sha256"],
+                        "member_manifest": str(manifest.relative_to(Path(run_path))),
+                        "files": len(members),
+                    }
+                )
+            return {
+                "node_id": node_id,
+                "archives": archives,
+                "actor_stderr_members": actor_stderr_members,
+            }
+
+        if ray.is_initialized():
+            task = ray.remote(num_cpus=0, max_retries=0)(snapshot_node)
+            refs = [
+                task.options(
+                    scheduling_strategy=NodeAffinitySchedulingStrategy(
+                        node["NodeID"], soft=False
+                    )
+                ).remote(str(self.run), node["NodeID"], str(ray_log_root))
+                for node in ray.nodes()
+                if node["Alive"]
+            ]
+            nodes = ray.get(refs, timeout=30.0)
+        else:
+            nodes = [
+                snapshot_node(
+                    str(self.run), "local-ray-not-initialized", str(ray_log_root)
+                )
+            ]
+        process_report = self.run / "controller-process-exit.json"
+        exits_confirmed = (
+            process_report.exists()
+            and json.loads(process_report.read_text())["status"] == "PASS"
+        )
+        (self.run / "ray-log-snapshot.json").write_text(
+            json.dumps(
+                {
+                    "scope": "Node-pinned tar snapshots from every live Ray node; post-worker-exit only when exits_confirmed=true. Stderr absence does not prove CUDA IPC counter validity.",
+                    "exits_confirmed": exits_confirmed,
+                    "nodes": nodes,
+                    "process_exit_report": str(process_report),
+                },
+                indent=2,
+            )
+            + "\n"
+        )

@@ -1,0 +1,35 @@
+{
+  "status": "FIXED_CPU_AND_CUDA_PASS",
+  "checkpoint": 5,
+  "file": "nemo_rl/algorithms/x_token/native_same_tokenizer.py",
+  "function": "compute_native_same_tokenizer_kl",
+  "branch": "not full_vocab and vocab_topk == 0",
+  "problem": "logits.sum() accumulates in FP16; finite logits can overflow before multiplying by zero, producing NaN for an empty-K objective that should be exactly zero.",
+  "reproduction": {
+    "logits": "torch.full((1, 2, 1000), 400.0, dtype=torch.float16, requires_grad=True)",
+    "teacher_rows": "torch.zeros(1, 2, 1000)",
+    "native_context": "global positions [0,1], input/next IDs all zero, next CE/KD/sample masks all one, full_seq_len=2, real_vocab_size=1000",
+    "loss_config": "temperature=1.0, reverse_kl=False, vocab_topk=0",
+    "normalizer": 2.0,
+    "groups": "tp_group=None, cp_group=None",
+    "observed_loss": "NaN",
+    "expected_loss": 0.0,
+    "reference": "torch.log_softmax(logits[..., :0].float(), -1).sum() returns 0.0"
+  },
+  "proposed_fix": "Use logits.sum(dtype=torch.float32) * 0 in the empty-K branch.",
+  "planned_test": "Focused FP16 regression asserting finite zero loss, finite all-zero input gradient, and no teacher gradient.",
+  "scope_note": "vocab_topk=0 is distinct from teacher_topk_ipc_k=0. Focused FP16 CPU and CUDA regression passed; existing BF16/K64 validation results are unaffected.",
+  "verification": {
+    "host_command": "pytest --confcutdir=tests/unit/algorithms/x_token tests/unit/algorithms/x_token/test_native_same_tokenizer.py -q -k empty_k_fp16",
+    "host_result": "exit 0; 1 passed, 1 CUDA skipped, 20 deselected in 24.33 seconds",
+    "host_log": "/tmp/native-same-empty-k-fp16.log",
+    "ruff": "format unchanged; check passed",
+    "cuda_node": "tests/unit/algorithms/x_token/test_native_same_tokenizer.py::test_native_same_tokenizer_empty_k_fp16[cuda]",
+    "production_sha256": "c4ea66ab4a8ef67e7d2247a6be7b0300c22c61f2778da4ca1fbc7f62373a576b",
+    "test_sha256": "d3c0235dbced0b87b46083c1f19534bfd65207a6c3b9fbb8e3b27b8771dca105",
+    "cuda_job_id": "19991376",
+    "cuda_result": "1 passed, 0 skipped in 16.64 seconds; main reference job COMPLETED0:0",
+    "cuda_log": "runs/R1-reference-tp2cp2-20261010/preflight-pytest.log"
+  },
+  "related_review": "Native sparse zero connection already uses logits.sum(dtype=torch.float32). Native CE empty rows flow through FP32 distributed_selected_logprobs and an empty FP32 reduction. Neither shares this FP16 summation branch."
+}

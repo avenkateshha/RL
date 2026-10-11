@@ -1,0 +1,8 @@
+{
+  "allocation_job_id": "19992163",
+  "scope": "Read-only actual driver import; no actors/models/GPU",
+  "file_sha256": {
+    "launcher/probe.py": "f61728dff5188ba8f2c36102a40d7dbcbc80aaf5ad0f9d1a8c58200049a70f82",
+    "launcher/driver.sh": "3b1278cf49ed653169ded127c2aa21bcb8186f969e5a9f7ec3e744bab52da6ef"
+  }
+}

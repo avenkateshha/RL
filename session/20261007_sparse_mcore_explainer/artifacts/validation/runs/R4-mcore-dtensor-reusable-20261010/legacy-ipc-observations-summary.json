@@ -1,0 +1,154 @@
+{
+  "coverage_status": "PASS",
+  "counter_lifetime_status": "NO_COUNTER_ANOMALY_OBSERVED",
+  "expected_worker_count": 8,
+  "observed_worker_count": 8,
+  "errors": [],
+  "totals": {
+    "selected_tp0": {
+      "workers": 4,
+      "events": 40,
+      "after_export_counters": 0,
+      "boundary_counters": 0,
+      "boundary_negative": 0,
+      "boundary_zero": 0,
+      "boundary_positive": 0,
+      "read_errors": 0,
+      "reusable_records": 480,
+      "empty_records": 0,
+      "intentional_nonpublisher_events": 0
+    },
+    "discarded_tp_nonzero": {
+      "workers": 4,
+      "events": 40,
+      "after_export_counters": 0,
+      "boundary_counters": 0,
+      "boundary_negative": 0,
+      "boundary_zero": 0,
+      "boundary_positive": 0,
+      "read_errors": 0,
+      "reusable_records": 0,
+      "empty_records": 0,
+      "intentional_nonpublisher_events": 40
+    },
+    "dense_all_tp": {
+      "workers": 0,
+      "events": 0,
+      "after_export_counters": 0,
+      "boundary_counters": 0,
+      "boundary_negative": 0,
+      "boundary_zero": 0,
+      "boundary_positive": 0,
+      "read_errors": 0,
+      "reusable_records": 0,
+      "empty_records": 0,
+      "intentional_nonpublisher_events": 0
+    }
+  },
+  "unique_boundary_counters_by_transport": {
+    "dtensor_sparse": {
+      "negative": 0,
+      "zero": 0,
+      "positive": 0
+    }
+  },
+  "workers": [
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "rank": 0,
+      "transport": "dtensor_sparse",
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "rank": 1,
+      "transport": "dtensor_sparse",
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "rank": 2,
+      "transport": "dtensor_sparse",
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "rank": 3,
+      "transport": "dtensor_sparse",
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "rank": 4,
+      "transport": "dtensor_sparse",
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "rank": 5,
+      "transport": "dtensor_sparse",
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "rank": 6,
+      "transport": "dtensor_sparse",
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "rank": 7,
+      "transport": "dtensor_sparse",
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "scope": "Reads counter observations only; negatives do not stop optimizer replay."
+}

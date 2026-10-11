@@ -1,0 +1,50 @@
+{
+  "scope": "Final native sparse/CE/same-tokenizer math, adapters, mixed dispatch, controller eligibility and actual dense IPC. Actual R1-R6 models remain separate.",
+  "nodes": 1,
+  "gpus_allocated": 8,
+  "time_limit": "00:30:00",
+  "required_cuda_math_cases": 12,
+  "groups": [
+    {
+      "name": "native_math",
+      "cuda_visible": true,
+      "pytest_args": [
+        "tests/unit/algorithms/x_token/test_native_sparse_loss.py",
+        "tests/unit/algorithms/x_token/test_native_student.py",
+        "tests/unit/algorithms/x_token/test_native_same_tokenizer.py"
+      ]
+    },
+    {
+      "name": "dispatch",
+      "cuda_visible": false,
+      "pytest_args": [
+        "tests/unit/algorithms/x_token/test_native_loss_contract.py",
+        "tests/unit/algorithms/x_token/test_native_dense_contract.py",
+        "tests/unit/algorithms/x_token/test_native_sparse_dispatch.py",
+        "tests/unit/algorithms/x_token/test_native_sparse_legacy_mix.py",
+        "tests/unit/algorithms/x_token/test_native_same_mixed.py",
+        "tests/unit/algorithms/x_token/test_native_loss_input.py",
+        "tests/unit/algorithms/x_token/test_native_dense_reader.py"
+      ]
+    },
+    {
+      "name": "wrapper",
+      "cuda_visible": true,
+      "pytest_args": [
+        "tests/unit/algorithms/x_token/test_megatron_cp_normalization.py",
+        "-k", "wrapper_keeps_schedule_compensation or loss_input_enables_per_term"
+      ]
+    },
+    {
+      "name": "controller",
+      "cuda_visible": false,
+      "pytest_args": ["tests/unit/algorithms/x_token/test_xtoken_off_policy_distillation.py"]
+    },
+    {
+      "name": "dense_cuda",
+      "cuda_visible": true,
+      "pytest_args": ["tests/unit/algorithms/x_token/test_native_dense_reader_cuda.py"]
+    }
+  ],
+  "excluded": ["larger memory tests", "staged K ladder", "production-size VRAM gate"]
+}

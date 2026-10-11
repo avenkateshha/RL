@@ -1,0 +1,12 @@
+{
+  "status": "PASS_CPU_LIFECYCLE_MOCKS",
+  "command": "uv run --no-sync --offline python session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_teardown.py",
+  "exit_code": 0,
+  "cases": 7,
+  "policies_per_case": 3,
+  "source_sha256_before_after": {
+    "controller_teardown.py": "f3a00165152dfa1cd2a329054a1fe00cf1a9aea25fec8b8ae1988dae18c299f7",
+    "verify_controller_teardown.py": "ecf91a023e0500d51637615d1c8d46d7743972f3cf6ca4fd03381150a21a2ae5"
+  },
+  "scope": "Mocked all-policy teardown control flow only. Failed identity capture cannot report OS exit, including successful shutdown of a cleared group; all cleanup/wait attempts still occur. No Ray/OS/CUDA evidence."
+}

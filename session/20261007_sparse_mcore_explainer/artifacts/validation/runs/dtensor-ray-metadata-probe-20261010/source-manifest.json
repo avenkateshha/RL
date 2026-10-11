@@ -1,0 +1,8 @@
+{
+  "allocation_job_id": "19992100",
+  "scope": "Read-only actor class metadata import, no GPU allocation/model/actor",
+  "file_sha256": {
+    "launcher/driver.sh": "4d5e5419593709a6fc1defd897f407fa1dff3777101316e2ad36023ac7f5db9e",
+    "launcher/probe_dtensor_ray_metadata.py": "d3a6308b4a9d76d3f650ac57fd9c990a1b470c9d730febfc8e88eea5b5946f41"
+  }
+}

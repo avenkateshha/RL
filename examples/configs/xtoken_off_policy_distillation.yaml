@@ -45,7 +45,7 @@ loss_fn:
   reverse_kl: false           # KL(student||teacher) instead of KL(teacher||student)
   kl_loss_weight: 1.0         # KD weight in fixed-weight mode
   ce_loss_scale: 0.1          # CE weight in fixed-weight mode
-  dynamic_loss_scaling: true  # rescale KD to match CE magnitude each step
+  dynamic_loss_scaling: true  # rescale KD per student microbatch and DP replica
                               # (kl_loss_weight / ce_loss_scale then ignored)
   # ---- v6 (prefix-bidir partition KL) knobs ----
   # Common-vocab support source: false => derive the exact 1-to-1 map from the
@@ -77,12 +77,15 @@ loss_fn:
   # Sparse support selection. The current port supports row-wise top-k
   # independently at each teacher position.
   teacher_topk_ipc_support_mode: "row_topk"
-  # When sparse transport is active, reserve each realized teacher label in
-  # the support. This also permits one-element mismatch support in v6.
+  # Preserve realized teacher labels for sparse mismatch support. Native MCore
+  # keeps natural top-k unchanged and supplies realized scores separately;
+  # the legacy sparse route reserves labels in its exported support.
   teacher_topk_ipc_keep_realized: true
   # Advanced (unset => v6 defaults): the non-1-to-1 mismatch weighting
-  # (prefix_bidir_v3_mismatch_pos0_alpha / _mismatch_loss_beta, both require
-  # position_0_kl: true) and the pure-ALM baseline
+  # (prefix_bidir_v3_mismatch_pos0_alpha / _mismatch_loss_beta) and pure-ALM.
+  # Native sparse requires position_0_kl: false and, when setting beta,
+  # explicit alpha: 0. Retained legacy routes keep their own position-0 rules.
+  # The pure-ALM baseline is controlled by
   # (prefix_bidir_v3_pure_alm). See
   # CrossTokenizerDistillationLossConfig for the full set.
   # ---- Multi-teacher aggregation (defaults reproduce single-teacher) ----
@@ -148,10 +151,11 @@ policy:
     # on every rank first. Lowers peak memory for large checkpoints.
     shard_before_load: false
   # Megatron-Core backend base for the student (disabled by default). xToken
-  # cross-tokenizer distillation supports Megatron tensor, context AND pipeline
-  # parallelism. Under PP only the last stage holds logits, so only it exports
-  # teacher-logit IPC handles; on >1 node the whole tp*cp*pp group must fit in
-  # one node so that stage stays co-located with the importing student ranks.
+  # cross-tokenizer distillation supports tensor and context parallelism.
+  # Native sparse requires PP1. Multi-node IPC requires PP1 for the student and
+  # every teacher, matched TP/CP grids, and each model group fitting on one node.
+  # Preserved single-node legacy routes may use pipeline parallelism; only the
+  # last pipeline stage exports teacher-logit IPC handles.
   # Recipes select it by setting megatron_cfg.enabled: true and
   # dtensor_cfg.enabled: false. A Megatron student's optimizer / scheduler live
   # HERE (megatron_cfg.optimizer / .scheduler), not at policy.optimizer / .scheduler.

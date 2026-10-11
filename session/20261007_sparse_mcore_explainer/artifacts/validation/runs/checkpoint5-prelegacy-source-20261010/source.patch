@@ -1,0 +1,91 @@
+diff --git a/nemo_rl/algorithms/x_token/native_same_tokenizer.py b/nemo_rl/algorithms/x_token/native_same_tokenizer.py
+index ea15a62a4..689f21300 100644
+--- a/nemo_rl/algorithms/x_token/native_same_tokenizer.py
++++ b/nemo_rl/algorithms/x_token/native_same_tokenizer.py
+@@ -251,7 +251,7 @@ def compute_native_same_tokenizer_kl(
+     )
+     batch, sequence = torch.nonzero(mask != 0, as_tuple=True)
+     if not full_vocab and k == 0:
+-        return logits.sum() * 0
++        return logits.sum(dtype=torch.float32) * 0
+     geometry = _KLGeometry(
+         temperature=temperature,
+         reverse=loss_fn.reverse_kl,
+diff --git a/nemo_rl/distributed/worker_groups.py b/nemo_rl/distributed/worker_groups.py
+index 0f70c55ca..db4025bfa 100644
+--- a/nemo_rl/distributed/worker_groups.py
++++ b/nemo_rl/distributed/worker_groups.py
+@@ -1231,7 +1231,9 @@ class RayWorkerGroup:
+         """Capture OS identities before exposing reusable IPC to healthy workers.
+ 
+         Ray's built-in ``__ray_call__`` executes in each actor without requiring
+-        a new worker API. Failure to capture every worker raises before any IPC
++        a new worker API. Pass the callback by name because driver metadata for
++        actors with isolated dependencies may contain only **kwargs. Failure
++        to capture every worker raises before any IPC
+         consumer may start. Call again before a new lifetime if workers change.
+         """
+         if not self._workers:
+@@ -1248,7 +1250,7 @@ class RayWorkerGroup:
+         # Retain their earlier identity snapshot for failure cleanup.
+         processes = ray.get(
+             [
+-                worker.__ray_call__.remote(capture_worker_process)
++                worker.__ray_call__.remote(fn=capture_worker_process)
+                 for worker in self._workers
+             ],
+             timeout=timeout,
+diff --git a/tests/unit/distributed/test_process_lifetime.py b/tests/unit/distributed/test_process_lifetime.py
+index 56c25c9e2..ba4cfa20c 100644
+--- a/tests/unit/distributed/test_process_lifetime.py
++++ b/tests/unit/distributed/test_process_lifetime.py
+@@ -194,6 +194,49 @@ def test_incomplete_capture_raises_before_publishing_snapshot(monkeypatch):
+     assert group._termination_snapshot is None
+ 
+ 
++@pytest.mark.parametrize(
++    "placeholder", [False, True], ids=["healthy", "driver_placeholder"]
++)
++def test_process_capture_binds_isolated_actor_metadata(monkeypatch, placeholder):
++    """Ray may deserialize a dependency-isolated actor as a kwargs-only stub."""
++    from ray._common import signature
++    from ray._private.function_manager import FunctionActorManager
++    from ray._raylet import PythonFunctionDescriptor
++    from ray.actor import _ActorClassMethodMetadata, _modify_class
++    from ray.util.tracing.tracing_helper import _inject_tracing_into_class
++
++    if placeholder:
++        manager = FunctionActorManager.__new__(FunctionActorManager)
++        actor_class = manager._create_fake_actor_class(
++            "MissingDriverDependency", ["__ray_call__"], "optional dependency absent"
++        )
++    else:
++        actor_class = _modify_class(type("HealthyActor", (), {}))
++    _inject_tracing_into_class(actor_class)
++    metadata = _ActorClassMethodMetadata.create(
++        actor_class,
++        PythonFunctionDescriptor(__name__, "__init__", f"capture_{placeholder}"),
++    )
++    parameters = metadata.signatures["__ray_call__"]
++    identity = _identity(os.getpid())
++
++    def remote(*args, **kwargs):
++        signature.flatten_args(parameters, list(args), kwargs)
++        assert not args
++        assert kwargs["fn"] is process_lifetime.capture_worker_process
++        return identity
++
++    group = _bare_group()
++    worker = _worker("isolated-worker")
++    worker.__ray_call__ = SimpleNamespace(remote=remote)
++    group._workers = [worker]
++    monkeypatch.setattr(ray, "get", lambda refs, timeout: refs)
++    group.record_worker_processes(timeout=1)
++    assert group._termination_snapshot == WorkerProcessSnapshot(
++        ("isolated-worker",), (identity,)
++    )
++
++
+ def test_nested_capture_timeout_keeps_matching_process_snapshot(monkeypatch):
+     group = _bare_group()
+     worker = _worker("worker")

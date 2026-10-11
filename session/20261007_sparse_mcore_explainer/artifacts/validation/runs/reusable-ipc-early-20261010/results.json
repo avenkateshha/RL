@@ -1,0 +1,50 @@
+{
+  "status": "PASS",
+  "scope": "Raw reusable CUDA IPC GPU primitive plus controller/public dispatch/schedule tests. Production producer/dense/Ray teardown proof still pending.",
+  "job_id": "19990303",
+  "passed": 217,
+  "skipped": 0,
+  "suites": {
+    "raw": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 19.589
+    },
+    "orchestration": {
+      "tests": 181,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 24.115
+    },
+    "policy": {
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 11.799
+    },
+    "wrapper": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 20.02
+    }
+  },
+  "legacy_torch_counter_diagnostic": {
+    "status": "BUG_CONFIRMED",
+    "counter_values": [
+      1,
+      0,
+      -1
+    ],
+    "shutdown_warning": true,
+    "mapping_header_bytes": 64,
+    "note": "This deliberately repeats the legacy one-use Torch descriptor. It does not exercise the replacement raw reusable allocator."
+  },
+  "raw_reusable_shutdown_warning": false,
+  "source_validation": "Before and after source hashes PASS"
+}

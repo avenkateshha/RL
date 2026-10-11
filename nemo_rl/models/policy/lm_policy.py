@@ -889,9 +889,10 @@ class Policy(ColocatablePolicyInterface, GenerationInterface):
         Packed xToken callers must supply the controller-owned plan and side ID;
         this method never recomputes membership locally.
 
-        Native same-tokenizer consumers opt into reusable producer-owned handles
-        through the internal ``reusable_ipc`` argument. Dense values and shard
-        layout are unchanged; the legacy export remains the default.
+        Compatible native and legacy dense consumers opt into reusable
+        producer-owned handles through the internal ``reusable_ipc`` argument.
+        Dense values and shard layout are unchanged; Torch IPC remains the
+        default export.
         """
         if self.use_dynamic_batches:
             raise NotImplementedError(

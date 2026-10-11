@@ -1,0 +1,535 @@
+"""Run-owned instrumentation for actual mixed-backend controller acceptance.
+
+Teacher observations come from the real postprocessors before sparse export.
+The ordinary controller keeps all producer actors alive and executes its real
+loss, backward, optimizer and evaluation. Test-only full-logit gathers are
+separate from production preparation. Capture files also support a first-step
+student parameter-gradient replay without substituting teacher model outputs.
+"""
+
+from functools import lru_cache, wraps
+from contextlib import ExitStack
+import inspect
+import hashlib
+import json
+import os
+from pathlib import Path
+from unittest.mock import patch
+
+import torch
+import torch.distributed as dist
+import yaml
+
+import model_oracle
+
+_first_step_complete = False
+_first_step_microbatches = []
+_first_step_optimizers = []
+
+
+def _run():
+    return Path(os.environ["XTOKEN_NUMERICAL_CAPTURE_RUN"])
+
+
+def _sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+@lru_cache(maxsize=1)
+def _teacher_inventory():
+    """Bind observations to configured teacher indices, including equal vocabs."""
+    config = yaml.safe_load((_run() / "resolved_config.yaml").read_text())
+    runtime = json.loads((_run() / "runtime.json").read_text())
+    manifest = json.loads(Path(runtime["fixture_manifest"]).read_text())
+    pinned = {
+        str(Path(model["snapshot_path"]).resolve()): model
+        for model in manifest["models"].values()
+    }
+    result = []
+    for index, teacher in enumerate(config["teachers"]):
+        model_name = str(Path(teacher["model_name"]).resolve())
+        result.append(
+            {
+                "teacher_index": index,
+                "model_name": model_name,
+                "real_vocab_size": pinned[model_name]["real_tokenizer_vocab_size"],
+                "is_cross_tokenizer": teacher["is_cross_tokenizer"],
+            }
+        )
+    return result
+
+
+def _teacher_identity(vocab, model_name=None):
+    candidates = [
+        teacher
+        for teacher in _teacher_inventory()
+        if teacher["real_vocab_size"] == vocab
+        and (
+            teacher["model_name"] == str(Path(model_name).resolve())
+            if model_name is not None
+            else teacher["is_cross_tokenizer"]
+        )
+    ]
+    assert len(candidates) == 1, (vocab, model_name, candidates)
+    return candidates[0]
+
+
+def _optimizer_first_step_complete(report):
+    global _first_step_complete
+    assert _first_step_microbatches, (
+        "Optimizer prepared without captured training microbatches"
+    )
+    assert not report["found_inf"], report
+    _first_step_complete = True
+    _first_step_optimizers.append(report)
+    index = {
+        "format": "controller_first_optimizer_step_v1",
+        "rank": dist.get_rank(),
+        "microbatches": _first_step_microbatches,
+        "optimizers": _first_step_optimizers,
+        "boundary": "All first-step microbatches; optimizer gradients prepared before clipping/update",
+    }
+    path = _run() / "optimizer-first-step" / f"rank{dist.get_rank()}-index.json"
+    temporary = path.with_suffix(f".json.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(index, indent=2) + "\n")
+    temporary.replace(path)
+
+
+def _save_atomic(value, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + f".{os.getpid()}.tmp")
+    torch.save(value, temporary)
+    temporary.replace(path)
+
+
+def _all_gather(tensor, group, dim):
+    parts = [torch.empty_like(tensor) for _ in range(dist.get_world_size(group))]
+    dist.all_gather(parts, tensor.contiguous(), group=group)
+    return torch.cat(parts, dim=dim)
+
+
+def _positions(length, rank, size):
+    if size == 1:
+        return torch.arange(length)
+    width = length // (2 * size)
+    return torch.cat(
+        (
+            torch.arange(rank * width, (rank + 1) * width),
+            torch.arange((2 * size - rank - 1) * width, (2 * size - rank) * width),
+        )
+    )
+
+
+def _mcore_full(local):
+    from megatron.core import parallel_state as ps
+
+    tp_group, cp_group = (
+        ps.get_tensor_model_parallel_group(),
+        ps.get_context_parallel_group(),
+    )
+    native = _all_gather(local.detach(), tp_group, -1)
+    parts = [torch.empty_like(native) for _ in range(dist.get_world_size(cp_group))]
+    dist.all_gather(parts, native.contiguous(), group=cp_group)
+    length = native.shape[1] * len(parts)
+    full = torch.empty((native.shape[0], length, native.shape[-1]))
+    for rank, value in enumerate(parts):
+        full[:, _positions(length, rank, len(parts))] = value.float().cpu()
+    return full
+
+
+def _save_teacher(full, data, vocab, backend, writer, *, model_name=None):
+    if not writer:
+        return
+    identity = _teacher_identity(vocab, model_name)
+    ids = data["batch_item_id"].detach().cpu().tolist()
+    for index, item_id in enumerate(ids):
+        _save_atomic(
+            {
+                "logits": full[index].float().cpu(),
+                "input_ids": data["input_ids"][index].detach().cpu(),
+                "backend": backend,
+                "batch_item_id": int(item_id),
+                "real_vocab_size": int(vocab),
+                "teacher_index": identity["teacher_index"],
+                "model_name": identity["model_name"],
+            },
+            _run()
+            / "teacher-observations"
+            / f"teacher{identity['teacher_index']}"
+            / f"{int(item_id)}.pt",
+        )
+
+
+def patch_automodel(module):
+    """Capture actual DTensor logits through its public postprocessor API."""
+    cls = module.SparseLogitsPostProcessor
+    original = cls.__call__
+
+    @wraps(original)
+    def observe(self, logits, data_dict, *args, **kwargs):
+        local = logits.to_local() if isinstance(logits, module.DTensor) else logits
+        local = local.detach()
+        tp_group, cp_group = self.tp_mesh.get_group(), self.cp_mesh.get_group()
+        vocab = int(self.vocab_size)
+        # Some Automodel configurations replicate the full output vocabulary.
+        full = local if local.shape[-1] >= vocab else _all_gather(local, tp_group, -1)
+        sharder = kwargs.get("cp_sharder")
+        if sharder is not None:
+            full = sharder.gather_token_tensor(full, seq_dim=1, trim=True)
+        elif self.cp_size > 1:
+            raise AssertionError("Actual DTensor CP observation requires its sharder")
+        _save_teacher(
+            full,
+            data_dict,
+            vocab,
+            "DTensorPolicyWorkerV2.actual_forward",
+            dist.get_rank(tp_group) == 0 and dist.get_rank(cp_group) == 0,
+        )
+        return original(self, logits, data_dict, *args, **kwargs)
+
+    cls.__call__ = observe
+
+
+def patch_megatron(module):
+    """Observe real native teacher exports and the controller's unscaled loss."""
+    from megatron.core import parallel_state as ps
+
+    from optimizer_gradient_capture import install_optimizer_gradient_capture
+
+    install_optimizer_gradient_capture(
+        output_dir=_run() / "optimizer-first-step",
+        on_first_step_complete=_optimizer_first_step_complete,
+    )
+    cls = module.SparseTeacherLogitsPostProcessor
+    original_teacher = cls.__call__
+
+    @wraps(original_teacher)
+    def teacher(self, data_dict, *args, **kwargs):
+        process = original_teacher(self, data_dict, *args, **kwargs)
+
+        def observe(logits):
+            _save_teacher(
+                _mcore_full(logits),
+                data_dict,
+                self.real_vocab_size,
+                "MegatronPolicyWorker.actual_forward",
+                ps.get_tensor_model_parallel_rank() == 0
+                and ps.get_context_parallel_rank() == 0,
+            )
+            return process(logits)
+
+        return observe
+
+    cls.__call__ = teacher
+    dense_cls = module.FullLogitsPostProcessor
+    original_dense = dense_cls.__call__
+
+    @wraps(original_dense)
+    def dense_teacher(self, data_dict, *args, **kwargs):
+        assert not self.cfg["sequence_packing"]["enabled"], (
+            "This real-model observation fixture requires unpacked teachers"
+        )
+        process = original_dense(self, data_dict, *args, **kwargs)
+        model_name = str(Path(self.cfg["model_name"]).resolve())
+        identities = [
+            teacher
+            for teacher in _teacher_inventory()
+            if teacher["model_name"] == model_name
+        ]
+        assert len(identities) == 1, (model_name, identities)
+
+        def observe(logits):
+            _save_teacher(
+                _mcore_full(logits),
+                data_dict,
+                identities[0]["real_vocab_size"],
+                "MegatronPolicyWorker.actual_dense_forward",
+                ps.get_tensor_model_parallel_rank() == 0
+                and ps.get_context_parallel_rank() == 0,
+                model_name=model_name,
+            )
+            return process(logits)
+
+        return observe
+
+    dense_cls.__call__ = dense_teacher
+    original_loss = module.wrap_loss_fn_with_input_preparation
+    signature = inspect.signature(original_loss)
+
+    @wraps(original_loss)
+    def loss(*args, **kwargs):
+        bound = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        call = bound.arguments
+        loss_fn = call["loss_fn"]
+        if not isinstance(loss_fn, module.CrossTokenizerDistillationLossFn):
+            return original_loss(*args, **kwargs)
+        captured_input = {}
+        native_indices = []
+        native_dense_indices = []
+        prepare = call["prepare_fn"]
+
+        def capture_preparation(*prep_args, **prep_kwargs):
+            loss_input, prepared_data = prepare(*prep_args, **prep_kwargs)
+            native_indices.extend(loss_input.get("native_sparse_teachers", {}))
+            native_dense_indices.extend(loss_input.get("native_dense_teachers", {}))
+            # The legacy DTensor route's reconstructed sparse values are small
+            # and establish exactly which wire payload entered the mixed loss.
+            for index, values in loss_input.get(
+                "teacher_sparse_logits_by_idx", {}
+            ).items():
+                if isinstance(values, tuple):
+                    captured_input[index] = tuple(
+                        x.detach().cpu() if isinstance(x, torch.Tensor) else x
+                        for x in values
+                    )
+            return loss_input, prepared_data
+
+        call["prepare_fn"] = capture_preparation
+        from nemo_rl.algorithms.x_token import loss_utils
+
+        layout_calls = {}
+        with ExitStack() as stack:
+            for name in (
+                "cp_load_balanced_to_contiguous",
+                "rebuild_teacher_sparse_logits_from_ipc",
+                "rebuild_teacher_full_logits_from_ipc",
+                "allgather_cp_contiguous_tensor",
+            ):
+                layout_calls[name] = 0
+                original = getattr(loss_utils, name)
+
+                def counted(*call_args, _name=name, _original=original, **call_kwargs):
+                    layout_calls[_name] += 1
+                    return _original(*call_args, **call_kwargs)
+
+                stack.enter_context(patch.object(loss_utils, name, counted))
+            actual_loss, metrics = original_loss(**call)
+        assert layout_calls["rebuild_teacher_full_logits_from_ipc"] == 0
+        assert layout_calls["rebuild_teacher_sparse_logits_from_ipc"] == len(
+            captured_input
+        )
+        assert layout_calls["cp_load_balanced_to_contiguous"] <= 1
+        assert len(native_indices) + len(native_dense_indices) + len(
+            captured_input
+        ) == len(loss_fn.cfg["teacher_weights"])
+        if not captured_input:
+            assert layout_calls["cp_load_balanced_to_contiguous"] == 0
+            assert layout_calls["allgather_cp_contiguous_tensor"] == 0
+        _check_loss(
+            call,
+            actual_loss,
+            metrics,
+            captured_input,
+            native_indices,
+            native_dense_indices,
+            layout_calls,
+        )
+        return actual_loss, metrics
+
+    module.wrap_loss_fn_with_input_preparation = loss
+
+
+def _check_loss(
+    call,
+    actual_loss,
+    metrics,
+    legacy_sparse,
+    native_indices,
+    native_dense_indices,
+    layout_calls,
+):
+    from megatron.core import parallel_state as ps
+
+    logits, data, cfg = (
+        call["next_token_logits"],
+        call["data"],
+        dict(call["loss_fn"].cfg),
+    )
+    cpu_data = {
+        key: value.detach().cpu()
+        for key, value in data.items()
+        if isinstance(value, torch.Tensor)
+    }
+    item_ids = cpu_data["batch_item_id"].tolist()
+    observations = []
+    teacher_backends = []
+    for i, vocab in enumerate(cfg["teacher_vocab_sizes"]):
+        records = [
+            torch.load(
+                _run() / "teacher-observations" / f"teacher{i}" / f"{int(item)}.pt",
+                map_location="cpu",
+                weights_only=False,
+            )
+            for item in item_ids
+        ]
+        teacher_backends.append(sorted({record["backend"] for record in records}))
+        rows = torch.stack([record["logits"] for record in records])
+        # The production teacher pads independently from the student; preserve
+        # those actual observations and validate the same IDs used by the loss.
+        for b, record in enumerate(records):
+            assert record["teacher_index"] == i
+            assert record["model_name"] == _teacher_inventory()[i]["model_name"]
+            assert record["real_vocab_size"] == vocab
+            assert record["batch_item_id"] == item_ids[b]
+            torch.testing.assert_close(
+                record["input_ids"],
+                cpu_data[
+                    f"teacher_{i}_input_ids"
+                    if cfg["teacher_is_cross_tokenizer"][i]
+                    else "input_ids"
+                ][b],
+            )
+        observations.append(rows)
+    chains = {
+        i: (
+            model_oracle.read_chains(cfg["pseudo_target_paths"][i]),
+            model_oracle.read_chains(cfg["reverse_pseudo_target_paths"][i]),
+        )
+        for i, cross in enumerate(cfg["teacher_is_cross_tokenizer"])
+        if cross
+    }
+    token_denominator = float(call["global_valid_toks"])
+    kd_denominator = float(call["global_valid_kd_toks"])
+    chunk_denominators = {
+        i: float(value) for i, value in (call["global_valid_chunks_by_idx"] or {}).items()
+    }
+    with torch.enable_grad():
+        student = _mcore_full(logits).requires_grad_()
+        fixture = model_oracle.sparse_fixture(
+            cpu_data,
+            student,
+            observations,
+            cfg,
+            token_denominator,
+            chunk_denominators,
+            chains,
+        )
+        reference_loss, reference_metrics = model_oracle.full_objective(
+            fixture,
+            observations,
+            cpu_data,
+            student,
+            cfg,
+            kd_denominator,
+            legacy_sparse_payloads=legacy_sparse,
+            legacy_loss_fn=call["loss_fn"],
+        )
+        full_gradient = torch.autograd.grad(reference_loss, student)[0]
+    cp_group = ps.get_context_parallel_group()
+    cp_loss = actual_loss.detach().clone()
+    dist.all_reduce(cp_loss, group=cp_group)
+    torch.testing.assert_close(
+        cp_loss.cpu(), reference_loss.detach(), rtol=0.02, atol=0.005
+    )
+    for name, expected in reference_metrics.items():
+        assert name in metrics, name
+        torch.testing.assert_close(
+            torch.as_tensor(metrics[name]).cpu().to(expected),
+            expected.detach(),
+            rtol=0.02,
+            atol=0.005,
+            msg=lambda message, name=name: f"Controller metric {name}: {message}",
+        )
+    owned = _positions(
+        student.shape[1],
+        ps.get_context_parallel_rank(),
+        ps.get_context_parallel_world_size(),
+    )
+    vocab_start = ps.get_tensor_model_parallel_rank() * logits.shape[-1]
+    expected_gradient = full_gradient[
+        :, owned, vocab_start : vocab_start + logits.shape[-1]
+    ].contiguous()
+    actual_gradient = None
+    gradient_error = None
+    if actual_loss.requires_grad:
+        actual_gradient = torch.autograd.grad(actual_loss, logits, retain_graph=True)[0]
+        gradient_error = model_oracle.gradient_errors(
+            actual_gradient.cpu(), expected_gradient
+        )
+        assert gradient_error["relative_l2"] <= 0.02, gradient_error
+        assert gradient_error["relative_norm"] <= 0.02, gradient_error
+    capture = {
+        "status": "PASS",
+        "rank": dist.get_rank(),
+        "dp_rank": ps.get_data_parallel_rank(),
+        "tp_rank": ps.get_tensor_model_parallel_rank(),
+        "cp_rank": ps.get_context_parallel_rank(),
+        "item_ids": item_ids,
+        "data": cpu_data,
+        "loss_config": cfg,
+        "student_full_logits": student.detach(),
+        "teacher_full_logits": observations,
+        "teacher_backends": teacher_backends,
+        "actual_local_dlogits": None
+        if actual_gradient is None
+        else actual_gradient.detach().cpu(),
+        "reference_local_dlogits": expected_gradient,
+        "legacy_sparse_payloads": legacy_sparse,
+        "legacy_sparse_teacher_indices": sorted(legacy_sparse),
+        "native_sparse_teacher_indices": sorted(native_indices),
+        "native_dense_teacher_indices": sorted(native_dense_indices),
+        "production_layout_calls": layout_calls,
+        "token_denominator": token_denominator,
+        "kd_denominator": kd_denominator,
+        "chunk_denominators": chunk_denominators,
+        "reference_metrics": {
+            name: float(value.detach()) for name, value in reference_metrics.items()
+        },
+        "production_metrics": metrics,
+        "dlogits": gradient_error,
+    }
+    stem = f"items{int(item_ids[0])}-{int(item_ids[-1])}-rank{dist.get_rank()}"
+    capture_path = _run() / "controller-reference" / (stem + ".pt")
+    # All first-step microbatches use pinned weights; retain each until the real
+    # optimizer prepare hook confirms the complete accumulated preclip boundary.
+    save_tensors = actual_gradient is not None and not _first_step_complete
+    if save_tensors:
+        _save_atomic(capture, capture_path)
+    report = {
+        name: capture[name]
+        for name in (
+            "status",
+            "rank",
+            "dp_rank",
+            "tp_rank",
+            "cp_rank",
+            "item_ids",
+            "teacher_backends",
+            "legacy_sparse_teacher_indices",
+            "native_sparse_teacher_indices",
+            "native_dense_teacher_indices",
+            "production_layout_calls",
+            "token_denominator",
+            "kd_denominator",
+            "chunk_denominators",
+            "reference_metrics",
+            "dlogits",
+        )
+    }
+    report["gradient_kind"] = (
+        "actual controller loss dlogits before MCore schedule scaling and clipping"
+    )
+    report["reference_kind"] = (
+        "Independent native teacher oracle plus retained CP1 legacy objective on "
+        "identical full-sequence sparse exports; independent CE and aggregation"
+    )
+    report["capture_path"] = str(capture_path) if save_tensors else None
+    report["capture_sha256"] = _sha256(capture_path) if save_tensors else None
+    if save_tensors:
+        _first_step_microbatches.append(
+            {
+                "ordinal": len(_first_step_microbatches),
+                "capture_path": str(capture_path),
+                "capture_sha256": report["capture_sha256"],
+                "item_ids": item_ids,
+            }
+        )
+    capture_path.parent.mkdir(parents=True, exist_ok=True)
+    (_run() / "controller-reference" / (stem + ".json")).write_text(
+        json.dumps(report, indent=2) + "\n"
+    )

@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "focused": {
+    "passed": 11,
+    "skipped": 1,
+    "skip_reason": "two CUDA devices required"
+  },
+  "legacy_compat": {
+    "passed": 13,
+    "deselected": 48
+  },
+  "observer_selfcheck": "PASS; zero CUDA imports; Ray cloned class, cloudpickle and metadata dispatch",
+  "source_sha256": {
+    "nemo_rl/algorithms/x_token/loss_utils.py": "2836a8701458878c5c4a8aa7afacb92c73675b5ab451cc8825f11e9427a3fc22",
+    "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py": "23b68268b113a9ef1d28888a81f3d51c10d37f0d0c6eb4e802fb24ec5f63b48e",
+    "tests/unit/models/policy/test_dtensor_sparse_ipc.py": "79906a9dcc2122dae357f855d8ab37ec4f0ca8eeac9b981c1597b31a3723bef9",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/legacy_ipc_counter_observer.py": "aec643d43406feb65d28ef00521025525a58083c61841df08bcee329a948e70f",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/legacy_ipc_counter_observer_selfcheck.py": "a8c979d37b9c3caf732bf8e951453c884fc5152897b245f1a55d9937aea6e01d",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_legacy_ipc_observations.py": "b2d615139f56781656a1527a2282df53cdb42e0dc7102cd6fa901ad920f8fe65"
+  },
+  "source_hash_timing": "Recorded immediately after tests; source unchanged since freeze-ready signal",
+  "logs": [
+    "focused.log",
+    "legacy-compat.log",
+    "observer-selfcheck.log"
+  ]
+}

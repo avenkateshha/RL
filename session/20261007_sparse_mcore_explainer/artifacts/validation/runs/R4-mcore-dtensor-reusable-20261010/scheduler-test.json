@@ -1,0 +1,20 @@
+{
+  "command": [
+    "sbatch",
+    "--nodes=1",
+    "--gres=gpu:8",
+    "--exclusive",
+    "--account=coreai_dlalgo_genai",
+    "--partition=interactive",
+    "--time=00:45:00",
+    "--job-name=xtoken-small-R4-mcore-dtensor-reusable-20261010",
+    "--output=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/slurm-%j.out",
+    "--chdir=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+    "--test-only",
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-mcore-dtensor-reusable-20261010/launcher/ray-runtime.sub"
+  ],
+  "utc": "2026-10-10T23:06:47.845088+00:00",
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "sbatch: Job 19993792 to start at 2026-10-10T16:07:47 using 128 processors on nodes pool0-01636 in partition interactive\n"
+}

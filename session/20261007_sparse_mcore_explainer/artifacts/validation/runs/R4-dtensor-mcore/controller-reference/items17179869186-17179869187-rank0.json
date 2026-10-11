@@ -1,0 +1,54 @@
+{
+  "status": "PASS",
+  "rank": 0,
+  "dp_rank": 0,
+  "tp_rank": 0,
+  "cp_rank": 0,
+  "item_ids": [
+    17179869186,
+    17179869187
+  ],
+  "teacher_backends": [
+    [
+      "DTensorPolicyWorkerV2.actual_forward"
+    ],
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ]
+  ],
+  "legacy_sparse_teacher_indices": [
+    0
+  ],
+  "native_sparse_teacher_indices": [
+    1
+  ],
+  "native_dense_teacher_indices": [],
+  "production_layout_calls": {
+    "cp_load_balanced_to_contiguous": 1,
+    "rebuild_teacher_sparse_logits_from_ipc": 1,
+    "rebuild_teacher_full_logits_from_ipc": 0,
+    "allgather_cp_contiguous_tensor": 2
+  },
+  "token_denominator": 90.0,
+  "kd_denominator": 90.0,
+  "chunk_denominators": {
+    "0": 128.0,
+    "1": 242.0
+  },
+  "reference_metrics": {
+    "loss": 0.20724058151245117,
+    "ce_loss": 1.0328627824783325,
+    "kl_loss": 0.10395430773496628,
+    "kl_loss_scale": 1.0,
+    "accuracy": 0.2916666567325592,
+    "kl_loss_t0": 0.19392059743404388,
+    "kl_loss_t1": 0.06539732217788696,
+    "teacher_0/weighted_kl": 0.058176182210445404,
+    "teacher_1/weighted_kl": 0.045778125524520874
+  },
+  "dlogits": null,
+  "gradient_kind": "actual controller loss dlogits before MCore schedule scaling and clipping",
+  "reference_kind": "Independent native teacher oracle plus retained CP1 legacy objective on identical full-sequence sparse exports; independent CE and aggregation",
+  "capture_path": null,
+  "capture_sha256": null
+}

@@ -28,6 +28,7 @@ This guide explains how to:
 1. Create the projection matrix from a (student, teacher) tokenizer pair.
 2. Launch distillation with the projection matrix, or use existing subtoken
    tables for [matrix-free v6](#matrix-free-v6-with-subtoken-tables).
+3. Choose a supported backend and [teacher transport](#native-mcore-sparse-transport).
 
 ## How it works
 
@@ -66,9 +67,10 @@ single `.pt` file. The final step is the actual distillation training loop.
                         └────────────────────────────────────────────────────┘
 ```
 
-The projection matrix is a sparse `[V_student, top_k]` tensor that the
-training-time loss multiplies against the student logits to project them into
-the teacher's vocab space.
+The projection artifact stores sparse relationships between student and teacher
+tokens. Current v6 derives its common-token map from these relationships, or
+from subtoken tables in matrix-free mode. Mismatch partitions use prefix
+alternatives rather than a dense multiplication of student logits by the matrix.
 
 <img src="../assets/projection_matrix_colour_matching.png" alt="Projection-matrix weights mapping student tokens (rows) to teacher tokens (columns)" width="600">
 
@@ -101,43 +103,39 @@ weight thresholds, hand-picked intermediate filenames, etc.).
 
 ## Backend and scope
 
-- **DTensor only.** Set `policy.dtensor_cfg.enabled=true`. The Megatron policy
-  worker is not wired for cross-tokenizer distillation.
-- **Teacher logits travel via CUDA IPC**, so student and teacher policies must
-  be colocated on the same node. No remote-Ray transport for x-token logits.
-- **One colocated GPU pool, serial execution.** All teachers and the student
-  share a single `RayVirtualCluster`
-  (`max_colocated_worker_groups = len(teachers) + 1`). There is no separate
-  generation worker (off-policy distillation trains on a fixed dataset) and no
-  colocation toggle. Each step time-slices the shared GPUs: one teacher at a
-  time is onloaded, runs its forward pass, ships its logits to the student over
-  CUDA IPC, then offloads; the student trains last, reading and releasing each
-  teacher's IPC buffer. GPU memory therefore holds exactly one teacher's params
-  *or* the student's at any instant, plus the teachers' resident IPC logit
-  buffers.
+X-token supports Megatron-Core and the existing DTensor routes. Teachers and the
+student share one colocated Ray GPU pool and run serially: each teacher exports
+its logits and offloads its model, then the student consumes every teacher's
+payload. Producers retain reusable storage across successful steps. The controller
+releases it at the enclosing train or validation scope exit, after all student
+consumers have completed. Teacher parameter offload does not release these payloads.
 
-```
-   RayVirtualCluster — one GPU pool, shared by every worker group
-   max_colocated_worker_groups = len(teachers) + 1   (no separate
-   generation worker; no colocation toggle)
-   Shared GPUs = cluster.gpus_per_node × cluster.num_nodes
+CUDA IPC is node-local. Every teacher/student pair must satisfy the placement,
+DP-sample, and TP/CP compatibility checks; equal global GPU counts alone are not
+sufficient. On multiple nodes, both policies must use PP1. There is no remote-Ray
+fallback for tensor storage.
 
-   Worker groups, all colocated on the SAME GPUs:
-     teacher_0, teacher_1, …, teacher_{N-1}, student
+The native MCore student path requires PP1, static batches, and disabled sequence
+packing. A native sparse MCore teacher has the same restrictions. Each loss uses
+the original MCore CP rows, including both zigzag segments, with global next-token
+labels. Native sparse-only, same-tokenizer-only, and their mixture avoid a student
+full-sequence logits relayout. A retained legacy consumer can request one shared
+contiguous compatibility view. The dense teacher producer may still rearrange
+its own rows.
 
-   Per training step — serial time-slice on those GPUs:
-     teacher_0      : onload → forward → ship logits (CUDA IPC) → offload
-     teacher_1      : onload → forward → ship logits (CUDA IPC) → offload
-       ⋮
-     teacher_{N-1}  : onload → forward → ship logits (CUDA IPC) → offload
-     student        : train → read each teacher's IPC buffer → release
+| Teacher route | Export | Student behavior |
+|---|---|---|
+| MCore cross-tokenizer, `teacher_topk_ipc_k > 0` | Native sparse row support, exact log-normalizer, realized-label sidecars | Native sparse KD on a static, unpacked MCore PP1 student |
+| DTensor-V2 cross-tokenizer, `teacher_topk_ipc_k > 0` | Reusable sparse slabs published by TP0 | Retained reconstructed-sparse consumer; can coexist with native MCore sparse teachers |
+| Cross-tokenizer, `teacher_topk_ipc_k = 0` | Contiguous dense export; reusable CUDA slabs for eligible static MCore pairs | Retained dense cross-tokenizer consumer |
+| Same-tokenizer, any `teacher_topk_ipc_k` | Dense export | Native row reads when student and teacher satisfy the MCore envelope; otherwise the existing dense consumer |
 
-   At any instant: exactly ONE teacher's params OR the student's resident,
-   plus the teachers' IPC logit buffers (node-local).
-```
-
-Future work will ease these requirements — we are actively working on
-improving cross-tokenizer distillation support.
+Teacher selection and dynamic teacher weights remain available for supported
+dense-only runs. For true same-tokenizer `averaged_logits`, a teacher set that
+mixes native-capable MCore and legacy exporters stays entirely on the existing
+dense route so logits remain position-aligned. Other supported dense/DTensor
+paths retain their established behavior. The Megatron split training API does
+not support x-token; use ordinary `Policy.train` and validation.
 
 ## Step 1 — Build multi-token mappings
 
@@ -258,6 +256,62 @@ configuration does not load a projection matrix. Each cross-tokenizer teacher
 needs tables for its own tokenizer pair. Same-tokenizer teachers in a mixed
 run keep `is_cross_tokenizer: false` and leave all artifact paths unset.
 
+### Native MCore sparse transport
+
+The [small multi-teacher MCore recipe](../../examples/configs/recipes/llm/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2.yaml)
+uses a Llama-3.2-1B student, Qwen3-4B and SmolLM2-1.7B teachers, K64,
+256-token inputs, and three training steps with validation. Supply a local text
+corpus through `XTOKEN_TEXT_DATA` and each tokenizer pair's prebuilt forward and
+reverse tables through the four `XTOKEN_*_TABLE` variables documented in the
+recipe. Its reused validation fixture checks execution, not held-out quality.
+
+This is an unpinned functional example. The recorded small correctness runs use
+pinned model snapshots and the reused container's Python 3.13.13, PyTorch 2.11,
+and Transformer Engine 2.15, with isolated Bridge `1f8873bb` and MCore `6a366090`
+source overlays. The repository requests Python 3.13.14 and PyTorch 2.13; that
+runtime remains outside this evidence. Seeds, learning rates, offload settings,
+teacher padding and evaluation cadence are recorded in each run's resolved
+configuration. See the [validation record](../../session/20261007_sparse_mcore_explainer/artifacts/validation/README.md)
+for exact fixtures, runtime provenance and results.
+
+`loss_fn.teacher_topk_ipc_k` selects cross-tokenizer transport globally: `0`
+exports dense teacher logits, and positive `K` exports sparse support for every
+cross-tokenizer teacher. Backend dispatch selects native MCore sparse or the
+existing DTensor-V2 sparse implementation per teacher. Same-tokenizer teachers
+always export dense logits. This transport setting is separate from
+`loss_fn.vocab_topk`, which controls the same-tokenizer KL vocabulary subset.
+
+For each native sparse MCore teacher, supply its own forward and reverse subtoken
+tables. Table-based common-vocabulary matching uses
+`common_indices_from_subtoks: true` with a null projection path. A matrix-derived
+common-token map remains supported, but the two prefix tables are still required
+for native sparse mismatch support.
+
+The native sparse envelope requires:
+
+- `teacher_topk_ipc_support_mode: row_topk` and
+  `teacher_topk_ipc_keep_realized: true`.
+- Nonnegative `prefix_bidir_v3_noise_filter_topk` and both K values no larger
+  than that teacher's real tokenizer vocabulary. Padded LM-head columns are excluded.
+- KL or JSD common and mismatch partitions. BCE, pure ALM, and position-zero KL
+  are unsupported on this route.
+- If `prefix_bidir_v3_mismatch_loss_beta` is configured, explicitly set
+  `prefix_bidir_v3_mismatch_pos0_alpha: 0`. Nonzero position-zero coefficients and
+  combinations of deprecated and replacement coefficient keys are rejected.
+- Static teacher weights: `sum_weights_metric: null` and
+  `kd_loss_mode` set to `sum` or `averaged_logits`. Sparse teacher scoring and
+  `select_teacher` require information that sparse transport does not export.
+
+`averaged_logits` with any cross-tokenizer teacher retains the established
+static weighted-sum fallback. No new objective or per-teacher K flag is needed.
+
+Sparse export keeps natural top-K support and independently records realized
+labels; a row request substitutes its required realized label only when absent.
+Two chunks requesting the same teacher row can require different labels without
+changing each other's support. The exact full-vocabulary log-normalizer and REST
+mass remain part of the sparse objective. Producer slabs retain FP32 scores and
+int32 IDs, while bounded temporary tiles handle selection and normalization.
+
 ### Text and chat batches
 
 Both exemplar configs declare a typed top-level `collator` block:
@@ -363,8 +417,8 @@ ChatML override so the test retains reasoning, tool calls, and end-of-turn
 supervision. The script generates its multi-turn arithmetic JSONL and projection
 matrix at runtime, then checks that three training steps produce finite losses.
 The chat scenario is functional coverage, not a nightly convergence benchmark.
-DP alignment, native student-only SFT, sequence packing, and backend/loss changes
-are outside this port.
+That chat fixture does not validate DP alignment, native student-only SFT,
+sequence packing, or the MCore routes described above.
 
 ### Cascade releases and weighted subsets
 
@@ -492,22 +546,50 @@ The exemplar documents the complete defaults owned by `CascadeDatasetConfig`.
 
 ### Loss-mode knobs
 
-`loss_fn` has two flags that pick between three behaviors:
+A cross-tokenizer teacher uses the v6 prefix-bidir partition objective. A
+same-tokenizer teacher uses direct KL on matching predictor rows. Both share one
+student next-token CE term; each teacher retains its own masks, tables, weight,
+and full-step normalizer.
 
-| `gold_loss` | `xtoken_loss` | Behavior |
-|---|---|---|
-| `false` | (inert) | **P-KL** — full-vocab teacher logits; the loss derives a microbatch-global top-k inside, projects the student into teacher vocab via the projection matrix, and chunk-averages KL on the top-k subset. CE term is added. |
-| `true` | `false` | **Gold loss** — split the vocab into an *exact-token-mapped* common set (KL) and an *uncommon* tail (sorted L1). |
-| `true` | `true`  | **H-KL (gold + xtoken)** — same as gold, but relax the exact-map threshold to `>= 0.6` and allow multi-token projections to count as exact maps via a collision-replacement rule. |
+| `loss_fn.kd_loss_mode` | Objective |
+|---|---|
+| `sum` | Sum teacher KD terms with configured teacher weights; supported dense-only runs may derive weights from `sum_weights_metric`. |
+| `averaged_logits` | When all teachers share the student's tokenizer and provide matching rows, form the configured convex average of raw teacher logits and compute one full-vocabulary KL. A cross-tokenizer teacher uses the established static weighted-sum fallback. |
+| `select_teacher` | Choose the dense teacher with the lowest frozen next-token CE and use its KD term. Sparse transport is incompatible. |
 
-Other relevant fields:
+`vocab_topk` selects one common same-tokenizer vocabulary subset using maximum
+teacher importance over valid predictors in the microbatch and across CP. It is
+not sparse export's independent top-K at each row. A zero `vocab_topk` produces
+zero direct same-tokenizer KD; setting `teacher_topk_ipc_k: 0` only selects dense
+export and does not disable KD. True averaged-logits KL uses
+the full vocabulary; native KL excludes padded LM-head columns. `temperature`,
+`reverse_kl`, and temperature-squared scaling preserve the existing KL
+definitions. Native teacher CE scoring uses shifted KD masks and global next
+labels; entropy and maximum-probability scores use the unshifted predictor KD
+mask. Student CE and KD masks remain distinct.
 
-- `loss_fn.temperature` — softmax temperature applied symmetrically to student and teacher logits before KL.
-- `loss_fn.vocab_topk` — microbatch-global top-k size for the P-KL path (inert when `gold_loss=true`).
-- `loss_fn.uncommon_topk` — cap on the L1 uncommon-tail sort in the gold path (defaults to 8192).
-- `loss_fn.reverse_kl` — compute `KL(student || teacher)` instead of `KL(teacher || student)`.
+Megatron normalizes each term according to its gradient ownership. Native CE,
+native sparse KD, and same-tokenizer KL use disjoint rows or chunk owners and
+have no extra objective `/CP`. Retained replicated CE and cross-tokenizer KD
+receive their existing `/CP` correction. The schedule's separate microbatch/CP
+compensation remains in place. This corrects the earlier same-tokenizer
+underweighting at CP greater than one, including dense-only runs.
+
+With `dynamic_loss_scaling: false`, the combined objective is
+`ce_loss_scale * CE + kl_loss_weight * weighted_KD`. With dynamic scaling enabled,
+each student microbatch and DP replica forms one detached CP-complete ratio
+`abs(CE) / abs(weighted_KD)`, using `1` for zero KD, and computes
+`CE + ratio * weighted_KD`. This branch ignores the two fixed scales. Teacher
+weights and vocabulary scaling are applied before the ratio. Changing
+microbatch or DP sample grouping may change this ratio; changing microbatch
+support can also change common-K KL. Loss and per-teacher metrics report the
+CP-complete contributions.
 
 ## Results — 100-step multi-teacher run
+
+These results describe an earlier run and are not native MCore acceptance
+evidence. Implementation checkpoints and their scoped validation results are
+recorded in the [native CP x-token checkpoint log](../../session/20261007_sparse_mcore_explainer/checkpoints.md).
 
 ```bash
 uv run python examples/run_xtoken_off_policy_distillation.py \
@@ -559,10 +641,24 @@ Measured on the same run (per training step, micro-batch 1, sequence length
 | Teacher forward (both teachers) | 4.94 s mean — the dominant per-step cost |
 | Training throughput | ≈29.5k valid tokens/s (196,512 tokens/step ÷ mean step time) |
 
-Each teacher's full-vocab logits stay on-node: the producer publishes a
-rank-level `[B_r, T_t, V_t]` bf16 tray and hands the student a CUDA IPC handle
-to it, so teacher logits never cross the network even with two teachers in
-play.
+The measurements above describe the historical run, not a production-memory
+claim for native MCore sparse transport. Native sparse export reduces persistent
+cross-tokenizer payloads, but teacher forwards still produce local dense logits.
+Same-tokenizer teachers retain FP32 dense export. Teacher buffers remain
+allocated across successful steps, and every current teacher payload must
+coexist through student consumption and backward, even with serial teacher
+forwards. Streaming avoids an additional whole-step copy; it does not remove
+the persistent payload or model, activation, gradient, and optimizer memory.
+
+For scale only, at GBS96/DP4/TP2/CP2 with 16,384 teacher positions and K8192, each
+sparse teacher's FP32 scores plus int32 IDs occupy about 12 GiB on each TP0
+exporter, before sidecars. A dense same-tokenizer teacher with padded vocabulary
+128,256 occupies about 47 GiB per GPU for FP32 IPC storage. Two sparse teachers
+therefore contribute about 24 GiB per exporter; one sparse plus one dense teacher
+contributes about 59 GiB on exporters and 47 GiB on other TP ranks. These are
+illustrative payload estimates, not total peak memory or tested production fit.
+Reducing sparse K does not reduce the dense same-tokenizer payload. Small
+correctness and integration tests do not establish large-workload memory fit.
 
 ## Where files live
 

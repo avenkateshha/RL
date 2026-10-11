@@ -1,0 +1,46 @@
+{
+  "status": "PASS",
+  "job_id": "19991383",
+  "slurm_state": "COMPLETED",
+  "exit_code": "0:0",
+  "elapsed": "00:05:44",
+  "optimizer_steps": [
+    1,
+    2,
+    3
+  ],
+  "evaluation_steps": [
+    3
+  ],
+  "numerical_microbatch_reports": 14,
+  "training_dlogits_reports": 6,
+  "max_dlogits_relative_l2": 4.022240631743996e-05,
+  "first_step_optimizer_capture": {
+    "microbatches": 2,
+    "parameter_tensors": 98,
+    "parameter_elements": 1235814400,
+    "gradient_dtype": "torch.bfloat16",
+    "field": "decoupled_grad",
+    "before_clipping": true
+  },
+  "source_and_owned_hashes_before_after": "PASS",
+  "cuda_ipc_shutdown_warning_scan": "none found",
+  "actual_preclip_grad_norms": [
+    39.307823181152344,
+    36.73929214477539,
+    77.9992446899414
+  ],
+  "actual_step_loss": [
+    1.1937880516052246,
+    1.0590129494667053,
+    1.6056163907051086
+  ],
+  "scope": "Actual MCore export/native guarded loss,14train/eval microbatch independent objective checks,6training dlogits comparisons,3updates+eval,plus companion full accumulated first-step optimizer preclip reference covering every98parameter tensors and1.235B elements.",
+  "optimizer_preclip_replay": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-optimizer-replay-tp1cp1-20261010",
+  "actual_optimizer_preclip_gradients": {
+    "relative_l2": 0.009656411238541563,
+    "relative_norm": 0.0006699055360065977,
+    "actual_norm_including_tp_replicas": 39.30782426776542,
+    "reference_norm_including_tp_replicas": 39.33417444898304
+  }
+}

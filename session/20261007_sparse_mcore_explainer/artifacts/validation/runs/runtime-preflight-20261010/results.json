@@ -1,0 +1,14 @@
+{
+  "status": "FAIL",
+  "purpose": "Verify container interpreters, SpanRegistry, MCore APIs and GPU availability; no model training or memory benchmark.",
+  "workflow_reference_job": "19467093",
+  "resources": {
+    "nodes": 1,
+    "gpus_per_node": 8,
+    "partition": "interactive",
+    "time_limit": "00:20:00"
+  },
+  "scope": "imports/CUDA only; model conversion separately required",
+  "job_id": "19989358",
+  "reason": "Cached base has no MCore/Lens; actor interpreter with pinned Lens imports MCore but current worker requires missing FullyShardedDataParallelV1. Focused tests also lacked pytest. Current-source overlay retry is job19989442."
+}

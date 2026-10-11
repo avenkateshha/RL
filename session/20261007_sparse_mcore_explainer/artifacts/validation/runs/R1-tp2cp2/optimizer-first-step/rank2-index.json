@@ -1,0 +1,37 @@
+{
+  "format": "controller_first_optimizer_step_v1",
+  "rank": 2,
+  "microbatches": [
+    {
+      "ordinal": 0,
+      "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/controller-reference/items0-1-rank2.pt",
+      "capture_sha256": "b14bed39435846488e3c8448c1aa6f4dd7fd9c32a4cad920ab80eaace6008980",
+      "item_ids": [
+        0,
+        1
+      ]
+    },
+    {
+      "ordinal": 1,
+      "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/controller-reference/items2-3-rank2.pt",
+      "capture_sha256": "2f96647f78b701648bfb6dda4c167ed6eb5900f8a88a2ed1329a3facb022467e",
+      "item_ids": [
+        2,
+        3
+      ]
+    }
+  ],
+  "optimizers": [
+    {
+      "metadata_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/optimizer-first-step/rank2-optimizer0.json",
+      "tensor_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/optimizer-first-step/rank2-optimizer0.pt",
+      "sha256": "81a8f12e89cd7f6993429e2ee89cace71e431670536a55e42593818c082be906",
+      "rank": 2,
+      "optimizer_index": 0,
+      "found_inf": false,
+      "num_parameters": 44,
+      "num_elements": 308970496
+    }
+  ],
+  "boundary": "All first-step microbatches; optimizer gradients prepared before clipping/update"
+}

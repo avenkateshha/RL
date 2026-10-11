@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "scope": "Exact container actor interpreter; 17 process-lifetime tests, including actual isolated Ray actor OS exit and healthy/placeholder signature cases",
+  "passed": 17,
+  "skipped": 0,
+  "duration_seconds": 25.5,
+  "job_id": "19992724",
+  "test_file": "tests/unit/distributed/test_process_lifetime.py",
+  "test_source_sha256": "d68f5479c849c676e3a517ec9a8256d1b7299c05dbb034eba0ea6b18edac084e",
+  "log_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/preflight-pytest.log",
+  "log_sha256": "ceec764dba8dc6fad02371641dc309371f7e9d0e99eaa6516882766ab4ca0f17",
+  "source_manifest": "runtime.json:source_sha256_at_submission",
+  "command_script": "launcher/driver.sh",
+  "note": "Tests ran before the controller initial source verification; submission froze their source and launcher hashes, and the final job guard verifies both."
+}

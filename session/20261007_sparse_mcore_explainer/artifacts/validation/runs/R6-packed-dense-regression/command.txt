@@ -1,0 +1,1 @@
+uv run --no-sync -m pytest tests/unit/algorithms/x_token/test_packing_loss.py tests/unit/data/packing/test_lockstep.py

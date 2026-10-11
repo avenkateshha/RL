@@ -1,0 +1,82 @@
+{
+  "status": "PASS",
+  "scope": "Read-only teacher-order comparison of two accepted runs; no new GPU work or tensor loading.",
+  "teacher_orders": [
+    [
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71"
+    ],
+    [
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c"
+    ]
+  ],
+  "settings_by_model": {
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c": {
+      "weight": 0.3,
+      "logprob_batch_size": 1,
+      "train_micro_batch_size": 1
+    },
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71": {
+      "weight": 0.7,
+      "logprob_batch_size": 2,
+      "train_micro_batch_size": 2
+    }
+  },
+  "configuration_equivalence": "Exact after sorting teachers by model and excluding output log directory",
+  "identical_student_logical_batches": 3,
+  "identical_rank_item_and_model_normalizer_reports": 80,
+  "tolerances": {
+    "loss_rtol": 0.02,
+    "loss_atol": 0.005,
+    "gradient_relative_l2_max": 0.02,
+    "gradient_norm_relative_error_max": 0.02
+  },
+  "step_comparisons": [
+    {
+      "step": 1,
+      "combined_losses": [
+        0.7984887361526489,
+        0.7984887361526489
+      ],
+      "preclip_norms": [
+        16.15473175048828,
+        16.15473175048828
+      ],
+      "absolute_loss_difference": 0.0,
+      "relative_norm_difference": 0.0
+    },
+    {
+      "step": 2,
+      "combined_losses": [
+        0.9921413064002991,
+        0.9921413064002991
+      ],
+      "preclip_norms": [
+        21.1761474609375,
+        21.1761474609375
+      ],
+      "absolute_loss_difference": 0.0,
+      "relative_norm_difference": 0.0
+    },
+    {
+      "step": 3,
+      "combined_losses": [
+        0.7515491098165512,
+        0.7515491098165512
+      ],
+      "preclip_norms": [
+        10.127923011779785,
+        10.127923011779785
+      ],
+      "absolute_loss_difference": 0.0,
+      "relative_norm_difference": 0.0
+    }
+  ],
+  "input_sha256": {
+    "runs/R2-tp2cp2/results.json": "2fe861e5958e0c8fb54063bc513f2ffd83d76692914f70692f6a4fa035d2548a",
+    "runs/R2-tp2cp2/resolved_config.yaml": "eb9b0106b46172e51083f531df9f25db3a533e11af4710eadb7b9ed06002e498",
+    "runs/R2-tp2cp2-reversed/results.json": "160da27d2ce576edc212227aae2dc192f2406d6310fca58de95fe25828271a03",
+    "runs/R2-tp2cp2-reversed/resolved_config.yaml": "78846ed13a5f649c46e416278ab8bc296261bfc8eea9e5b0743679b890f0639e"
+  }
+}

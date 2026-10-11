@@ -1,0 +1,37 @@
+{
+  "format": "controller_first_optimizer_step_v1",
+  "rank": 4,
+  "microbatches": [
+    {
+      "ordinal": 0,
+      "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/controller-reference/items4-5-rank4.pt",
+      "capture_sha256": "8282440f9666c1de1adb538c2c7458a235ed041fdc02e6e66d99834b55f8c3a4",
+      "item_ids": [
+        4,
+        5
+      ]
+    },
+    {
+      "ordinal": 1,
+      "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/controller-reference/items6-7-rank4.pt",
+      "capture_sha256": "bf76bfaf5e0a8495ec87a788132f42fd3add8fd7f8ab9f9defcb190fb0093d15",
+      "item_ids": [
+        6,
+        7
+      ]
+    }
+  ],
+  "optimizers": [
+    {
+      "metadata_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/optimizer-first-step/rank4-optimizer0.json",
+      "tensor_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross-reusable-20261010/optimizer-first-step/rank4-optimizer0.pt",
+      "sha256": "8a8cdeccecdcf76697754eaf98629bd8e921351ea38fdab0368cb6ea9120529b",
+      "rank": 4,
+      "optimizer_index": 0,
+      "found_inf": false,
+      "num_parameters": 29,
+      "num_elements": 154485248
+    }
+  ],
+  "boundary": "All first-step microbatches; optimizer gradients prepared before clipping/update"
+}

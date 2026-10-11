@@ -1,0 +1,66 @@
+{
+  "status": "PASS_CHECKS_ONLY",
+  "scope": "Public functional-example schema/guard evidence and current shell syntax/dryrun; not exact pinned R2 recipe, model execution or GPU acceptance.",
+  "historical_schema_guard_check": {
+    "status": "PASS_REPORTED_WITH_RETAINED_LOG",
+    "log": "native-sparse-recipe-validation.log",
+    "log_sha256": "b9af80f8a31bfa8dc904b27ea7d1d4f6994523465c725378061d1e44f0d98bce",
+    "provenance": "Transport agent previously executed load_config + MasterConfig + actual sparse-route guard assertions and confirmed success; retained original log ends PASS. Exact original command and before/after source hashes were not saved. Current hashes below do not retrospectively prove historical input versions."
+  },
+  "checks": [
+    {
+      "name": "shell_syntax",
+      "command": "bash -n /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/tests/test_suites/llm/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2.sh",
+      "exit_code": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "shell_dryrun",
+      "command": "TEST_DRYRUN=1 bash /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/tests/test_suites/llm/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2.sh",
+      "exit_code": 0,
+      "status": "PASS"
+    }
+  ],
+  "historical_metric_checker_tests": {
+    "reported_passed": 14,
+    "status": "AGENT_REPORTED_NOT_INDEPENDENTLY_RERUN",
+    "provenance": "Transport agent reports prior tool-output-only synthetic metrics validation, including negative NaN, missing validation and incomplete steps cases; no retained script/command yet."
+  },
+  "current_file_sha256": {
+    "examples/configs/recipes/llm/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2.yaml": "468675fe8b0989962281a72969a947fc3987feaec384931491391de5c024cb32",
+    "tests/test_suites/llm/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2.sh": "5a9dab2a8699e2347bd96e547ddad50482d927679ceae5c1c22d3558e35dc50d",
+    "examples/configs/xtoken_off_policy_distillation.yaml": "46acea4a0bd57d8ea9fe5dd351bd0cdddf9f6045e62d9b16e20f1a5390e560cf",
+    "tests/test_suites/llm/common.env": "5d54441bbcb78e2d681dcd65d0d67f2025d87a7ae3d447014c731d0c4c1b538b"
+  },
+  "excluded": [
+    "GPU/model training",
+    "production-size memory tests"
+  ],
+  "minimization": {
+    "status": "PASS",
+    "resolved_semantics_before_after": "IDENTICAL",
+    "resolved_config_sha256": "8db8e306fcb6d754c3360801d40097fc2bcb0ae3ae401c4d6fb8747a10b914b3",
+    "recipe_before_sha256": "942d58b5599d18d2e292de30976f01603370b69dc2ef9577126b0118a3c27b8f",
+    "recipe_after_sha256": "468675fe8b0989962281a72969a947fc3987feaec384931491391de5c024cb32",
+    "command": [
+      "uv",
+      "run",
+      "--no-sync",
+      "--offline",
+      "python",
+      "tools/config_cli.py",
+      "minimize-check",
+      "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/examples/configs/recipes/llm/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2.yaml"
+    ],
+    "exit_code": 0,
+    "removed_inherited_keys": [
+      "loss_fn.ce_loss_scale",
+      "loss_fn.kl_loss_weight",
+      "loss_fn.kd_loss_mode",
+      "policy.megatron_cfg.pipeline_model_parallel_size",
+      "collator.mode",
+      "cluster.num_nodes",
+      "cluster.gpus_per_node"
+    ]
+  }
+}

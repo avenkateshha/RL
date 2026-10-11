@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "acceptance_cases": 35,
+  "command": [
+    "/usr/bin/python3",
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_legacy_lifetime_gate.py"
+  ],
+  "exit_code": 0,
+  "source_sha256": {
+    "verify_legacy_lifetime_gate.py": "a8e1d415513048a04196f7c2b2d399742aa0ef2481121d02e1add50f58e4b896",
+    "summarize_matrix_run.py": "842370e1b797329c5f50ceb9dbea323269a480a216af7a71bc27dbc402c5ab2b"
+  },
+  "annotation_followup": {
+    "status": "PASS",
+    "acceptance_cases": 35,
+    "source_sha256": {
+      "verify_legacy_lifetime_gate.py": "26aed0f8f2f81a169b4c3909b6b5110fd12aac8905705c67b1d9dd13d05ae17c",
+      "summarize_matrix_run.py": "94bd30949b2d198ef410a39c3a6a1a615fabc122f62e1fdca3d51e5fc7e3df06"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "status": "PASS",
+  "scope": "Independent post-run source/config/launcher verification against frozen pre-submission hashes; temporarily saved on /tmp because project inode quota prevents creating run result file",
+  "source_files": 386,
+  "owned_files": 16,
+  "mismatches": []
+}

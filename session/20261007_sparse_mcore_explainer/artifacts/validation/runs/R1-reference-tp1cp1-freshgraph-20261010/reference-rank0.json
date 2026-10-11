@@ -1,0 +1,167 @@
+{
+  "status": "PASS",
+  "rank": 0,
+  "tp": 1,
+  "cp": 1,
+  "dp": 1,
+  "dp_rank": 0,
+  "weights_loaded": true,
+  "placement": [
+    {
+      "rank": 0,
+      "host": "pool0-01710",
+      "local_device": 0,
+      "dp_rank": 0,
+      "tp_rank": 0,
+      "cp_rank": 0
+    }
+  ],
+  "node_local_ipc_groups": "PASS; each DP replica's TP/CP producer-consumer group shares one host",
+  "elapsed_seconds": 31.919825760647655,
+  "settings_adjustment": {},
+  "reports": [
+    {
+      "step": 0,
+      "microbatch": 0,
+      "sample_indices": [
+        0,
+        1
+      ],
+      "reference": {
+        "loss": 0.615314245223999,
+        "ce_loss": 2.1224770545959473,
+        "kl_loss": 0.4030665457248688,
+        "kl_loss_scale": 1.0,
+        "accuracy": 0.2916666567325592,
+        "kl_loss_t0": 0.4030665457248688,
+        "teacher_0/weighted_kl": 0.4030665457248688
+      },
+      "production": {
+        "loss": 0.6152965426445007,
+        "kl_loss": 0.4030475318431854,
+        "ce_loss": 2.122490167617798,
+        "kl_loss_scale": 1.0,
+        "accuracy": 0.2916666567325592,
+        "num_valid_samples": 2.0,
+        "ipc_reconstruction_fallbacks": 0,
+        "teacher_0/weighted_kl": 0.4030475318431854,
+        "kl_loss_t0": 0.4030475318431854,
+        "kl_common_per_chunk_t0": 1.4261681483342097,
+        "kl_partition_last_per_chunk_t0": 0.0,
+        "kl_mismatch_combined_per_chunk_t0": 0.0,
+        "kl_mismatch_scaled_per_chunk_t0": 0.0,
+        "num_common_chunks_t0": 26,
+        "num_mismatch_chunks_t0": 0,
+        "num_noise_filtered_common_chunks_t0": 0,
+        "num_noise_filtered_mismatch_chunks_t0": 0,
+        "top1_acc_per_chunk_t0": 0.34615384615384615,
+        "sparse_topk_k_t0": 64,
+        "prefix_bidir_v3_mismatch_loss_multiplier_t0": 1.0,
+        "prefix_bidir_v3_noise_filter_topk_t0": 0,
+        "native_sparse_v6_t0": 1,
+        "weight_t0": 1.0,
+        "teacher_0/routed_samples": 2,
+        "teacher_0/routed_tokens": 26
+      },
+      "loss_cp_sum": 0.6152965426445007,
+      "dlogits": {
+        "relative_l2": 3.125305985376428e-05,
+        "relative_norm": 1.964099839613183e-05,
+        "absolute_l2": 8.949377948749134e-07,
+        "reference_norm": 0.028635205610663513,
+        "max_absolute": 3.67872416973114e-07
+      },
+      "parameter_gradients": {
+        "relative_l2": 0.008299292945648035,
+        "relative_norm": 0.0015170563257958499,
+        "reference_norm": 21.879690828795322,
+        "parameter_tensors_per_rank": 98,
+        "synchronized_cp_dp_group_size": 1,
+        "synchronization": "SUM over CP and DP; objective uses full-step DP denominators",
+        "reference_forward": "Fresh graph, same frozen weights/input/RNG; logits match rtol=atol=1e-5",
+        "compared_elements_including_replicas": 1235814400
+      },
+      "no_relayout_guard": "PASS",
+      "teacher_payload_checks": [
+        {
+          "status": "PASS",
+          "requested_forced_slots": 54,
+          "rtol": 1e-05,
+          "atol": 1e-05
+        }
+      ]
+    },
+    {
+      "step": 0,
+      "microbatch": 1,
+      "sample_indices": [
+        2,
+        3
+      ],
+      "reference": {
+        "loss": 0.39275848865509033,
+        "ce_loss": 1.3425043821334839,
+        "kl_loss": 0.25850802659988403,
+        "kl_loss_scale": 1.0,
+        "accuracy": 0.5909090638160706,
+        "kl_loss_t0": 0.25850802659988403,
+        "teacher_0/weighted_kl": 0.25850802659988403
+      },
+      "production": {
+        "loss": 0.39274299144744873,
+        "kl_loss": 0.2584914267063141,
+        "ce_loss": 1.3425155878067017,
+        "kl_loss_scale": 1.0,
+        "accuracy": 0.5909090638160706,
+        "num_valid_samples": 2.0,
+        "ipc_reconstruction_fallbacks": 0,
+        "teacher_0/weighted_kl": 0.2584914267063141,
+        "kl_loss_t0": 0.2584914267063141,
+        "kl_common_per_chunk_t0": 1.1370977401733398,
+        "kl_partition_last_per_chunk_t0": 0.25981441140174866,
+        "kl_mismatch_combined_per_chunk_t0": 0.25981441140174866,
+        "kl_mismatch_scaled_per_chunk_t0": 0.25981441140174866,
+        "num_common_chunks_t0": 20,
+        "num_mismatch_chunks_t0": 4,
+        "num_noise_filtered_common_chunks_t0": 0,
+        "num_noise_filtered_mismatch_chunks_t0": 0,
+        "top1_acc_per_chunk_t0": 0.5,
+        "sparse_topk_k_t0": 64,
+        "prefix_bidir_v3_mismatch_loss_multiplier_t0": 1.0,
+        "prefix_bidir_v3_noise_filter_topk_t0": 0,
+        "native_sparse_v6_t0": 1,
+        "weight_t0": 1.0,
+        "teacher_0/routed_samples": 2,
+        "teacher_0/routed_tokens": 28
+      },
+      "loss_cp_sum": 0.39274299144744873,
+      "dlogits": {
+        "relative_l2": 3.620161929210101e-05,
+        "relative_norm": 1.736780422111172e-05,
+        "absolute_l2": 6.812875380049062e-07,
+        "reference_norm": 0.018819255915261207,
+        "max_absolute": 2.612359821796417e-07
+      },
+      "parameter_gradients": {
+        "relative_l2": 0.007556624542618596,
+        "relative_norm": 7.262421725993624e-05,
+        "reference_norm": 14.311330961912622,
+        "parameter_tensors_per_rank": 98,
+        "synchronized_cp_dp_group_size": 1,
+        "synchronization": "SUM over CP and DP; objective uses full-step DP denominators",
+        "reference_forward": "Fresh graph, same frozen weights/input/RNG; logits match rtol=atol=1e-5",
+        "compared_elements_including_replicas": 1235814400
+      },
+      "no_relayout_guard": "PASS",
+      "teacher_payload_checks": [
+        {
+          "status": "PASS",
+          "requested_forced_slots": 54,
+          "rtol": 1e-05,
+          "atol": 1e-05
+        }
+      ]
+    }
+  ],
+  "scope": "Actual pinned-weight MCore forward and native IPC loss, independent selected-support oracle, all-parameter preclip gradient comparison. Optimizer updates/evaluation are the companion controller run."
+}

@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "rank": 4,
+  "dp_rank": 1,
+  "tp_rank": 0,
+  "cp_rank": 0,
+  "item_ids": [
+    4,
+    5
+  ],
+  "teacher_backends": [
+    [
+      "DTensorPolicyWorkerV2.actual_forward"
+    ],
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ]
+  ],
+  "legacy_sparse_teacher_indices": [
+    0
+  ],
+  "legacy_dense_teacher_indices": [],
+  "native_sparse_teacher_indices": [
+    1
+  ],
+  "native_dense_teacher_indices": [],
+  "production_layout_calls": {
+    "cp_load_balanced_to_contiguous": 1,
+    "rebuild_teacher_sparse_logits_from_ipc": 1,
+    "rebuild_teacher_full_logits_from_ipc": 0,
+    "allgather_cp_contiguous_tensor": 2
+  },
+  "token_denominator": 108.0,
+  "kd_denominator": 108.0,
+  "chunk_denominators": {
+    "0": 178.0,
+    "1": 236.0
+  },
+  "reference_metrics": {
+    "loss": 0.20997652411460876,
+    "ce_loss": 1.205459713935852,
+    "kl_loss": 0.0894305408000946,
+    "kl_loss_scale": 1.0,
+    "accuracy": 0.23076923191547394,
+    "kl_loss_t0": 0.11480674147605896,
+    "kl_loss_t1": 0.07855502516031265,
+    "teacher_0/weighted_kl": 0.03444202244281769,
+    "teacher_1/weighted_kl": 0.054988518357276917
+  },
+  "dlogits": {
+    "relative_l2": 1.3524465521346589e-05,
+    "relative_norm": 2.4048383680867964e-06,
+    "absolute_l2": 7.188984454090224e-08,
+    "reference_norm": 0.005315540523759226,
+    "max_absolute": 4.540197551250458e-08
+  },
+  "gradient_kind": "actual controller loss dlogits before MCore schedule scaling and clipping",
+  "reference_kind": "Independent native teacher oracle plus retained CP1 legacy objective on identical full-sequence dense/sparse teacher values; independent CE and aggregation",
+  "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/controller-reference/items4-5-rank4.pt",
+  "capture_sha256": "132edf52faea5a17e9dca7706a375f7d4f90dbff3c34f649319bc5e92a7940ce"
+}

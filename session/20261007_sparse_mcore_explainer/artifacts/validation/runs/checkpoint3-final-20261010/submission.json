@@ -1,0 +1,20 @@
+{
+  "command": [
+    "sbatch",
+    "--parsable",
+    "--nodes=1",
+    "--gres=gpu:8",
+    "--exclusive",
+    "--account=coreai_dlalgo_genai",
+    "--partition=interactive",
+    "--time=00:15:00",
+    "--job-name=xtoken-checkpoint3-final",
+    "--output=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/slurm-%j.out",
+    "--chdir=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/checkpoint3-final-20261010/launcher/preflight.sub"
+  ],
+  "utc": "2026-10-10T20:38:13.199334+00:00",
+  "returncode": 0,
+  "stdout": "19990413\n",
+  "stderr": ""
+}

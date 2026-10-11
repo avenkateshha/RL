@@ -1,0 +1,76 @@
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 .venv/bin/python - <<'PY'
+from pathlib import Path
+from collections import defaultdict
+import hashlib
+import json
+import math
+import torch
+
+run = Path('session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-dynamic')
+reports = [json.loads(path.read_text()) for path in (run / 'controller-reference').glob('*.json')]
+assert len(reports) == 80
+reference_groups = defaultdict(list)
+for report in reports:
+    assert report['status'] == 'PASS'
+    assert report['native_sparse_teacher_indices'] == [0]
+    assert report['native_dense_teacher_indices'] == [1]
+    assert not any(report['production_layout_calls'].values())
+    metrics = report['reference_metrics']
+    ce, kd, ratio = metrics['ce_loss'], metrics['kl_loss'], metrics['kl_loss_scale']
+    assert math.isclose(ratio, abs(ce) / abs(kd) if kd else 1.0, rel_tol=1e-6)
+    assert math.isclose(metrics['loss'], ce + ratio * kd, rel_tol=1e-6)
+    assert math.isclose(metrics['teacher_0/weighted_kl'], 0.3 * metrics['kl_loss_t0'], rel_tol=1e-6)
+    assert math.isclose(metrics['teacher_1/weighted_kl'], 0.7 * metrics['kl_loss_t1'], rel_tol=1e-6)
+    reference_groups[(report['dp_rank'], tuple(report['item_ids']))].append(report)
+assert len(reference_groups) == 20
+for group in reference_groups.values():
+    assert {(x['tp_rank'], x['cp_rank']) for x in group} == {(0, 0), (0, 1), (1, 0), (1, 1)}
+    ratios = [x['reference_metrics']['kl_loss_scale'] for x in group]
+    assert all(math.isclose(ratios[0], value, rel_tol=1e-6) for value in ratios)
+
+actual_groups = defaultdict(list)
+hashes = {}
+for rank in range(8):
+    index_path = run / 'optimizer-first-step' / f'rank{rank}-index.json'
+    index = json.loads(index_path.read_text())
+    hashes[str(index_path)] = hashlib.sha256(index_path.read_bytes()).hexdigest()
+    assert len(index['microbatches']) == 2
+    for microbatch in index['microbatches']:
+        path = Path(microbatch['capture_path'])
+        hashes[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
+        assert hashes[str(path)] == microbatch['capture_sha256']
+        capture = torch.load(path, map_location='cpu', weights_only=False)
+        assert capture['loss_config']['dynamic_loss_scaling']
+        assert capture['token_denominator'] == capture['kd_denominator'] == 108
+        assert capture['chunk_denominators'] == {0: 178.0}
+        metrics = capture['production_metrics']
+        ce, kd, ratio = metrics['ce_loss'], metrics['kl_loss'], metrics['kl_loss_scale']
+        assert math.isclose(ratio, abs(ce) / abs(kd) if kd else 1.0, rel_tol=1e-6)
+        assert math.isclose(metrics['loss'], ce + ratio * kd, rel_tol=1e-6)
+        assert math.isclose(ratio, capture['reference_metrics']['kl_loss_scale'], rel_tol=0.02, abs_tol=0.005)
+        assert capture['dlogits']['relative_l2'] < 0.02
+        actual_groups[(capture['dp_rank'], tuple(capture['item_ids']))].append({'rank': rank, 'ce': ce, 'kd': kd, 'ratio': ratio})
+assert len(actual_groups) == 4
+first_step = []
+for (dp, items), group in sorted(actual_groups.items()):
+    assert len(group) == 4
+    assert all(math.isclose(group[0]['ratio'], x['ratio'], rel_tol=1e-6) for x in group)
+    first_step.append({'dp_rank': dp, 'item_ids': list(items), 'ranks': sorted(x['rank'] for x in group), **{key: group[0][key] for key in ['ce', 'kd', 'ratio']}})
+assert len({round(x['ratio'], 3) for x in first_step}) == 4
+whole_step_ratio = sum(x['ce'] for x in first_step) / sum(x['kd'] for x in first_step)
+assert all(abs(x['ratio'] - whole_step_ratio) > 0.1 for x in first_step)
+for source in [Path('nemo_rl/algorithms/loss/loss_functions.py'), run / 'launcher/reference_capture/model_oracle.py', run / 'launcher/reference_capture/controller_reference.py']:
+    hashes[str(source)] = hashlib.sha256(source.read_bytes()).hexdigest()
+print(json.dumps({
+    'status': 'PASS',
+    'scope': 'Read-only CPU audit of actual captured production metrics and retained independent-reference reports; no model/GPU execution.',
+    'all_controller_reports': len(reports),
+    'full_cp_microbatch_groups': len(reference_groups),
+    'first_step_actual_capture_count': 16,
+    'first_step_actual_ratios': first_step,
+    'counterfactual_whole_step_ratio': whole_step_ratio,
+    'ratio_semantics': 'One ratio per microbatch and DP replica, shared across its TP/CP ranks, formed from CP-complete CE and weighted KD. Full-step denominators remain108 tokens and178 cross-tokenizer chunks.',
+    'gradient_scope': 'Stored dlogits compare against the independent oracle with detached ratio; production source detaches CE and KD before the CP sum and ratio.',
+    'input_and_source_sha256': hashes,
+}, indent=2))
+PY

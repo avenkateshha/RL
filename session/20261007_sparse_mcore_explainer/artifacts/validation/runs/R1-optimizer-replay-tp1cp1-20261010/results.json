@@ -1,0 +1,21 @@
+{
+  "status": "PASS_ACTUAL_OPTIMIZER_PRECLIP",
+  "job_id": "19991459",
+  "slurm_state": "COMPLETED",
+  "exit_code": "0:0",
+  "tp": 1,
+  "cp": 1,
+  "dp": 1,
+  "microbatches": 2,
+  "parameter_tensors": 98,
+  "parameter_elements": 1235814400,
+  "actual_optimizer_preclip_gradients": {
+    "relative_l2": 0.009656411238541563,
+    "relative_norm": 0.0006699055360065977,
+    "actual_norm_including_tp_replicas": 39.30782426776542,
+    "reference_norm_including_tp_replicas": 39.33417444898304
+  },
+  "source_and_owned_hashes_before_after": "PASS",
+  "scope": "Actual first optimizer step after prepare_grads before clipping/update; all MBs and owned parameter ranges compared to independent-reference VJP at pinned initial weights.",
+  "range_coverage": "PASS: every TP-local element owned exactly once across CP+DP"
+}

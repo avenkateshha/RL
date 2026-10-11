@@ -1,0 +1,2 @@
+bash -n /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/tests/test_suites/llm/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2.sh
+TEST_DRYRUN=1 bash /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/tests/test_suites/llm/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2.sh

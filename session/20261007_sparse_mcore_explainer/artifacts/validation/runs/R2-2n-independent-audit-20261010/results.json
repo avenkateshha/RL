@@ -1,0 +1,139 @@
+{
+  "status": "PASS",
+  "recorded_utc": "2026-10-10T23:34:29.209553+00:00",
+  "scope": "Independent read-only audit of completed two-node controller and separate first-step accumulated optimizer-gradient replay. No model execution, source mutation, or duplicate GPU job was performed by this audit.",
+  "controller": {
+    "run": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2",
+    "job_id": "19993994",
+    "slurm_state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:08:08",
+    "nodes": 2,
+    "gpus_per_node": 8,
+    "tp": 2,
+    "cp": 2,
+    "dp": 4,
+    "global_batch_size": 16,
+    "student_micro_batch_size": 2,
+    "optimizer_steps": 3,
+    "evaluation_steps": [
+      3
+    ],
+    "numerical_reports": 128,
+    "training_reports": 96,
+    "evaluation_reports": 32,
+    "max_dlogits_relative_l2": 0.00026498779582505327,
+    "native_sparse_teacher_indices": [
+      0,
+      1
+    ],
+    "all_student_relayout_and_teacher_full_reconstruction_counters_zero": true,
+    "first_step_microbatches_per_rank": 2,
+    "first_step_rank_count": 16,
+    "first_step_token_denominator": 192,
+    "first_step_kd_denominator": 192,
+    "first_step_chunk_denominators": {
+      "0": 370,
+      "1": 485
+    },
+    "binary_hashes_independently_verified": {
+      "microbatch_captures": 32,
+      "optimizer_gradients": 16
+    },
+    "source_hashes_independently_verified": 386,
+    "launcher_hashes_independently_verified": 13,
+    "resolved_config_hash_independently_verified": true
+  },
+  "actual_placement_and_lifetime": {
+    "evidence": "All 48 worker init_complete records read from final per-node tar archives; rank/host/physicalGPU records agree across all three policies. Production reusable CUDA IPC open also validates host identity.",
+    "worker_records": 48,
+    "policies": 3,
+    "ranks_0_through_7": {
+      "host": "pool0-01277",
+      "physical_gpu": "rank modulo 8"
+    },
+    "ranks_8_through_15": {
+      "host": "pool0-01393",
+      "physical_gpu": "rank modulo 8"
+    },
+    "archive_count": 2,
+    "all_archive_hashes_independently_verified": true,
+    "archive_members_independently_hashed": 1084,
+    "all_advertised_actor_stderr_members_present": true,
+    "all_48_os_identities_captured_and_exits_confirmed": true,
+    "all_3_original_policy_backend_cleanups_confirmed": true,
+    "scope_limit": "Stderr absence alone is not used as proof of PyTorch CUDA IPC counter correctness."
+  },
+  "parameter_range_coverage": {
+    "independently_reconstructed_from": "Actual optimizer inventories and [start,end) shard records across all 16 ranks",
+    "tp_ranks": 2,
+    "cp_dp_owners_per_tp_rank": 8,
+    "parameters_per_tp_rank": 98,
+    "elements_per_tp_rank": 617940992,
+    "coverage": "Every TP-local parameter element covered exactly once, without gaps or overlaps",
+    "actual_gradient_dtype": "torch.bfloat16",
+    "gradient_field": "decoupled_grad",
+    "capture_boundary": "DistributedOptimizer.prepare_grads returned; before clipping/update",
+    "calculate_per_token_loss": true,
+    "average_in_collective": false,
+    "gradient_accumulation_fusion": false
+  },
+  "replay": {
+    "run": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-optimizer-replay-20261010",
+    "job_id": "19994298",
+    "slurm_state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:03:18",
+    "ranks": 16,
+    "microbatches_per_rank": 2,
+    "pinned_initial_forwards_bit_exact": 32,
+    "capture_index_hashes_independently_verified": 16,
+    "microbatch_identity_and_order_matched": true,
+    "reported_dlogits_match_original_controller_reports": true,
+    "all_replay_owned_ranges_match_actual_optimizer_ranges": true,
+    "accumulation_parameter_count_per_rank": 98,
+    "accumulation_dtype": "torch.bfloat16",
+    "normalization": "Sum both microbatch VJPs, then CP+DP SUM across 8 owners; schedule factors cancel and token-finalization factor is one",
+    "gradient_metrics": {
+      "relative_l2": 0.009809617820152773,
+      "relative_norm": 0.0005711285881217119,
+      "actual_norm_including_tp_replicas": 13.917779349342247,
+      "reference_norm_including_tp_replicas": 13.925732733416844
+    },
+    "relative_l2_limit": 0.02,
+    "relative_norm_limit": 0.02,
+    "tolerances_unchanged": true,
+    "own_source_manifest_hashes_independently_verified": 383,
+    "own_launcher_config_fixture_hashes_independently_verified": 13,
+    "both_node_final_hash_checks_present": true
+  },
+  "evidence_sha256": {
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/runtime.json": "c74fe9d19de1dea123ff07e52b01f93f39b88fa4825a454c4d76018e5bf225ce",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/resolved_config.yaml": "30d13fed6dbd8d85b2c5865444ce0369abf663761307854e7c83abb5f742e029",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/controller-process-exit.json": "0e6355b9c0afb068af621a02fa1336bc0e7752616171bf8ef11b161fe7f4d6a3",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-log-snapshot.json": "0ec3a656914c01d448b2069fe8c32812867c1631538b1408698f5bf658dc9f54",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/manual-final-source-verification.json": "7a8214d1cd142ed30d648e08f2a55785248d26d15a4da76b82b377bd6ff538ce",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-optimizer-replay-20261010/source-manifest.json": "e35d19e51bdef855658800ef5354a90df66799a2e17e4e408398fa21a0861549",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-optimizer-replay-20261010/manual-final-source-verification.json": "e199079466b12b2c27ecc9c4aaf3cd2ad24bb54743e2f7d2dc5be301d9a5bcac"
+  },
+  "replay_report_sha256": {
+    "replay-rank0.json": "a366f947fbfd5ed9ce559d5af474dd2356db9038d819659fd5488a31319bf2fb",
+    "replay-rank1.json": "1eef33268a278d022efd163ae4658a6657e7dfc158f4bec0a76d38896d5c7d54",
+    "replay-rank2.json": "23d55b098fa17b43e8bc846717357abe3703cf2ac30476a666a63b078d352137",
+    "replay-rank3.json": "5e73da8eb7c82bf4ece628e42cba00362446e9d28e80dd6ce422c3243fdc34bb",
+    "replay-rank4.json": "6969e223a8f3c8d9367bcdf20576407c265d3dc9355ad7060eef6c765e5e2351",
+    "replay-rank5.json": "69caf8a79f6392c32683fc91320a26783d42af783ebc6dea924512ad58066757",
+    "replay-rank6.json": "60c87a82bde27bdc5b7b0470c5259ad418e51761066ad0256b8a38f8249cc8ef",
+    "replay-rank7.json": "49b5b81ff710cf4cbcc19b2972fffc1dcc90543dc70c3885c02fa015045c3149",
+    "replay-rank8.json": "8d6ee9e5293714a751a3557b2b29295d6086e198cd58e92cf74f6a8d0f5c029d",
+    "replay-rank9.json": "a596602004dea137ce5aeff8595103320fca9474abb591cdcda0f6c634236a0f",
+    "replay-rank10.json": "572c4f3452787fbe7f63b3163e523029301f2667c89f73da571917c3743d2e3f",
+    "replay-rank11.json": "b93ecdf14503b1082d4c9d2e2c8a9fc8db007e7329d0d534cda73b1f2a9d169e",
+    "replay-rank12.json": "ed8e770b7f8b1bc779db9b09de0b2ff6d0f59fcfb555d50302f5cebff3a6e6db",
+    "replay-rank13.json": "2d9a4b4f4219375e2fb26f57a813550523b2ec1f2d500e0e13be5f92e04235cf",
+    "replay-rank14.json": "7c790f35bf8c65dd55611d5751f04d3282ef30fb1b27c0dcf017d8610a159f5a",
+    "replay-rank15.json": "728f497115174df0c2f09fadcf1e3829348055c7e91614237e18a7ddccb87ce8"
+  },
+  "larger_memory_tests": "EXCLUDED",
+  "limitations": "This audit checks retained actual-run evidence and its source/provenance contracts; it does not repeat GPU execution. Gradients are checked for the complete first optimizer step at pinned initial weights; controller separately completed three steps and final evaluation."
+}

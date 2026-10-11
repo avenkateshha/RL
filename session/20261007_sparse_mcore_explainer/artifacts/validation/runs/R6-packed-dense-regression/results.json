@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "passed": 14,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "duration_seconds": 20.956,
+  "scope": "Existing focused CPU packing adapter/lockstep fixtures, not a pinned-weight packed MCore model run.",
+  "environment": "Host .venv with verified historical Lens and isolated committed Bridge/MCore source overlays.",
+  "source_hashes_recorded_after_execution": {
+    "tests/unit/algorithms/x_token/test_packing_loss.py": "94ff6ce6a02521fe7475f732a5c3bdb94bc154b33cf29cdd55664272f133d2d6",
+    "tests/unit/data/packing/test_lockstep.py": "9f5722267df81f016636b8b0b976243df56157c403c37fc7c049c9db56c1f286",
+    "nemo_rl/algorithms/x_token/packing_loss.py": "6a8f6f13b4d7b6332b8d4cb66d2ae36be0252cb59d0f3a68be76bc13d019dcc6"
+  },
+  "command": "source runs/R2-tp2cp2/launcher/runtime-env.sh; unset UV_PROJECT_ENVIRONMENT; uv run --no-sync python -m pytest --confcutdir=tests/unit/algorithms/x_token tests/unit/algorithms/x_token/test_packing_loss.py tests/unit/data/packing/test_lockstep.py -q --junitxml=runs/R6-packed-dense-regression/junit.xml"
+}

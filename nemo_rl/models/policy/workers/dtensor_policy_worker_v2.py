@@ -71,7 +71,6 @@ from nemo_rl.models.policy.interfaces import (
 from nemo_rl.models.policy.utils import (
     ensure_teacher_ipc_buffer,
     extract_batch_item_ids,
-    get_handle_from_tensor,
     get_runtime_env_for_policy_worker,
 )
 from nemo_rl.models.policy.workers.base_policy_worker import AbstractPolicyWorker
@@ -90,6 +89,10 @@ from nemo_rl.telemetry.setup import (
 from nemo_rl.utils.grad_norm import warn_if_inf_grad_norm
 from nemo_rl.utils.nsys import wrap_with_nvtx_name
 from nemo_rl.utils.packed_tensor import packed_broadcast_producer
+from nemo_rl.utils.reusable_cuda_ipc import (
+    allocate_reusable_cuda_tensor,
+    get_reusable_cuda_ipc_handle,
+)
 from nemo_rl.utils.timer import Timer
 
 
@@ -1169,6 +1172,16 @@ class DTensorPolicyWorkerV2Impl(
 
         if not output_logits:
             raise RuntimeError("No valid microbatches produced sparse teacher logits.")
+        tp_rank = self.tp_mesh.get_local_rank()
+        dp_rank = self.dp_mesh.get_local_rank()
+        if tp_rank != 0:
+            # All ranks completed forward/top-k/CP collectives above. Only TP0
+            # is collected by Policy; other ranks must not allocate or export.
+            return {
+                "per_sample_handles": [],
+                "dp_rank": dp_rank,
+                "sparse_ipc_publisher": False,
+            }
         final_logits = torch.cat(output_logits, dim=0)
         final_indices = torch.cat(output_indices, dim=0)
         final_log_z = torch.cat(output_log_z, dim=0)
@@ -1198,7 +1211,9 @@ class DTensorPolicyWorkerV2Impl(
                 or storage.device != source.device
             )
             if needs_reallocation:
-                storage = torch.empty_like(source)
+                storage = allocate_reusable_cuda_tensor(
+                    tuple(source.shape), dtype=source.dtype, device=source.device
+                )
             target = storage[tuple(slice(0, size) for size in source.shape)]
             target.copy_(source)
             sparse_storage.append(storage)
@@ -1234,17 +1249,20 @@ class DTensorPolicyWorkerV2Impl(
         )
 
         cp_rank = self.cp_mesh.get_local_rank()
-        dp_rank = self.dp_mesh.get_local_rank()
         global_seq_start = cp_rank * final_logits.shape[1]
+        descriptors = [
+            get_reusable_cuda_ipc_handle(storage) for storage in sparse_storage
+        ]
         per_sample_handles: list[dict[str, Any]] = []
         for sample_idx in range(final_logits.shape[0]):
             logits_sample = final_logits[sample_idx]
             indices_sample = final_indices[sample_idx]
             log_z_sample = final_log_z[sample_idx]
             handle: dict[str, Any] = {
-                "topk_logits_ipc": get_handle_from_tensor(logits_sample),
-                "topk_indices_ipc": get_handle_from_tensor(indices_sample),
-                "log_z_ipc": get_handle_from_tensor(log_z_sample),
+                "topk_logits_ipc": descriptors[0],
+                "topk_indices_ipc": descriptors[1],
+                "log_z_ipc": descriptors[2],
+                "ipc_sample_index": sample_idx,
                 "topk_shape": tuple(logits_sample.shape),
                 "topk_dtype": logits_sample.dtype,
                 "indices_dtype": indices_sample.dtype,
@@ -1258,12 +1276,16 @@ class DTensorPolicyWorkerV2Impl(
                 gt_sample = final_gt_in_topk[sample_idx]
                 handle.update(
                     {
-                        "gt_in_topk_ipc": get_handle_from_tensor(gt_sample),
+                        "gt_in_topk_ipc": descriptors[3],
                         "gt_in_topk_dtype": gt_sample.dtype,
                     }
                 )
             per_sample_handles.append(handle)
-        return {"per_sample_handles": per_sample_handles, "dp_rank": dp_rank}
+        return {
+            "per_sample_handles": per_sample_handles,
+            "dp_rank": dp_rank,
+            "sparse_ipc_publisher": True,
+        }
 
     def release_ipc_buffer(self) -> None:
         """Free the persistent teacher-logit IPC storage. Called once at end of training/validation."""

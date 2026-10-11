@@ -13,8 +13,8 @@
 # limitations under the License.
 import copy
 import gc
-import math
 import logging
+import math
 import os
 import re
 import time
@@ -3082,9 +3082,10 @@ class MegatronPolicyWorkerImpl(
         by :class:`FullLogitsPostProcessor` and streamed directly into the
         persistent IPC slab.
 
-        ``reusable_ipc`` opts native dense readers into producer-owned raw CUDA
-        slabs and reusable descriptors. Values, layout and row metadata stay
-        identical; legacy consumers retain the default Torch IPC transport.
+        ``reusable_ipc`` opts compatible static dense readers into producer-owned
+        raw CUDA slabs and reusable descriptors. Native and contiguous readers
+        retain identical values, layout and row metadata. The default transport
+        remains Torch IPC for callers outside this supported configuration.
         """
         if reusable_ipc and (
             self.cfg["sequence_packing"]["enabled"]

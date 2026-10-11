@@ -1,0 +1,1 @@
+19993994|COMPLETED|0:0|00:08:08|billing=16,cpu=256,gres/gpu=16,mem=4000000M,node=2

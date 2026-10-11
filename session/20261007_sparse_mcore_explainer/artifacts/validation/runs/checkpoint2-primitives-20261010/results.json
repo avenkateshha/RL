@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "job_id": "19989749",
+  "slurm_state": "COMPLETED",
+  "slurm_exit_code": "0:0",
+  "tests": 39,
+  "passed": 39,
+  "skipped": 0,
+  "gpu_cases": [
+    "test_cuda_tp_cp_primitive_values_and_preclip_gradients[1-1]",
+    "test_cuda_tp_cp_primitive_values_and_preclip_gradients[2-1]",
+    "test_cuda_tp_cp_primitive_values_and_preclip_gradients[1-2]",
+    "test_cuda_tp_cp_primitive_values_and_preclip_gradients[2-2]"
+  ],
+  "pytest_duration_seconds": 60.181,
+  "value_absolute_tolerance": 1e-06,
+  "preclip_gradient_absolute_tolerance": 2e-06,
+  "scope": "Synthetic primitive values and pre-clip gradients, native geometry, sparse reader exactness and metadata rejection. Tensor-backed reader tests use CPU; model and CUDA IPC integration remain later checkpoints.",
+  "source_validation": "Frozen manifest checked before and after pytest; both checks passed.",
+  "evidence": [
+    "junit.xml",
+    "pytest.log",
+    "source-manifest.json",
+    "slurm-accounting.txt",
+    "command.txt"
+  ]
+}

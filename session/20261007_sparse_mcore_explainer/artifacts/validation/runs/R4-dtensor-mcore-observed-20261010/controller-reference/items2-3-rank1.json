@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "rank": 1,
+  "dp_rank": 0,
+  "tp_rank": 1,
+  "cp_rank": 0,
+  "item_ids": [
+    2,
+    3
+  ],
+  "teacher_backends": [
+    [
+      "DTensorPolicyWorkerV2.actual_forward"
+    ],
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ]
+  ],
+  "legacy_sparse_teacher_indices": [
+    0
+  ],
+  "legacy_dense_teacher_indices": [],
+  "native_sparse_teacher_indices": [
+    1
+  ],
+  "native_dense_teacher_indices": [],
+  "production_layout_calls": {
+    "cp_load_balanced_to_contiguous": 1,
+    "rebuild_teacher_sparse_logits_from_ipc": 1,
+    "rebuild_teacher_full_logits_from_ipc": 0,
+    "allgather_cp_contiguous_tensor": 2
+  },
+  "token_denominator": 108.0,
+  "kd_denominator": 108.0,
+  "chunk_denominators": {
+    "0": 178.0,
+    "1": 236.0
+  },
+  "reference_metrics": {
+    "loss": 0.2728066146373749,
+    "ce_loss": 1.39329993724823,
+    "kl_loss": 0.1334766149520874,
+    "kl_loss_scale": 1.0,
+    "accuracy": 0.3870967626571655,
+    "kl_loss_t0": 0.2100987583398819,
+    "kl_loss_t1": 0.10063855350017548,
+    "teacher_0/weighted_kl": 0.06302963197231293,
+    "teacher_1/weighted_kl": 0.07044698297977448
+  },
+  "dlogits": {
+    "relative_l2": 7.62963020100698e-06,
+    "relative_norm": 1.1039906235607569e-06,
+    "absolute_l2": 7.15064614529302e-09,
+    "reference_norm": 0.0009372205410885126,
+    "max_absolute": 7.130438461899757e-09
+  },
+  "gradient_kind": "actual controller loss dlogits before MCore schedule scaling and clipping",
+  "reference_kind": "Independent native teacher oracle plus retained CP1 legacy objective on identical full-sequence dense/sparse teacher values; independent CE and aggregation",
+  "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-observed-20261010/controller-reference/items2-3-rank1.pt",
+  "capture_sha256": "9460232b3f16049e2453edeb93f9d00d9ffb07d3cc6be157ea91cf7a9f174d1d"
+}

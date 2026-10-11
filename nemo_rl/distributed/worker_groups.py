@@ -1231,7 +1231,9 @@ class RayWorkerGroup:
         """Capture OS identities before exposing reusable IPC to healthy workers.
 
         Ray's built-in ``__ray_call__`` executes in each actor without requiring
-        a new worker API. Failure to capture every worker raises before any IPC
+        a new worker API. Pass the callback by name because driver metadata for
+        actors with isolated dependencies may contain only **kwargs. Failure
+        to capture every worker raises before any IPC
         consumer may start. Call again before a new lifetime if workers change.
         """
         if not self._workers:
@@ -1248,7 +1250,7 @@ class RayWorkerGroup:
         # Retain their earlier identity snapshot for failure cleanup.
         processes = ray.get(
             [
-                worker.__ray_call__.remote(capture_worker_process)
+                worker.__ray_call__.remote(fn=capture_worker_process)
                 for worker in self._workers
             ],
             timeout=timeout,

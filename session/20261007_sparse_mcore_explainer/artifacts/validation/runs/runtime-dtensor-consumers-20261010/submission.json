@@ -1,0 +1,20 @@
+{
+  "command": [
+    "sbatch",
+    "--parsable",
+    "--nodes=1",
+    "--gres=gpu:8",
+    "--exclusive",
+    "--account=coreai_dlalgo_genai",
+    "--partition=interactive",
+    "--time=00:15:00",
+    "--job-name=xtoken-dtensor-consumers",
+    "--output=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/slurm-%j.out",
+    "--chdir=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/launcher/preflight.sub"
+  ],
+  "utc": "2026-10-10T20:51:11.840910+00:00",
+  "returncode": 0,
+  "stdout": "19990683\n",
+  "stderr": ""
+}

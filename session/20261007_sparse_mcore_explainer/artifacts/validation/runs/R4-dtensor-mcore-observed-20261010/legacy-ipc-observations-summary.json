@@ -1,0 +1,120 @@
+{
+  "coverage_status": "PASS",
+  "counter_lifetime_status": "NEGATIVE_COUNTERS_CONFIRMED",
+  "expected_worker_count": 8,
+  "observed_worker_count": 8,
+  "errors": [],
+  "totals": {
+    "selected_tp0": {
+      "workers": 4,
+      "events": 40,
+      "after_export_counters": 240,
+      "boundary_counters": 240,
+      "boundary_negative": 240,
+      "boundary_zero": 0,
+      "boundary_positive": 0,
+      "read_errors": 0
+    },
+    "discarded_tp_nonzero": {
+      "workers": 4,
+      "events": 40,
+      "after_export_counters": 240,
+      "boundary_counters": 240,
+      "boundary_negative": 0,
+      "boundary_zero": 0,
+      "boundary_positive": 240,
+      "read_errors": 0
+    }
+  },
+  "workers": [
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "rank": 0,
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "rank": 1,
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "rank": 2,
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "rank": 3,
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "rank": 4,
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "rank": 5,
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "rank": 6,
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "rank": 7,
+      "generations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "scope": "Reads counter observations only; negatives do not stop optimizer replay."
+}

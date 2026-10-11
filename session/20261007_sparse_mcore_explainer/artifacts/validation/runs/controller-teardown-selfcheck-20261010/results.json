@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "command": "UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_teardown.py",
+  "exit_code": 0,
+  "cases": 7,
+  "policies_attempted_per_case": 3,
+  "source_sha256_before": {
+    "controller_teardown.py": "0fca839c15f625439d157e184beff758a35446016e83ab36df1784797ebb010f",
+    "verify_controller_teardown.py": "14a82ee5baa796cd1e2ee15244c85d95dba040f0aced53f82727a201693bbdff",
+    "prepare_launchers.py": "b63af5d5cd2dfcc2f0dcae38accd512d7d1a4ad52ad7a12d27fc979d8896507f"
+  },
+  "source_sha256_after": {
+    "controller_teardown.py": "0fca839c15f625439d157e184beff758a35446016e83ab36df1784797ebb010f",
+    "verify_controller_teardown.py": "14a82ee5baa796cd1e2ee15244c85d95dba040f0aced53f82727a201693bbdff",
+    "prepare_launchers.py": "b63af5d5cd2dfcc2f0dcae38accd512d7d1a4ad52ad7a12d27fc979d8896507f"
+  },
+  "source_unchanged": true,
+  "scope": "CPU fake policy/worker lifecycle only: all-policy attempt ordering, report-write-error continuation, idempotent/empty/failed-controller constructor restoration. Launcher final-error preservation reviewed directly. No Ray, OS process-exit, CUDA or IPC-counter evidence."
+}

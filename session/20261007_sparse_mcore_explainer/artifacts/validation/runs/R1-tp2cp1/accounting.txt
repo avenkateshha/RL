@@ -1,0 +1,1 @@
+19992100|COMPLETED|0:0|00:06:26|billing=8,cpu=128,gres/gpu=8,mem=2000000M,node=1

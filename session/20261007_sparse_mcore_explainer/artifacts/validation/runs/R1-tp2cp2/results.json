@@ -1,0 +1,73 @@
+{
+  "status": "PASS",
+  "job_id": "19992724",
+  "slurm_state": "COMPLETED",
+  "exit_code": "0:0",
+  "elapsed": "00:07:40",
+  "allocated_resources": "billing=8,cpu=128,gres/gpu=8,mem=2000000M,node=1",
+  "controller_run": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2",
+  "tp": 2,
+  "cp": 2,
+  "dp": 1,
+  "optimizer_steps": [
+    1,
+    2,
+    3
+  ],
+  "evaluation_steps": [
+    3
+  ],
+  "numerical_microbatch_reports": 56,
+  "training_dlogits_reports": 24,
+  "evaluation_loss_metric_reports": 32,
+  "max_dlogits_relative_l2": 0.0002594655325059827,
+  "actual_preclip_grad_norms": [
+    35.872798919677734,
+    36.4537353515625,
+    61.14778518676758
+  ],
+  "actual_step_loss": [
+    1.1266485750675201,
+    1.055717021226883,
+    1.350347101688385
+  ],
+  "native_only_no_student_relayout_or_full_reconstruction_reports": 56,
+  "optimizer_replay": {
+    "status": "PASS",
+    "run": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2",
+    "ranks": 4,
+    "microbatches_per_rank": 2,
+    "range_coverage": "PASS: every TP-local element owned exactly once across CP+DP",
+    "covered_parameter_elements_per_tp_rank": [
+      617940992
+    ],
+    "max_relative_l2": 0.010690967264971965,
+    "max_relative_norm_error": 0.0008648220977944585,
+    "actual_norm_including_tp_replicas": 35.9018134414559,
+    "reference_norm_including_tp_replicas": 35.93288899789888,
+    "scope": "Actual first optimizer step after prepare_grads before clipping/update; all MBs and owned parameter ranges compared to independent-reference VJP at pinned initial weights."
+  },
+  "independent_source_verification": {
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2": {
+      "status": "PASS",
+      "scope": "Independent post-run source/config/launcher verification against frozen pre-submission hashes",
+      "source_files": 387,
+      "owned_files": 16,
+      "mismatches": []
+    }
+  },
+  "cuda_ipc_warning_scan": {
+    "files_scanned": 783,
+    "matches": [],
+    "verified_archives": [
+      {
+        "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/ray-final-logs/53d86f364d3cbc4714b60b57b4bbe7d67f37eb9d955c8acaab98b3f8/session_2026-10-10_15-25-14_741276_676360.tar.gz",
+        "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp2/ray-final-logs/53d86f364d3cbc4714b60b57b4bbe7d67f37eb9d955c8acaab98b3f8/session_2026-10-10_15-25-14_741276_676360.members.json",
+        "members_verified": 779,
+        "log_members_scanned": 778
+      }
+    ],
+    "scope": "Only retained raw logs were scanned. Absence of warnings does not prove clean IPC counters or complete worker teardown."
+  },
+  "larger_memory_tests": "EXCLUDED"
+}

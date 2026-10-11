@@ -1,0 +1,53 @@
+{
+  "status": "PASS",
+  "date": "2026-10-10",
+  "cwd": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+  "checks": [
+    {
+      "name": "verify_model_oracle.py",
+      "command": "UV_CACHE_DIR=/tmp/xtoken-port-uv-cache PYTHONPATH=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/experiments/xtoken-smoke/xtoken-distillation/xtoken-offset-rebased-2n100-20260928-092950/runtime/python uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_model_oracle.py",
+      "exit_code": 0,
+      "seconds": 27.569,
+      "log": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_model_oracle.log",
+      "scope": "48 actual native CPU scalar/gradient/metric comparisons; no distributed/CUDA/model/optimizer proof"
+    },
+    {
+      "name": "verify_controller_capture.py",
+      "command": "UV_CACHE_DIR=/tmp/xtoken-port-uv-cache PYTHONPATH=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_capture.py",
+      "exit_code": 0,
+      "seconds": 9.02,
+      "log": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_controller_capture.log",
+      "scope": "Actual extracted capture functions; CPU rank/collective stubs and oracle-as-actual; plumbing only"
+    },
+    {
+      "name": "verify_controller_observations.py",
+      "command": "UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_observations.py",
+      "exit_code": 0,
+      "seconds": 3.981,
+      "log": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/controller-capture-selfcheck-20261010/verify_controller_observations.log",
+      "scope": "Actual extracted identity/storage functions; five matrix inventories and storage only; no model proof"
+    }
+  ],
+  "source_sha256_before": {
+    "controller_reference.py": "f15771770092e3b1f79dc94a1de7d75987744d8d71268ef03e94cf8a0ffc9fef",
+    "model_oracle.py": "04e2773d5463d83be15f86fbdb341e725def51b821ae5b2fdd5e1f067edc939e",
+    "optimizer_gradient_capture.py": "b3a909a7ec59ecbae1be8f59bfb7acac64106f2ed0ecb7fcc2b19391a1724db2",
+    "replay_controller_gradients.py": "d24dbeb091671fbde8be0fa804c11f669c60f37f3596ae6503c413eb22e6af0f",
+    "verify_model_oracle.py": "4aedfcd8f0171b2bd6d123572548ce00d26d61a86eeeac9e3e3018dfd3e821c7",
+    "verify_controller_capture.py": "ea3340f2990fdc5e237a20b58863ca2fa8367857dc678d030d8a693d580a08ce",
+    "verify_controller_observations.py": "175764333012f9387ae7b6a90302d783baa018a05d9da5dc237a0dc0e6ae5e6e",
+    "verify_optimizer_replay.py": "72f739be436e7fc5364e08bd6e005a7bd1e707b4c2168da8970b4bbd2773c254"
+  },
+  "source_sha256_after": {
+    "controller_reference.py": "f15771770092e3b1f79dc94a1de7d75987744d8d71268ef03e94cf8a0ffc9fef",
+    "model_oracle.py": "04e2773d5463d83be15f86fbdb341e725def51b821ae5b2fdd5e1f067edc939e",
+    "optimizer_gradient_capture.py": "b3a909a7ec59ecbae1be8f59bfb7acac64106f2ed0ecb7fcc2b19391a1724db2",
+    "replay_controller_gradients.py": "d24dbeb091671fbde8be0fa804c11f669c60f37f3596ae6503c413eb22e6af0f",
+    "verify_model_oracle.py": "4aedfcd8f0171b2bd6d123572548ce00d26d61a86eeeac9e3e3018dfd3e821c7",
+    "verify_controller_capture.py": "ea3340f2990fdc5e237a20b58863ca2fa8367857dc678d030d8a693d580a08ce",
+    "verify_controller_observations.py": "175764333012f9387ae7b6a90302d783baa018a05d9da5dc237a0dc0e6ae5e6e",
+    "verify_optimizer_replay.py": "72f739be436e7fc5364e08bd6e005a7bd1e707b4c2168da8970b4bbd2773c254"
+  },
+  "source_unchanged": true,
+  "scope": "CPU artifact selfchecks only. AST extraction is limited to pure identity/storage/range or explicitly stubbed capture plumbing; native math test imports actual production helpers. No MCore model, CUDA, distributed optimizer or NCCL acceptance claim."
+}

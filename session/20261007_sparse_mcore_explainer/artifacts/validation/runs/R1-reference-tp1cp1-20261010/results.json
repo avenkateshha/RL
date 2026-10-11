@@ -1,0 +1,10 @@
+{
+  "status": "FAIL_TEST_HARNESS",
+  "job_id": "19991091",
+  "failure": "SparseTeacherRowReader expects torch.device; test harness supplied string cuda",
+  "scope": "Both actual pinned models loaded and teacher sparse export executed before reader construction; numerical/gradient acceptance NOT_COMPLETE",
+  "production_defect": false,
+  "source_hash_checks": "PASS before and after failure",
+  "retry": "R1-reference-tp1cp1-devicefix-20261010",
+  "large_memory_tests": "EXCLUDED"
+}

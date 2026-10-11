@@ -1,0 +1,20 @@
+{
+  "command": [
+    "sbatch",
+    "--nodes=1",
+    "--gres=gpu:8",
+    "--exclusive",
+    "--account=coreai_dlalgo_genai",
+    "--partition=interactive",
+    "--time=00:45:00",
+    "--job-name=xtoken-small-R4-dtensor-mcore",
+    "--output=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/slurm-%j.out",
+    "--chdir=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL",
+    "--parsable",
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/launcher/ray-runtime.sub"
+  ],
+  "utc": "2026-10-10T21:58:42.645795+00:00",
+  "returncode": 0,
+  "stdout": "19991907\n",
+  "stderr": ""
+}

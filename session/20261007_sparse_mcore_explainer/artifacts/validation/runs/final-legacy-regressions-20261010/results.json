@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "exit_code": 0,
+  "duration_seconds": 102.377,
+  "pytest": {
+    "tests": 33,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2
+  },
+  "skips": [
+    {
+      "test": "test_v6_parity_common_only",
+      "reason": "set XTOKEN_UPSTREAM_ROOT to run cross-repository parity"
+    },
+    {
+      "test": "test_v6_parity_with_mismatch",
+      "reason": "set XTOKEN_UPSTREAM_ROOT to run cross-repository parity"
+    }
+  ],
+  "source_hashes_before_after": "PASS",
+  "source_file_count": 388,
+  "command": "CUDA_VISIBLE_DEVICES= PYTHONPATH=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/experiments/xtoken-smoke/xtoken-distillation/xtoken-offset-rebased-2n100-20260928-092950/runtime/python UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline python -m pytest --confcutdir=tests/unit/algorithms/x_token -q -rs tests/unit/algorithms/x_token/test_chat_eot_supervision.py tests/unit/algorithms/x_token/test_global_chunk_normalization.py tests/unit/algorithms/x_token/test_v6_loss_parity.py tests/unit/algorithms/x_token/test_ce_sharded_student_memory.py tests/unit/algorithms/x_token/test_v6_sharded_student_memory.py --junitxml=/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/final-legacy-regressions-20261010/junit.xml",
+  "scope": "CPU/Gloo existing focused regressions; no GPU or large-memory acceptance"
+}

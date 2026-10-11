@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+REFERENCE_MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+export REFERENCE_MASTER_ADDR
+export REFERENCE_MASTER_PORT=$((20000 + SLURM_JOB_ID % 20000))
+srun --no-container-mount-home --mpi=pmix --ntasks="$REFERENCE_NODES" --ntasks-per-node=1 --nodes="$REFERENCE_NODES" --gres=gpu:8   --container-image="$CONTAINER" --container-mounts="$MOUNTS" --container-workdir="$REPO_ROOT"   bash "$PREFLIGHT_RUN/launcher/driver.sh"

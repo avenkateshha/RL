@@ -1,0 +1,61 @@
+"""Load one exact pinned HF checkpoint through Bridge and run native TP2/CP2."""
+from datetime import timedelta
+import json
+import os
+from pathlib import Path
+import sys
+import time
+import torch
+import torch.distributed as dist
+from megatron.bridge import AutoBridge
+from megatron.core import parallel_state
+from megatron.core.utils import get_batch_on_this_cp_rank
+from transformers import AutoTokenizer
+
+run=Path(__file__).resolve().parents[1]
+validation=run.parents[1]
+role=sys.argv[1]
+manifest=json.loads((validation/'fixture_manifest.json').read_text())
+fixture=manifest['models'][role]
+local_rank=int(os.environ['LOCAL_RANK'])
+torch.cuda.set_device(local_rank)
+dist.init_process_group('nccl',timeout=timedelta(minutes=5))
+start=time.monotonic()
+bridge=AutoBridge.from_hf_pretrained(fixture['snapshot_path'],torch_dtype=torch.bfloat16,local_files_only=True)
+provider=bridge.to_megatron_provider(load_weights=True)
+provider.tensor_model_parallel_size=2
+provider.context_parallel_size=2
+provider.pipeline_model_parallel_size=1
+provider.params_dtype=torch.bfloat16
+provider.pipeline_dtype=torch.bfloat16
+provider.bf16=True
+provider.fp16=False
+provider.sequence_parallel=False
+provider.gradient_accumulation_fusion=False
+provider.finalize()
+provider.initialize_model_parallel(seed=1234)
+models=provider.provide_distributed_model(wrap_with_ddp=False)
+assert len(models)==1
+model=models[0]
+model.eval()
+tokenizer=AutoTokenizer.from_pretrained(fixture['snapshot_path'],local_files_only=True)
+ids=tokenizer.encode('The cat sat beside the window. A bird landed on the fence.',add_special_tokens=True)
+pad=tokenizer.eos_token_id
+assert pad is not None
+ids=(ids+[pad]*32)[:32]
+batch={'tokens':torch.tensor([ids],device='cuda'),'position_ids':torch.arange(32,device='cuda')[None,:],'attention_mask':None,'cu_seqlens':None}
+batch=get_batch_on_this_cp_rank(batch,is_hybrid_cp=False,cp_group=parallel_state.get_context_parallel_group())
+with torch.no_grad():
+    logits=model(input_ids=batch['tokens'],position_ids=batch['position_ids'],attention_mask=None)
+assert tuple(logits.shape[:2])==(1,16),tuple(logits.shape)
+assert bool(torch.isfinite(logits).all())
+summary=torch.tensor([logits.float().norm().item(),logits.shape[-1]],device='cuda')
+gathered=[torch.empty_like(summary) for _ in range(dist.get_world_size())]
+dist.all_gather(gathered,summary)
+if dist.get_rank()==0:
+    result={'status':'PASS','role':role,'revision':fixture['revision'],'tp':2,'cp':2,'pp':1,'dp':1,'global_input_length':32,'batch_size':1,'weights_loaded':True,'native_rows_per_rank':16,'logits_dtype':str(logits.dtype),'rank_logits_norm_and_vocab_width':[x.tolist() for x in gathered],'elapsed_seconds':time.monotonic()-start,'scope':'Actual pinned-weight Bridge conversion and finite native MCore forward; no KD/reference/backward assertion.'}
+    (run/(role+'-model-forward.json')).write_text(json.dumps(result,indent=2)+'\n')
+    print(json.dumps(result,indent=2),flush=True)
+dist.barrier()
+parallel_state.destroy_model_parallel()
+dist.destroy_process_group()

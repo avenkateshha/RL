@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "job_id": "19991092",
+  "slurm_state": "COMPLETED",
+  "exit_code": "0:0",
+  "elapsed": "00:11:45",
+  "checkpoint": "fcc943c5eab4690a4faa1892d80b9d56cb8d1564",
+  "groups": [
+    {
+      "tests": 55,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "group": "native_math",
+      "exit_code": 0
+    },
+    {
+      "tests": 85,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "group": "dispatch",
+      "exit_code": 0
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "group": "wrapper",
+      "exit_code": 0
+    },
+    {
+      "tests": 200,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "group": "controller",
+      "exit_code": 0
+    },
+    {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "group": "dense_cuda",
+      "exit_code": 0
+    }
+  ],
+  "total_passed": 348,
+  "cuda_math_grid_tests": 12,
+  "source_hashes_before_after": "PASS",
+  "owned_launcher_plan_hashes_before_after": "PASS",
+  "cuda_ipc_shutdown_warning_scan": "none found",
+  "scope": "Focused synthetic numerical native CUDA primitives/CE/sparse/same, mixed dispatch, controller orchestration and actual two-device dense IPC lifetime. Actual pinned-model optimizer/controller acceptance remains in R1-R6 companion runs.",
+  "tolerance": "Per-test declared FP64/FP32/BF16 tolerances; actual model tolerance remains2% in companion acceptance."
+}

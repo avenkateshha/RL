@@ -1,0 +1,165 @@
+{
+  "status": "PASS",
+  "purpose": "Actual pinned-weight TP2CP2 forward with exemplar gradient_accumulation_fusion=false; focused split guards --mcore-only.",
+  "resources": {
+    "nodes": 1,
+    "gpus_per_node": 8,
+    "time_limit": "00:20:00"
+  },
+  "prior_attempt": "19989499 student provider default gradient_accumulation_fusion=true required unavailable APEX; exemplar already configures false.",
+  "source_snapshots": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/runtime/source-provenance.json",
+  "split_guards": {
+    "status": "PASS",
+    "passed": 2,
+    "deselected": 90,
+    "command": "uv run --no-sync --python /opt/ray_venvs/nemo_rl.models.policy.workers.megatron_policy_worker.MegatronPolicyWorker/bin/python -m pytest tests/unit/models/policy/test_megatron_split_state.py --mcore-only -k xtoken",
+    "log": "split-guards.log",
+    "exit_code": 0
+  },
+  "job_id": "19989617",
+  "scheduler_state": "COMPLETED",
+  "scheduler_exit_code": "0:0",
+  "elapsed": "00:06:24",
+  "model_forwards": {
+    "student": {
+      "status": "PASS",
+      "role": "student",
+      "revision": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "tp": 2,
+      "cp": 2,
+      "pp": 1,
+      "dp": 1,
+      "global_input_length": 32,
+      "batch_size": 1,
+      "weights_loaded": true,
+      "native_rows_per_rank": 16,
+      "logits_dtype": "torch.float32",
+      "rank_logits_norm_and_vocab_width": [
+        [
+          3826.638671875,
+          64128.0
+        ],
+        [
+          2878.787353515625,
+          64128.0
+        ],
+        [
+          3758.201904296875,
+          64128.0
+        ],
+        [
+          2878.12109375,
+          64128.0
+        ]
+      ],
+      "elapsed_seconds": 18.749476419296116,
+      "scope": "Actual pinned-weight Bridge conversion and finite native MCore forward; no KD/reference/backward assertion."
+    },
+    "teacher_a": {
+      "status": "PASS",
+      "role": "teacher_a",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "tp": 2,
+      "cp": 2,
+      "pp": 1,
+      "dp": 1,
+      "global_input_length": 32,
+      "batch_size": 1,
+      "weights_loaded": true,
+      "native_rows_per_rank": 16,
+      "logits_dtype": "torch.float32",
+      "rank_logits_norm_and_vocab_width": [
+        [
+          3460.166015625,
+          75968.0
+        ],
+        [
+          3055.67626953125,
+          75968.0
+        ],
+        [
+          3446.47216796875,
+          75968.0
+        ],
+        [
+          3418.41796875,
+          75968.0
+        ]
+      ],
+      "elapsed_seconds": 46.04900438571349,
+      "scope": "Actual pinned-weight Bridge conversion and finite native MCore forward; no KD/reference/backward assertion."
+    },
+    "teacher_b": {
+      "status": "PASS",
+      "role": "teacher_b",
+      "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "tp": 2,
+      "cp": 2,
+      "pp": 1,
+      "dp": 1,
+      "global_input_length": 32,
+      "batch_size": 1,
+      "weights_loaded": true,
+      "native_rows_per_rank": 16,
+      "logits_dtype": "torch.float32",
+      "rank_logits_norm_and_vocab_width": [
+        [
+          2825.98193359375,
+          24576.0
+        ],
+        [
+          2644.171630859375,
+          24576.0
+        ],
+        [
+          2974.469482421875,
+          24576.0
+        ],
+        [
+          2879.140625,
+          24576.0
+        ]
+      ],
+      "elapsed_seconds": 25.148787226062268,
+      "scope": "Actual pinned-weight Bridge conversion and finite native MCore forward; no KD/reference/backward assertion."
+    },
+    "teacher_c_same_tokenizer": {
+      "status": "PASS",
+      "role": "teacher_c_same_tokenizer",
+      "revision": "13afe5124825b4f3751f836b40dafda64c1ed062",
+      "tp": 2,
+      "cp": 2,
+      "pp": 1,
+      "dp": 1,
+      "global_input_length": 32,
+      "batch_size": 1,
+      "weights_loaded": true,
+      "native_rows_per_rank": 16,
+      "logits_dtype": "torch.float32",
+      "rank_logits_norm_and_vocab_width": [
+        [
+          2845.993896484375,
+          64128.0
+        ],
+        [
+          2694.203369140625,
+          64128.0
+        ],
+        [
+          2491.159423828125,
+          64128.0
+        ],
+        [
+          2109.38623046875,
+          64128.0
+        ]
+      ],
+      "elapsed_seconds": 38.391641253139824,
+      "scope": "Actual pinned-weight Bridge conversion and finite native MCore forward; no KD/reference/backward assertion."
+    }
+  },
+  "limitations": [
+    "Forward compatibility only: no KD/reference/backward or R1-R6 acceptance.",
+    "Cached Python3.13.13/Torch2.11/TE2.15 differs from repository locked runtime; exact committed Bridge/MCore Python source snapshots were used."
+  ]
+}

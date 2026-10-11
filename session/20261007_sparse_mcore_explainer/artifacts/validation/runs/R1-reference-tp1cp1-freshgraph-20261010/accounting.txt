@@ -1,0 +1,4 @@
+19991170      COMPLETED      0:0   00:03:10     pool0-01710 
+19991170.ba+  COMPLETED      0:0   00:03:10     pool0-01710 
+19991170.ex+  COMPLETED      0:0   00:03:10     pool0-01710 
+19991170.0    COMPLETED      0:0   00:02:46     pool0-01710 

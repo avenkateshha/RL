@@ -1,0 +1,55 @@
+{
+  "root_head": "310d4dcfdf0b0433d1d1c15beea9dffd6202aed7",
+  "execution": "Host CPU/Gloo, CUDA_VISIBLE_DEVICES empty",
+  "source_hash_check": "PASS before/after,11 intended files",
+  "source_sha256": {
+    "nemo_rl/algorithms/loss/loss_functions.py": "103ba83853a081c7802b9315de24c9a6432e934bbfba5566546dad899af4e564",
+    "nemo_rl/algorithms/x_token/native_sparse_loss.py": "53aeeaaa579e96a15100e998a1d7254e9d3c9723ae884a26a265d7eac8dc02b4",
+    "nemo_rl/algorithms/x_token/native_student.py": "1dc1161b4c549eee4290f8080c4bcd70d65c9aa171b09826bbfd68ecfd750a6b",
+    "nemo_rl/models/megatron/train.py": "f91f642843230d042604fb1cad0be3687ed6fc4e03d3ef2d61b478346d959287",
+    "pyrefly.toml": "7ee1023d94c2fc2145974836abf1243606383b51e6e1cafa65453c34ce41e94f",
+    "tests/unit/algorithms/x_token/test_native_sparse_loss.py": "332b932eca91a202f9dd7af790e7ea31460f863f92fe560c789e4debab8f7618",
+    "tests/unit/algorithms/x_token/test_native_student.py": "487a5ea4328f698f21368107c7d10515fe11d3a884236ee2391237bdad472d56",
+    "tests/unit/algorithms/x_token/test_native_loss_contract.py": "8132c1cf49ddae4a09cde7495370e6014ecc6c3a35f3f3a4ca00aecfa08477f9",
+    "tests/unit/algorithms/x_token/test_native_sparse_dispatch.py": "f052e973c25b09cbd3191cab1b0722ee10664ee6fc1d16fbdf54aad782b7c8e8",
+    "tests/unit/algorithms/x_token/test_native_sparse_legacy_mix.py": "7651de8024621c3fd41405cb723372b3f72e3ad45df0e12b5effa5f06e8e9a82",
+    "tests/unit/algorithms/x_token/test_megatron_cp_normalization.py": "6423edb8e10165d8422d795493c4c23a7fc7170c5a396b1af6f9236c20dada83"
+  },
+  "log_artifacts": {
+    "xtoken-native-sparse-dispatch-verified.log": {
+      "source": "/tmp/xtoken-native-sparse-dispatch-verified.log",
+      "sha256": "d61be9f330d12ffc5757854cd87de105290e72bae9117ea85aca4a5f3db589cb",
+      "bytes": 34944
+    },
+    "xtoken-native-sparse-legacy-mix-verified.log": {
+      "source": "/tmp/xtoken-native-sparse-legacy-mix-verified.log",
+      "sha256": "ea309aaabc1d4057172da46e54abbfd56d80e9c5aedc7883709905eb856ae0ec",
+      "bytes": 34948
+    },
+    "native-sparse-loss-vectorized.log": {
+      "source": "/tmp/native-sparse-loss-vectorized.log",
+      "sha256": "efd1cab59dac2b093fc4504ee8f7d7062d82307e4be1e78583c806c3a0dadf3f",
+      "bytes": 58834
+    },
+    "xtoken-native-student-tests.log": {
+      "source": "/tmp/xtoken-native-student-tests.log",
+      "sha256": "d0275dbe1dd1e06f3aae2df3d0e9349f1c24dd5342d01b74ae55b04b48dc5f70",
+      "bytes": 2090
+    },
+    "xtoken-native-loss-contract-final.log": {
+      "source": "/tmp/xtoken-native-loss-contract-final.log",
+      "sha256": "ddd55abae7563d0c330866be6559d35e3d645b92ae8c51272606f03719d16994",
+      "bytes": 12096
+    },
+    "xtoken-native-loss-regression.log": {
+      "source": "/tmp/xtoken-native-loss-regression.log",
+      "sha256": "e275819e5b5531109d481ed862e03317afdaea561f4244977f329e0289b0028b",
+      "bytes": 124564
+    },
+    "source-after-check.log": {
+      "source": "/tmp/xtoken-stage4a-after-check.log",
+      "sha256": "7bc2c9112ea68f42681b9ba7c48599d51c499f78418eb5d5ea81407bb25ea6be"
+    }
+  },
+  "gpu_execution": "NOT_RUN; native CUDA cases explicitly skipped/deselected"
+}

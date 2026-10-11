@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "passed": 33,
+  "cuda_skipped": 2,
+  "deselected": 39,
+  "source_sha256": {
+    "nemo_rl/algorithms/x_token/loss_utils.py": "3dc38e79454a285d84ef55a1db6d25464ab4233c2ae6db6cbea237f5a1533879",
+    "nemo_rl/models/policy/workers/megatron_policy_worker.py": "1d6bdb1ec4af560341a422f8e23c1f5da984772d1cc5d35710b534a370ee4625",
+    "tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py": "59f2dff690582af46ea3c25bec3f746d232b35327fc694bf3473135ba2832f88"
+  },
+  "source_hash_timing": "After test completion; loss_utils and test unchanged; worker docstring updated after tests",
+  "command": "source V/runs/R2-tp2cp2/launcher/runtime-env.sh; unset UV_PROJECT_ENVIRONMENT; CUDA_VISIBLE_DEVICES='' uv run --no-sync --offline python -m pytest --confcutdir=tests/unit/algorithms/x_token tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py tests/unit/algorithms/x_token/test_loss_utils.py -k 'legacy_dense_reusable_ipc or RebuildSparseTeacherLogits or ZeroCopyTeacherLogits or AssembleTeacherLogitsFromShards' -q",
+  "lint": "Ruff check and format --check PASS; git diff --check PASS"
+}

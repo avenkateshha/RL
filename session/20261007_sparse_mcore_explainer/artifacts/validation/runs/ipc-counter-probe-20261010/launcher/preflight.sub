@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --exclusive
+#SBATCH --account=coreai_dlalgo_genai
+#SBATCH --partition=interactive
+#SBATCH --time=00:15:00
+#SBATCH --gres=gpu:8
+set -euo pipefail
+srun --no-container-mount-home --mpi=pmix --ntasks=1 --nodes=1 --gres=gpu:8 \
+  --container-image="$CONTAINER" --container-mounts="$MOUNTS" --container-workdir="$REPO_ROOT" \
+  bash "$PREFLIGHT_RUN/launcher/driver.sh"

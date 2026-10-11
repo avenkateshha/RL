@@ -194,6 +194,49 @@ def test_incomplete_capture_raises_before_publishing_snapshot(monkeypatch):
     assert group._termination_snapshot is None
 
 
+@pytest.mark.parametrize(
+    "placeholder", [False, True], ids=["healthy", "driver_placeholder"]
+)
+def test_process_capture_binds_isolated_actor_metadata(monkeypatch, placeholder):
+    """Ray may deserialize a dependency-isolated actor as a kwargs-only stub."""
+    from ray._common import signature
+    from ray._private.function_manager import FunctionActorManager
+    from ray._raylet import PythonFunctionDescriptor
+    from ray.actor import _ActorClassMethodMetadata, _modify_class
+    from ray.util.tracing.tracing_helper import _inject_tracing_into_class
+
+    if placeholder:
+        manager = FunctionActorManager.__new__(FunctionActorManager)
+        actor_class = manager._create_fake_actor_class(
+            "MissingDriverDependency", ["__ray_call__"], "optional dependency absent"
+        )
+    else:
+        actor_class = _modify_class(type("HealthyActor", (), {}))
+    _inject_tracing_into_class(actor_class)
+    metadata = _ActorClassMethodMetadata.create(
+        actor_class,
+        PythonFunctionDescriptor(__name__, "__init__", f"capture_{placeholder}"),
+    )
+    parameters = metadata.signatures["__ray_call__"]
+    identity = _identity(os.getpid())
+
+    def remote(*args, **kwargs):
+        signature.flatten_args(parameters, list(args), kwargs)
+        assert not args
+        assert kwargs["fn"] is process_lifetime.capture_worker_process
+        return identity
+
+    group = _bare_group()
+    worker = _worker("isolated-worker")
+    worker.__ray_call__ = SimpleNamespace(remote=remote)
+    group._workers = [worker]
+    monkeypatch.setattr(ray, "get", lambda refs, timeout: refs)
+    group.record_worker_processes(timeout=1)
+    assert group._termination_snapshot == WorkerProcessSnapshot(
+        ("isolated-worker",), (identity,)
+    )
+
+
 def test_nested_capture_timeout_keeps_matching_process_snapshot(monkeypatch):
     group = _bare_group()
     worker = _worker("worker")

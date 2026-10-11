@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "rank": 5,
+  "dp_rank": 1,
+  "tp_rank": 1,
+  "cp_rank": 0,
+  "item_ids": [
+    6,
+    7
+  ],
+  "teacher_backends": [
+    [
+      "DTensorPolicyWorkerV2.actual_forward"
+    ],
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ]
+  ],
+  "legacy_sparse_teacher_indices": [
+    0
+  ],
+  "legacy_dense_teacher_indices": [],
+  "native_sparse_teacher_indices": [
+    1
+  ],
+  "native_dense_teacher_indices": [],
+  "production_layout_calls": {
+    "cp_load_balanced_to_contiguous": 1,
+    "rebuild_teacher_sparse_logits_from_ipc": 1,
+    "rebuild_teacher_full_logits_from_ipc": 0,
+    "allgather_cp_contiguous_tensor": 2
+  },
+  "token_denominator": 108.0,
+  "kd_denominator": 108.0,
+  "chunk_denominators": {
+    "0": 178.0,
+    "1": 236.0
+  },
+  "reference_metrics": {
+    "loss": 0.10974977910518646,
+    "ce_loss": 0.5166113376617432,
+    "kl_loss": 0.058088645339012146,
+    "kl_loss_scale": 1.0,
+    "accuracy": 0.3888888955116272,
+    "kl_loss_t0": 0.12127546221017838,
+    "kl_loss_t1": 0.03100857324898243,
+    "teacher_0/weighted_kl": 0.03638264164328575,
+    "teacher_1/weighted_kl": 0.021706001833081245
+  },
+  "dlogits": {
+    "relative_l2": 4.290103927198013e-05,
+    "relative_norm": 2.701527343899494e-06,
+    "absolute_l2": 8.989718776530043e-10,
+    "reference_norm": 2.095454778971166e-05,
+    "max_absolute": 6.03135319465764e-10
+  },
+  "gradient_kind": "actual controller loss dlogits before MCore schedule scaling and clipping",
+  "reference_kind": "Independent native teacher oracle plus retained CP1 legacy objective on identical full-sequence dense/sparse teacher values; independent CE and aggregation",
+  "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/controller-reference/items6-7-rank5.pt",
+  "capture_sha256": "28b28d85e9800684bea9186daa9855b5452d3484c381c2a796c540dfde102940"
+}

@@ -1,0 +1,290 @@
+"""Observe existing DTensor export counters without importing CUDA handles.
+
+Run-owned diagnostic only. The 64-byte RefcountedMapAllocator header and signed
+64-bit slot interpretation are exactly those exercised by job 19990303's
+``reusable-ipc-early-20261010/launcher/ipc_refcount_probe.py`` (1 -> 0 -> -1).
+No extra export, CUDA import, consumer, or collective is introduced here.
+"""
+
+import hashlib
+import inspect
+import json
+import os
+import struct
+import time
+from dataclasses import asdict, dataclass
+from functools import wraps
+from pathlib import Path
+from weakref import WeakKeyDictionary
+
+_FIELDS = (
+    "topk_logits_ipc",
+    "topk_indices_ipc",
+    "log_z_ipc",
+    "gt_in_topk_ipc",
+)
+_PATCHED = set()
+_PENDING = WeakKeyDictionary()
+_GENERATIONS = WeakKeyDictionary()
+
+
+@dataclass(frozen=True)
+class CounterSlot:
+    sample_index: int
+    field: str
+    shm_name: str
+    slot: int
+    tensor_shape: tuple[int, ...]
+    dtype: str
+    storage_handle_sha256: str
+    descriptor_sha256: str
+
+
+@dataclass(frozen=True)
+class PendingExport:
+    generation: int
+    slots: tuple[CounterSlot, ...]
+    transport: str = "dtensor_sparse"
+    coordinates: tuple[int, int, int] | None = None
+    sample_records: int = 0
+    reusable_records: int = 0
+    empty_records: int = 0
+    field_records: int = 0
+    intentional_nonpublisher: bool = False
+
+
+def parse_counter_slot(handle, *, sample_index, field) -> CounterSlot:
+    """Bind the real Torch rebuild signature; never rebuild its CUDA storage."""
+    from torch.multiprocessing.reductions import rebuild_cuda_tensor
+
+    arguments = inspect.signature(rebuild_cuda_tensor).bind(*handle[0]).arguments
+    name = arguments["ref_counter_handle"].decode()
+    slot = arguments["ref_counter_offset"]
+    if (
+        not isinstance(slot, int)
+        or slot < 0
+        or not name.startswith("/")
+        or not name[1:]
+        or "/" in name[1:]
+    ):
+        raise ValueError("Unexpected Torch CUDA IPC shared-counter metadata")
+    storage_hash = hashlib.sha256(arguments["storage_handle"]).hexdigest()
+    shape = tuple(arguments["tensor_size"])
+    dtype = str(arguments["dtype"])
+    identity = json.dumps(
+        [name, slot, storage_hash, shape, dtype], separators=(",", ":")
+    )
+    return CounterSlot(
+        sample_index,
+        field,
+        name,
+        slot,
+        shape,
+        dtype,
+        storage_hash,
+        hashlib.sha256(identity.encode()).hexdigest(),
+    )
+
+
+def read_counter(slot: CounterSlot) -> int:
+    """Read a mapped atomic int64 as bytes, without changing its reference count."""
+    descriptor = os.open("/dev/shm/" + slot.shm_name.lstrip("/"), os.O_RDONLY)
+    try:
+        value = os.pread(descriptor, 8, 64 + slot.slot * 8)
+    finally:
+        os.close(descriptor)
+    if len(value) != 8:
+        raise ValueError("Torch CUDA IPC counter mapping is shorter than its slot")
+    return struct.unpack("q", value)[0]
+
+
+def _write_observation(worker, pending: PendingExport, stage: str) -> None:
+    counters = []
+    for slot in pending.slots:
+        record = asdict(slot)
+        try:
+            record["value"] = read_counter(slot)
+        except (OSError, ValueError) as error:
+            record["value"] = None
+            record["read_error"] = f"{type(error).__name__}: {error}"
+        counters.append(record)
+    if pending.coordinates is None:
+        tp_rank = worker.tp_mesh.get_local_rank()
+        cp_rank = worker.cp_mesh.get_local_rank()
+        dp_rank = worker.dp_mesh.get_local_rank()
+    else:
+        tp_rank, cp_rank, dp_rank = pending.coordinates
+    event = {
+        "schema_version": 1,
+        "stage": stage,
+        "generation": pending.generation,
+        "time_ns": time.time_ns(),
+        "pid": os.getpid(),
+        "model_name": worker.cfg["model_name"],
+        "rank": worker.rank,
+        "tp_rank": tp_rank,
+        "cp_rank": cp_rank,
+        "dp_rank": dp_rank,
+        "transport": pending.transport,
+        "sample_records": pending.sample_records,
+        "reusable_records": pending.reusable_records,
+        "empty_records": pending.empty_records,
+        "field_records": pending.field_records,
+        "intentional_nonpublisher": pending.intentional_nonpublisher,
+        "controller_selects_output": tp_rank == 0
+        if pending.transport == "dtensor_sparse"
+        else True,
+        "counter_mapping_header_bytes": 64,
+        "counters": counters,
+        "negative_counter_count": sum(
+            item["value"] is not None and item["value"] < 0 for item in counters
+        ),
+        "read_error_count": sum("read_error" in item for item in counters),
+    }
+    directory = Path(os.environ["XTOKEN_NUMERICAL_CAPTURE_RUN"]) / "legacy-ipc-counters"
+    directory.mkdir(parents=True, exist_ok=True)
+    # Each process appends only its own observations. Keep no Tensor references.
+    with (directory / f"rank{worker.rank}-pid{os.getpid()}.jsonl").open("a") as stream:
+        stream.write(json.dumps(event, sort_keys=True) + "\n")
+
+
+def observe_export(original, worker, *args, **kwargs):
+    from nemo_rl.utils.reusable_cuda_ipc import is_reusable_cuda_ipc_handle
+
+    previous = _PENDING.pop(worker, None)
+    if previous is not None:
+        _write_observation(worker, previous, "before_next_export")
+    result = original(worker, *args, **kwargs)
+    generation = _GENERATIONS.get(worker, 0) + 1
+    _GENERATIONS[worker] = generation
+    records = result["per_sample_handles"]
+    intentional_nonpublisher = (
+        not records
+        and worker.tp_mesh.get_local_rank() > 0
+        and result.get("sparse_ipc_publisher") is False
+    )
+    if not records and not intentional_nonpublisher:
+        raise ValueError("Sparse IPC observer found an unmarked empty publisher")
+    slots = []
+    reusable = field_count = 0
+    for index, record in enumerate(records):
+        if not all(field in record for field in _FIELDS[:3]):
+            raise ValueError("Sparse IPC observation is missing mandatory fields")
+        for field in _FIELDS:
+            if field not in record:
+                continue
+            field_count += 1
+            if is_reusable_cuda_ipc_handle(record[field]):
+                reusable += 1
+            else:
+                slots.append(
+                    parse_counter_slot(record[field], sample_index=index, field=field)
+                )
+    if reusable and slots:
+        raise ValueError("Sparse IPC observer found mixed raw and Torch fields")
+    current = PendingExport(
+        generation,
+        tuple(slots),
+        sample_records=len(records),
+        reusable_records=reusable,
+        field_records=field_count,
+        intentional_nonpublisher=intentional_nonpublisher,
+    )
+    _PENDING[worker] = current
+    _write_observation(worker, current, "after_export")
+    return result
+
+
+def observe_dense_export(original, worker, *args, **kwargs):
+    from nemo_rl.utils.reusable_cuda_ipc import is_reusable_cuda_ipc_handle
+
+    previous = _PENDING.pop(worker, None)
+    if previous is not None:
+        _write_observation(worker, previous, "before_next_export")
+    result = original(worker, *args, **kwargs)
+    generation = _GENERATIONS.get(worker, 0) + 1
+    _GENERATIONS[worker] = generation
+    handles = result["per_sample_handles"]
+    # The agreed tests use PP1, so every dense teacher worker owns real shards.
+    if not handles:
+        raise ValueError("Dense counter observer requires nonempty PP1 shard records")
+    slots = []
+    reusable = empty = 0
+    for index, record in enumerate(handles):
+        handle = record["payload_ipc"]
+        if handle is None:
+            if record.get("stored_seq_len") != 0:
+                raise ValueError("Missing dense payload for nonempty storage")
+            empty += 1
+        elif is_reusable_cuda_ipc_handle(handle):
+            reusable += 1
+        else:
+            slots.append(
+                parse_counter_slot(handle, sample_index=index, field="payload_ipc")
+            )
+    first = handles[0]
+    current = PendingExport(
+        generation,
+        tuple(slots),
+        "mcore_dense",
+        (int(first["tp_rank"]), int(first["cp_rank"]), int(result["dp_rank"])),
+        len(handles),
+        reusable,
+        empty,
+    )
+    _PENDING[worker] = current
+    _write_observation(worker, current, "after_export")
+    return result
+
+
+def observe_release(original, worker, *args, **kwargs):
+    previous = _PENDING.pop(worker, None)
+    if previous is not None:
+        _write_observation(worker, previous, "before_release")
+    return original(worker, *args, **kwargs)
+
+
+def _wrap(original, operation):
+    @wraps(original)
+    def method(worker, *args, **kwargs):
+        # The actor class is cloudpickled by value. Import module-owned state on
+        # invocation; never capture WeakKeyDictionary objects in its closure.
+        import legacy_ipc_counter_observer as observer
+
+        return getattr(observer, operation)(original, worker, *args, **kwargs)
+
+    return method
+
+
+def _patch_actor(actor, export_name, operation) -> None:
+    """Patch Ray's copied methods and its already-created method metadata.
+
+    Ray 2.56.1 actor._modify_class installs tracing wrappers directly on
+    __ray_metadata__.modified_class. _ActorClassMethodMetadata.create then
+    snapshots inspect.getmembers into method_meta.methods. Patching the plain
+    implementation after @ray.remote has run reaches neither copy.
+    """
+    metadata = actor.__ray_metadata__
+    implementation = metadata.modified_class
+    if implementation in _PATCHED:
+        return
+    for name, callback in (
+        (export_name, operation),
+        ("release_ipc_buffer", "observe_release"),
+    ):
+        original = getattr(implementation, name)
+        method = _wrap(original, callback)
+        setattr(implementation, name, method)
+        metadata.method_meta.methods[name] = method
+        assert getattr(implementation, name) is metadata.method_meta.methods[name]
+    _PATCHED.add(implementation)
+
+
+def patch_dtensor_worker(module) -> None:
+    _patch_actor(module.DTensorPolicyWorkerV2, "get_topk_logits_ipc", "observe_export")
+
+
+def patch_megatron_worker(module) -> None:
+    _patch_actor(
+        module.MegatronPolicyWorker, "get_full_logits_ipc", "observe_dense_export"
+    )

@@ -1,0 +1,43 @@
+{
+  "root_head_at_tests": "6bf7cb1c616ba026db808d6808158bedd55ed80f",
+  "source_check": "PASS8 snapshot files captured in flight and checked again after completion; not a before-command-start manifest.2 capability tests hashed at final capture.",
+  "source_sha256": {
+    "nemo_rl/algorithms/loss/loss_functions.py": "44b3752ab8b96ad6e74e71a7c9ac2133a0b988b412624b3305513a1f3510ecb9",
+    "nemo_rl/algorithms/x_token/native_same_tokenizer.py": "ef3f654605fe05846b2830f3e821df85dd55eb1752b87e48576735dd05dffd14",
+    "nemo_rl/algorithms/xtoken_off_policy_distillation.py": "2209fa12b805122315c1da5b931225e67816c3bcc90ed9b4dbce580c2166f2b4",
+    "nemo_rl/models/megatron/train.py": "d7389a34bcda6af58aa9250eeefaee06b72e85ab29ab22834d7203c36e68a8ab",
+    "tests/unit/algorithms/x_token/test_native_same_tokenizer.py": "9d02907c988959016d858014d93d2be5433bfeefe49e1d57a27ed97e76ec6df6",
+    "tests/unit/algorithms/x_token/test_native_same_mixed.py": "21e205c7af730e3a38e16dc318994b241f9709ec7fdbb566362c75248657b8ce",
+    "tests/unit/algorithms/x_token/test_native_dense_contract.py": "61af15f5cb5f4c04784eb19858af8c8cda9b4fe4fc831e77c334254e5f71b2ac",
+    "tests/unit/algorithms/x_token/test_xtoken_off_policy_distillation.py": "0db643ebb1f4e162973e68d14fadf244d62f5ae5bfb365ccb83802c7482ce51c",
+    "tests/unit/algorithms/x_token/test_native_loss_contract.py": "d239fa1d032dc104818a49c43882907e97e5dc1a7e1da3246e28e7d6e0023450",
+    "tests/unit/algorithms/x_token/test_megatron_cp_normalization.py": "6404343f1f2c0d551bc1b25a70e4828cc74aa8f842c5473f255c6bb5dcf49c36"
+  },
+  "log_artifacts": {
+    "native-same-final-cpu.log": {
+      "source": "/tmp/native-same-final-cpu.log",
+      "sha256": "b028618e2c09aa8042d6ca2bd55f370ff3046aaa59d617e1e64bf0dac3ba13ef"
+    },
+    "xtoken-same-mixed-cpu.log": {
+      "source": "/tmp/xtoken-same-mixed-cpu.log",
+      "sha256": "22b90a1b3b3ea32e7b7e54a385db141c4f6aae2114864d449619e6756f8104ae"
+    },
+    "xtoken-controller4b-tests.log": {
+      "source": "/tmp/xtoken-controller4b-tests.log",
+      "sha256": "815e0de68a032eb67b5cb2950dae6cfa495b40db797baeee6f5efa0fa628120e"
+    },
+    "xtoken-controller4b-selector-tests.log": {
+      "source": "/tmp/xtoken-controller4b-selector-tests.log",
+      "sha256": "58c4d84eae726630a9bc34556910777b5aef6b448138bb3f95ad78716e7473ec"
+    },
+    "xtoken-native-dense-contract-final.log": {
+      "source": "/tmp/xtoken-native-dense-contract-final.log",
+      "sha256": "c8f78b15dddb46b05ff900ef06564c13e217f27324316406e49a40fccafef79a"
+    },
+    "xtoken-native-dense-early-regression.log": {
+      "source": "/tmp/xtoken-native-dense-early-regression.log",
+      "sha256": "06a32a9dc7a6993ebd6d6bf37531bc7f9d32c1a1742f03b7e275f0b4bd248f5e"
+    }
+  },
+  "gpu_execution": "NOT_RUN"
+}

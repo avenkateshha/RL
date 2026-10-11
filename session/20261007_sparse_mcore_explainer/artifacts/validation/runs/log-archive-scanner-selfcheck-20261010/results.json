@@ -1,0 +1,81 @@
+{
+  "status": "PASS_INTEGRITY_AND_SCANNER",
+  "synthetic_checks": "Both manifest formats and archive/member digest corruption rejection PASS",
+  "source_sha256": {
+    "summarize_matrix_run.py": "78fb3d2a455afa023c9f6b72e8e2158a4de8788fd67f966caecce56a114d14f6",
+    "verify_log_archive_scan.py": "8d41e0ddc8d58959a740f61b1600ab6080723bc0ed768f5232a1360830db9457"
+  },
+  "actual_retained_run_scans": {
+    "R1-tp2cp1": {
+      "files_scanned": 1510,
+      "matches": [],
+      "verified_archives": [
+        {
+          "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__ray-final-logs.tar.gz",
+          "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__ray-final-logs.json",
+          "members_verified": 754,
+          "log_members_scanned": 753
+        },
+        {
+          "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__driver-logs__19992100-logs__ray.tar.gz",
+          "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R1-tp2cp1/archived-raw-logs/runs__R1-tp2cp1__driver-logs__19992100-logs__ray.json",
+          "members_verified": 754,
+          "log_members_scanned": 753
+        }
+      ],
+      "scope": "Only retained raw logs were scanned. Absence of warnings does not prove clean IPC counters or complete worker teardown."
+    },
+    "R3-fixed": {
+      "files_scanned": 1919,
+      "matches": [],
+      "verified_archives": [
+        {
+          "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__ray-final-logs.tar.gz",
+          "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__ray-final-logs.json",
+          "members_verified": 959,
+          "log_members_scanned": 958
+        },
+        {
+          "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__driver-logs__19991885-logs__ray.tar.gz",
+          "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed/archived-raw-logs/runs__R3-fixed__driver-logs__19991885-logs__ray.json",
+          "members_verified": 959,
+          "log_members_scanned": 958
+        }
+      ],
+      "scope": "Only retained raw logs were scanned. Absence of warnings does not prove clean IPC counters or complete worker teardown."
+    },
+    "R3-fixed-cuda-support-20261010": {
+      "files_scanned": 827,
+      "matches": [],
+      "verified_archives": [
+        {
+          "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/archived-raw-logs/runs__R3-fixed-cuda-support-20261010__driver-logs__19992163-logs__ray.tar.gz",
+          "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R3-fixed-cuda-support-20261010/archived-raw-logs/runs__R3-fixed-cuda-support-20261010__driver-logs__19992163-logs__ray.json",
+          "members_verified": 825,
+          "log_members_scanned": 824
+        }
+      ],
+      "scope": "Only retained raw logs were scanned. Absence of warnings does not prove clean IPC counters or complete worker teardown."
+    },
+    "R4-dtensor-mcore": {
+      "files_scanned": 1919,
+      "matches": [],
+      "verified_archives": [
+        {
+          "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__driver-logs__19991907-logs__ray.tar.gz",
+          "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__driver-logs__19991907-logs__ray.json",
+          "members_verified": 959,
+          "log_members_scanned": 958
+        },
+        {
+          "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__ray-final-logs.tar.gz",
+          "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore/archived-raw-logs/runs__R4-dtensor-mcore__ray-final-logs.json",
+          "members_verified": 959,
+          "log_members_scanned": 958
+        }
+      ],
+      "scope": "Only retained raw logs were scanned. Absence of warnings does not prove clean IPC counters or complete worker teardown."
+    }
+  },
+  "scope": "Verified archived log integrity and warning detection only; no IPC counter or complete lifecycle inference."
+}

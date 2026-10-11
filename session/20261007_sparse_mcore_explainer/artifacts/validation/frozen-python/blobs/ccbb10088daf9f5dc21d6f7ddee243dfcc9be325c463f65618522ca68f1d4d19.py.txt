@@ -1,0 +1,106 @@
+"""Replay first-step controller cotangents through the real pinned student.
+
+Both teacher backends have already executed their real exporters and the real
+student consumer in the companion controller run. This replay uses the saved
+actual and independent-reference dlogits from those exact observations; it does
+not reload or substitute either teacher model. Student weights are the pinned
+initial weights, so only the first training microbatch on each rank is eligible.
+"""
+
+import argparse
+from datetime import timedelta
+import gc
+import hashlib
+import json
+import os
+from pathlib import Path
+
+from megatron.core import parallel_state as ps
+import torch
+import torch.distributed as dist
+import yaml
+
+from real_model_reference import (
+    capture_forward_rng,
+    compare_model_gradients,
+    forward,
+    load_model,
+    oracle_full_logits,
+)
+import model_oracle
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("case", type=Path)
+    parser.add_argument("--capture-run", required=True, type=Path)
+    args = parser.parse_args()
+    config = yaml.safe_load((args.case / "resolved_config.yaml").read_text())
+    torch.set_num_threads(4)
+    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
+    dist.init_process_group("nccl", timeout=timedelta(minutes=10))
+    tp = config["policy"]["megatron_cfg"]["tensor_model_parallel_size"]
+    cp = config["policy"]["megatron_cfg"]["context_parallel_size"]
+    student = load_model(config["policy"]["model_name"], tp, cp).train()
+    candidates = []
+    for report_path in (args.capture_run / "controller-reference").glob(
+        f"*-rank{dist.get_rank()}.json"
+    ):
+        report = json.loads(report_path.read_text())
+        if report["dlogits"] is not None and report.get("capture_path"):
+            candidates.append(
+                (
+                    min(report["item_ids"]),
+                    Path(report["capture_path"]),
+                    report["capture_sha256"],
+                )
+            )
+    assert candidates, "No real first-step controller gradient capture exists"
+    _, capture_path, capture_sha256 = min(candidates)
+    assert hashlib.sha256(capture_path.read_bytes()).hexdigest() == capture_sha256
+    capture = torch.load(capture_path, map_location="cpu", weights_only=False)
+    assert capture["status"] == "PASS"
+    assert capture["tp_rank"] == ps.get_tensor_model_parallel_rank()
+    assert capture["cp_rank"] == ps.get_context_parallel_rank()
+    assert capture["dp_rank"] == ps.get_data_parallel_rank()
+    forward_rng = capture_forward_rng()
+    logits = forward(student, capture["data"]["input_ids"])
+    full = oracle_full_logits(logits)
+    value_error = model_oracle.gradient_errors(full, capture["student_full_logits"])
+    assert value_error["relative_l2"] <= 0.002, value_error
+    torch.testing.assert_close(
+        full, capture["student_full_logits"], rtol=0.02, atol=0.05
+    )
+    actual = capture["actual_local_dlogits"].cuda()
+    reference = capture["reference_local_dlogits"].cuda()
+    assert tuple(actual.shape) == tuple(logits.shape) == tuple(reference.shape)
+    result = compare_model_gradients(
+        student, logits, actual, reference, capture["data"]["input_ids"], forward_rng
+    )
+    report = {
+        "status": "PASS",
+        "rank": dist.get_rank(),
+        "tp": tp,
+        "cp": cp,
+        "dp": ps.get_data_parallel_world_size(),
+        "capture_path": str(capture_path.resolve()),
+        "capture_sha256": capture_sha256,
+        "item_ids": capture["item_ids"],
+        "teacher_backends": capture["teacher_backends"],
+        "pinned_initial_student_forward": value_error,
+        "synchronized_preclip_parameter_gradients": result,
+        "scope": "First actual-controller microbatch at pinned initial student weights; saved real exporter observations, independent native/CE oracle and retained CP1 legacy compatibility cotangents. Actual controller separately performs three optimizer updates and evaluation.",
+    }
+    (args.case / f"replay-rank{dist.get_rank()}.json").write_text(
+        json.dumps(report, indent=2) + "\n"
+    )
+    del capture, actual, reference, logits, student
+    gc.collect()
+    torch.cuda.synchronize()
+    dist.barrier()
+    ps.destroy_model_parallel()
+    dist.destroy_process_group()
+
+
+if __name__ == "__main__":
+    main()

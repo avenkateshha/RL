@@ -1,0 +1,11 @@
+{
+  "session/20261007_sparse_mcore_explainer/artifacts/validation/model_oracle.py": "dda3b439f64b53f5ab2aa855dc1cb2c62e53d70866dc607239c53f28d5f33e32",
+  "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_dense_cross_oracle.py": "f586bd1d838b227ff987e8999bcc212f082c7d668a3a1d7988c03a971c3a0db0",
+  "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_model_oracle.py": "30a2e3ee457b5ea6ffd6f9400a0c95650291b57146b23d9791180d64b7a323c9",
+  "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_capture.py": "01a0f88b195d547147a453104c16e46d8d4db548b6ad7771730224780d478afe",
+  "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/resolved_config.yaml": "a8897f049a85522aaa5b8ce72d78e0c2041ca9d12eb6d3ec668fbf80957f4ae6",
+  "nemo_rl/algorithms/loss/loss_functions.py": "44b3752ab8b96ad6e74e71a7c9ac2133a0b988b412624b3305513a1f3510ecb9",
+  "tests/unit/algorithms/x_token/native_sparse_fixtures.py": "109788bf4931a3242d6e741632e9cfeacfedb57b75c458b5fd87045c0e02cc03",
+  "tests/unit/algorithms/x_token/test_native_same_tokenizer.py": "d3c0235dbced0b87b46083c1f19534bfd65207a6c3b9fbb8e3b27b8771dca105",
+  "tests/unit/algorithms/x_token/test_native_sparse_loss.py": "332b932eca91a202f9dd7af790e7ea31460f863f92fe560c789e4debab8f7618"
+}

@@ -1,0 +1,142 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "check": "verify_model_oracle.py",
+      "command": "uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_model_oracle.py",
+      "exit_code": 0,
+      "seconds": 27.83
+    },
+    {
+      "check": "verify_dense_cross_oracle.py",
+      "command": "uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_dense_cross_oracle.py",
+      "exit_code": 0,
+      "seconds": 51.65
+    },
+    {
+      "check": "verify_controller_observations.py",
+      "command": "uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_observations.py",
+      "exit_code": 0,
+      "seconds": 10.67
+    },
+    {
+      "check": "verify_controller_capture.py",
+      "command": "uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_capture.py",
+      "exit_code": 0,
+      "seconds": 2.64
+    },
+    {
+      "check": "legacy_ipc_counter_observer_selfcheck.py",
+      "command": "uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/legacy_ipc_counter_observer_selfcheck.py",
+      "exit_code": 0,
+      "seconds": 12.24
+    },
+    {
+      "check": "verify_frozen_python_package.py",
+      "command": "uv run --no-sync --offline python /lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_frozen_python_package.py",
+      "exit_code": 0,
+      "seconds": 0.21
+    }
+  ],
+  "source_hashes_before_after": "PASS",
+  "source_files": 424,
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "",
+    "UV_CACHE_DIR": "/tmp/xtoken-port-uv-cache",
+    "PYTHONPATH": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/experiments/xtoken-smoke/xtoken-distillation/xtoken-offset-rebased-2n100-20260928-092950/runtime/python"
+  },
+  "scope": "Artifact-only CPU oracle/capture/observer and exact-byte packaging regressions after master style changes; no GPU, model execution or original snapshot edits",
+  "publication_audit": {
+    "scope": "Original 1244-file candidate inventory before package integration; immutable run-owned Python was inspected but never rewritten.",
+    "ruff_version": "0.9.9",
+    "python_files": 286,
+    "run_owned_python_files": 253,
+    "master_python_files": 33,
+    "lint_findings": {
+      "F401": 4,
+      "F401_run_owned_files": 4,
+      "I001": 223,
+      "I001_files": 186,
+      "format_files": 94
+    },
+    "publication_resolution": "Exact original run-owned Python bytes are content-addressed non-executable .py.txt data with a validated original path/mode/hash manifest and explicit restore; current masters remain ordinary checked Python.",
+    "initial_package": {
+      "original_paths": 253,
+      "unique_blobs": 60,
+      "source_package_sha256": "4e88bf13c9c15d4b5431587e8668f3aba190ed651d8fc2bccb5939c7cfcd2c06"
+    }
+  },
+  "master_style_pass": {
+    "scope": "32 existing editable test-helper masters; excludes root-owned summarize_matrix_run.py and verify_legacy_lifetime_gate.py. Later owner changes are separate.",
+    "selected_files": 32,
+    "import_findings_fixed": 24,
+    "formatted_files": 3,
+    "changed_files": [
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/controller_reference.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/controller_teardown.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/dtensor_preflight.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/prepare_corpus.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/prepare_tables.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/legacy_ipc_counter_observer_selfcheck.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/prepare_launchers.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/prepare_publication_allowlist.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/prepare_recipes.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/prepare_reference_launcher.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/probe_dtensor_ray_metadata.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/real_model_reference.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/replay_controller_gradients.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/update_recipe_index.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/validate_recipes.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_capture.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_observations.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_teardown.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_dense_cross_oracle.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_log_archive_scan.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_model_oracle.py",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_ray_log_archives.py"
+    ],
+    "original_sha256": {
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/controller_reference.py": "3fa91e16ce89f9de8e3983d7cb4ab70a69d0b1d409d1b4ce9d824ed043d9d529",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/controller_teardown.py": "562b1cb8dcf66c70ff19cfa5d43a646d7d14710f00fd3083717b3289b1890480",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/dtensor_preflight.py": "722e9c39277a040547a1aa71d6cdb380d6eaa466016dd66f5f1d5b545131d643",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/prepare_corpus.py": "564104b46ce1c35e8e4df45d9c0767a228f750ac8b98583c602ef3afc92fc575",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/prepare_tables.py": "97650263c04c6279e3f46e99c0000462aa95a2213a3307a3d564168eb20c2d3e",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/ipc_refcount_probe.py": "fc5ac96a8501418790358596d3c3c0f87546f724ceca7e8a77c1c1d569cbd431",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/legacy_ipc_counter_observer.py": "7c8c07d6d8046b6e8f58d90bf68a2bb8df46dd53e26f02c942704477c0c7351d",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/legacy_ipc_counter_observer_selfcheck.py": "c58807bc079d76ce056486c675e14d3bf7aaf59282bafa05bb1e977b4df8d456",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/model_oracle.py": "ccd544629fc447168a7e5fbd80b8c2acc4bb1b5870081b4f5fdbb499b6344799",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/optimizer_gradient_capture.py": "b3a909a7ec59ecbae1be8f59bfb7acac64106f2ed0ecb7fcc2b19391a1724db2",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/prepare_launchers.py": "c34769be00a33fe47b1b95b10cafd0f00476eda8dba2147dc0a40f48a6a6b4e8",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/prepare_publication_allowlist.py": "ba9e55b0c53e985d65ef42f15bce9244cdaae817d90f2ed0978699d52a6852d0",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/prepare_recipes.py": "464f245c35b575b2a7a23bed7689f6ae63b70036b76f0ee96c2cabced0edc347",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/prepare_reference_launcher.py": "890cf0d1dec90dc25dfa8f63d57ced601fbb6475e4a840f470968a5439c1f145",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/probe_dtensor_ray_metadata.py": "d3a6308b4a9d76d3f650ac57fd9c990a1b470c9d730febfc8e88eea5b5946f41",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/probe_same_topk.py": "66edac861ba2a8de222267b42a14893895459b3e60f2506fef63667903619faa",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/real_model_reference.py": "6d61a5e3ff17932fb037b6c6795a41668cfb990585b1e93ed262f04cdbeee11b",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/reference_sitecustomize.py": "0e95e21a25175eaecd70e4f1fd31674165bc5d63d21c88262b257ea75eabbb29",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/replay_controller_gradients.py": "d24dbeb091671fbde8be0fa804c11f669c60f37f3596ae6503c413eb22e6af0f",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/update_recipe_index.py": "1f39968b317a8f4ed3b5863addff22b6c97446e2c24371b7a88a4501e585c7ba",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/validate_recipes.py": "baf73cc69981c63cd0d34e72ae6581a746573b33e0108aeab739d79c47a63d91",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_capture.py": "cba8e97143589b4f1159f40d1a82cef2dd310e68f6c493445bf3026799b72f93",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_observations.py": "75b2ba28d8fa6991c66038c0a6d96ece4d7fc18077c6c00bcf6ebdab3856fbbc",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_teardown.py": "ecf91a023e0500d51637615d1c8d46d7743972f3cf6ca4fd03381150a21a2ae5",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_dense_cross_oracle.py": "7c00a99123a9b60368c696bb9250a3bd902d10b584b4fff9f03cd86d65d1f8ac",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_frozen_run.py": "f72af4922f7cc7040f9df39f6f59f1949dd7827e2ed4d551ecf0ffb2a6805ad6",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_legacy_ipc_observations.py": "9ebcaa98a8ae572b51fe80719553a6ac7d247b2e32e15a94f32ad9fa1b81c031",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_log_archive_scan.py": "8d41e0ddc8d58959a740f61b1600ab6080723bc0ed768f5232a1360830db9457",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_model_oracle.py": "4aedfcd8f0171b2bd6d123572548ce00d26d61a86eeeac9e3e3018dfd3e821c7",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_optimizer_replay.py": "72f739be436e7fc5364e08bd6e005a7bd1e707b4c2168da8970b4bbd2773c254",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_ray_log_archives.py": "8cc3e28db5e806f3000a25548c3fdf75742c15b56cb04654f2b2d6ff536d047d",
+      "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_ray_process_capture_signature.py": "a440cc8a3f4fc981d3f3b95d2c17bd07a9eb8ef027f00b805b9935e37a68f130"
+    },
+    "status": "All 32 passed Ruff D/F, imports, and format checks immediately after fixes; six focused artifact selfchecks and source hashes above validate post-style behavior.",
+    "backup_scope": "Local temporary backup only; not included in publication."
+  },
+  "license_audit": {
+    "required_current_year_headers": [
+      "package_frozen_python.py",
+      "prepare_publication_allowlist.py"
+    ],
+    "test_only_exemption": "Other model/oracle/capture/replay/probe/verifier/fixture/launcher masters serve only the correctness/runtime tests and are exempt under the copyright skill. Historical source remains immutable."
+  }
+}

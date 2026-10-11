@@ -1,0 +1,191 @@
+{
+  "status": "PASS",
+  "rank": 0,
+  "tp": 2,
+  "cp": 2,
+  "dp": 1,
+  "dp_rank": 0,
+  "weights_loaded": true,
+  "placement": [
+    {
+      "rank": 0,
+      "host": "pool0-00778",
+      "local_device": 0,
+      "dp_rank": 0,
+      "tp_rank": 0,
+      "cp_rank": 0
+    },
+    {
+      "rank": 1,
+      "host": "pool0-00778",
+      "local_device": 1,
+      "dp_rank": 0,
+      "tp_rank": 1,
+      "cp_rank": 0
+    },
+    {
+      "rank": 2,
+      "host": "pool0-00778",
+      "local_device": 2,
+      "dp_rank": 0,
+      "tp_rank": 0,
+      "cp_rank": 1
+    },
+    {
+      "rank": 3,
+      "host": "pool0-00778",
+      "local_device": 3,
+      "dp_rank": 0,
+      "tp_rank": 1,
+      "cp_rank": 1
+    }
+  ],
+  "node_local_ipc_groups": "PASS; each DP replica's TP/CP producer-consumer group shares one host",
+  "elapsed_seconds": 132.42215093784034,
+  "settings_adjustment": {},
+  "reports": [
+    {
+      "step": 0,
+      "microbatch": 0,
+      "sample_indices": [
+        0,
+        1
+      ],
+      "reference": {
+        "loss": 0.6154007315635681,
+        "ce_loss": 2.1150989532470703,
+        "kl_loss": 0.40389084815979004,
+        "kl_loss_scale": 1.0,
+        "accuracy": 0.2916666567325592,
+        "kl_loss_t0": 0.40389084815979004,
+        "teacher_0/weighted_kl": 0.40389084815979004
+      },
+      "production": {
+        "loss": 0.6153832674026489,
+        "kl_loss": 0.40387195348739624,
+        "ce_loss": 2.115112781524658,
+        "kl_loss_scale": 1.0,
+        "accuracy": 0.2916666567325592,
+        "num_valid_samples": 2.0,
+        "ipc_reconstruction_fallbacks": 0,
+        "teacher_0/weighted_kl": 0.40387195348739624,
+        "kl_loss_t0": 0.40387195348739624,
+        "kl_common_per_chunk_t0": 1.4290853280287523,
+        "kl_partition_last_per_chunk_t0": 0.0,
+        "kl_mismatch_combined_per_chunk_t0": 0.0,
+        "kl_mismatch_scaled_per_chunk_t0": 0.0,
+        "num_common_chunks_t0": 26,
+        "num_mismatch_chunks_t0": 0,
+        "num_noise_filtered_common_chunks_t0": 0,
+        "num_noise_filtered_mismatch_chunks_t0": 0,
+        "top1_acc_per_chunk_t0": 0.34615384615384615,
+        "sparse_topk_k_t0": 64,
+        "prefix_bidir_v3_mismatch_loss_multiplier_t0": 1.0,
+        "prefix_bidir_v3_noise_filter_topk_t0": 0,
+        "native_sparse_v6_t0": 1,
+        "weight_t0": 1.0,
+        "teacher_0/routed_samples": 2,
+        "teacher_0/routed_tokens": 26
+      },
+      "loss_cp_sum": 0.6153832077980042,
+      "dlogits": {
+        "relative_l2": 3.465338107590153e-05,
+        "relative_norm": 2.9860937575328707e-05,
+        "absolute_l2": 6.878448200162237e-07,
+        "reference_norm": 0.019849284504436456,
+        "max_absolute": 3.6600977182388306e-07
+      },
+      "parameter_gradients": {
+        "relative_l2": 0.009123677139243513,
+        "relative_norm": 0.0009928724935636603,
+        "reference_norm": 30.429308737541362,
+        "parameter_tensors_per_rank": 98,
+        "synchronized_cp_dp_group_size": 2,
+        "synchronization": "SUM over CP and DP; objective uses full-step DP denominators",
+        "reference_forward": "Fresh graph, same frozen weights/input/RNG; logits match rtol=atol=1e-5",
+        "compared_elements_including_replicas": 2471763968
+      },
+      "no_relayout_guard": "PASS",
+      "teacher_payload_checks": [
+        {
+          "status": "PASS",
+          "requested_forced_slots": 54,
+          "rtol": 1e-05,
+          "atol": 1e-05
+        }
+      ]
+    },
+    {
+      "step": 0,
+      "microbatch": 1,
+      "sample_indices": [
+        2,
+        3
+      ],
+      "reference": {
+        "loss": 0.39805251359939575,
+        "ce_loss": 1.3472462892532349,
+        "kl_loss": 0.2633278965950012,
+        "kl_loss_scale": 1.0,
+        "accuracy": 0.5909090638160706,
+        "kl_loss_t0": 0.2633278965950012,
+        "teacher_0/weighted_kl": 0.2633278965950012
+      },
+      "production": {
+        "loss": 0.3980364203453064,
+        "kl_loss": 0.26331067085266113,
+        "ce_loss": 1.3472574949264526,
+        "kl_loss_scale": 1.0,
+        "accuracy": 0.5909090638160706,
+        "num_valid_samples": 2.0,
+        "ipc_reconstruction_fallbacks": 0,
+        "teacher_0/weighted_kl": 0.26331067085266113,
+        "kl_loss_t0": 0.26331067085266113,
+        "kl_common_per_chunk_t0": 1.1573700428009033,
+        "kl_partition_last_per_chunk_t0": 0.2692957352846861,
+        "kl_mismatch_combined_per_chunk_t0": 0.2692957352846861,
+        "kl_mismatch_scaled_per_chunk_t0": 0.2692957352846861,
+        "num_common_chunks_t0": 20,
+        "num_mismatch_chunks_t0": 4,
+        "num_noise_filtered_common_chunks_t0": 0,
+        "num_noise_filtered_mismatch_chunks_t0": 0,
+        "top1_acc_per_chunk_t0": 0.5416666666666666,
+        "sparse_topk_k_t0": 64,
+        "prefix_bidir_v3_mismatch_loss_multiplier_t0": 1.0,
+        "prefix_bidir_v3_noise_filter_topk_t0": 0,
+        "native_sparse_v6_t0": 1,
+        "weight_t0": 1.0,
+        "teacher_0/routed_samples": 2,
+        "teacher_0/routed_tokens": 28
+      },
+      "loss_cp_sum": 0.3980364203453064,
+      "dlogits": {
+        "relative_l2": 3.320357821112705e-05,
+        "relative_norm": 2.047768365637323e-05,
+        "absolute_l2": 4.547901376755908e-07,
+        "reference_norm": 0.01369702189275442,
+        "max_absolute": 1.9650906324386597e-07
+      },
+      "parameter_gradients": {
+        "relative_l2": 0.008545837374760742,
+        "relative_norm": 0.0008132808171074388,
+        "reference_norm": 20.561074675197,
+        "parameter_tensors_per_rank": 98,
+        "synchronized_cp_dp_group_size": 2,
+        "synchronization": "SUM over CP and DP; objective uses full-step DP denominators",
+        "reference_forward": "Fresh graph, same frozen weights/input/RNG; logits match rtol=atol=1e-5",
+        "compared_elements_including_replicas": 2471763968
+      },
+      "no_relayout_guard": "PASS",
+      "teacher_payload_checks": [
+        {
+          "status": "PASS",
+          "requested_forced_slots": 54,
+          "rtol": 1e-05,
+          "atol": 1e-05
+        }
+      ]
+    }
+  ],
+  "scope": "Actual pinned-weight MCore forward and native IPC loss, independent selected-support oracle, all-parameter preclip gradient comparison. Optimizer updates/evaluation are the companion controller run."
+}

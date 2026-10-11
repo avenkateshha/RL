@@ -1,0 +1,739 @@
+"""Small real MCore forwards, sparse IPC, independent loss and parameter gradients.
+
+Run with torchrun and a prepared case directory. Dense all-gathers occur only
+inside named oracle helpers, outside the guarded production loss invocation.
+This supplements the ordinary controller's three-step/evaluation integration.
+"""
+
+import argparse
+from contextlib import ExitStack
+from datetime import timedelta
+from functools import partial
+import gc
+import json
+import os
+from pathlib import Path
+import socket
+import time
+from unittest.mock import patch
+
+import torch
+import torch.distributed as dist
+import yaml
+from megatron.bridge import AutoBridge
+from megatron.core import parallel_state as ps
+from megatron.core.tensor_parallel.random import get_cuda_rng_tracker
+from megatron.core.utils import get_batch_on_this_cp_rank
+
+import model_oracle
+from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLossFn
+from nemo_rl.algorithms.loss.loss_input import prepare_loss_input
+from nemo_rl.algorithms.loss.wrapper import wrap_loss_fn_with_input_preparation
+from nemo_rl.algorithms.x_token import loss_utils
+from nemo_rl.algorithms.x_token.sparse_teacher import (
+    SparseTeacherIPC,
+    SparseTeacherRowReader,
+    build_native_force_token_ids,
+)
+from nemo_rl.distributed.batched_data_dict import BatchedDataDict
+from nemo_rl.models.megatron.sparse_teacher import SparseTeacherStorage
+from nemo_rl.models.megatron.train import (
+    FullLogitsPostProcessor,
+    SparseTeacherLogitsPostProcessor,
+)
+from nemo_rl.utils.reusable_cuda_ipc import (
+    allocate_reusable_cuda_tensor,
+    get_reusable_cuda_ipc_handle,
+)
+
+
+def positions(sequence, rank, size):
+    if size == 1:
+        return torch.arange(sequence)
+    width = sequence // (2 * size)
+    return torch.cat(
+        (
+            torch.arange(rank * width, (rank + 1) * width),
+            torch.arange((2 * size - rank - 1) * width, (2 * size - rank) * width),
+        )
+    )
+
+
+def oracle_full_logits(local):
+    """Detach then reconstruct only this tiny test observation, not loss input."""
+    tp_group, cp_group = (
+        ps.get_tensor_model_parallel_group(),
+        ps.get_context_parallel_group(),
+    )
+    vocab_parts = [
+        torch.empty_like(local) for _ in range(dist.get_world_size(tp_group))
+    ]
+    dist.all_gather(vocab_parts, local.detach().contiguous(), group=tp_group)
+    native = torch.cat(vocab_parts, dim=-1)
+    sequence_parts = [
+        torch.empty_like(native) for _ in range(dist.get_world_size(cp_group))
+    ]
+    dist.all_gather(sequence_parts, native, group=cp_group)
+    length = local.shape[1] * len(sequence_parts)
+    full = torch.empty((local.shape[0], length, native.shape[-1]), dtype=torch.float32)
+    for rank, value in enumerate(sequence_parts):
+        full[:, positions(length, rank, len(sequence_parts))] = value.float().cpu()
+    return full
+
+
+def load_model(snapshot, tp, cp):
+    bridge = AutoBridge.from_hf_pretrained(
+        snapshot, torch_dtype=torch.bfloat16, local_files_only=True
+    )
+    provider = bridge.to_megatron_provider(load_weights=True)
+    for key, value in dict(
+        tensor_model_parallel_size=tp,
+        context_parallel_size=cp,
+        pipeline_model_parallel_size=1,
+        params_dtype=torch.bfloat16,
+        pipeline_dtype=torch.bfloat16,
+        bf16=True,
+        fp16=False,
+        sequence_parallel=False,
+        gradient_accumulation_fusion=False,
+        hidden_dropout=0.0,
+        attention_dropout=0.0,
+    ).items():
+        setattr(provider, key, value)
+    provider.finalize()
+    if not ps.is_initialized():
+        provider.initialize_model_parallel(seed=1234)
+    models = provider.provide_distributed_model(wrap_with_ddp=False)
+    assert len(models) == 1
+    return models[0]
+
+
+def forward(model, ids):
+    batch = dict(
+        tokens=ids.cuda(),
+        position_ids=torch.arange(ids.shape[1], device="cuda")[None, :]
+        .expand(ids.shape[0], -1)
+        .contiguous(),
+        attention_mask=None,
+        cu_seqlens=None,
+    )
+    batch = get_batch_on_this_cp_rank(
+        batch, is_hybrid_cp=False, cp_group=ps.get_context_parallel_group()
+    )
+    return model(
+        input_ids=batch["tokens"],
+        position_ids=batch["position_ids"],
+        attention_mask=None,
+    )
+
+
+def gather_records(records, batch_size):
+    group = ps.get_tensor_and_context_parallel_group()
+    sources = [None for _ in range(dist.get_world_size(group))]
+    dist.all_gather_object(sources, records, group=group)
+    samples = []
+    for b in range(batch_size):
+        records = [source[b] for source in sources if source]
+        assert len({record["batch_item_id"] for record in records}) == 1
+        samples.append(
+            {"teacher_shards": records, "batch_item_id": records[0]["batch_item_id"]}
+        )
+    return samples
+
+
+def check_sparse_payload(payload, full_logits, forces, cfg, teacher_index):
+    """Read both forced slots, checking actual-model selected rows and logZ."""
+    requests = (forces >= 0).nonzero()
+    required = forces[requests[:, 0], requests[:, 1], requests[:, 2]]
+    reader = SparseTeacherRowReader(
+        SparseTeacherIPC(payload),
+        device=torch.device("cuda", torch.cuda.current_device()),
+    )
+    values, ids, log_z, membership = reader.gather_rows(
+        requests[:, 0], requests[:, 1], required
+    )
+    values, ids, log_z, membership = (
+        value.cpu() for value in (values, ids, log_z, membership)
+    )
+    real_vocab = cfg["teacher_vocab_sizes"][teacher_index]
+    for row, (batch, position, _) in enumerate(requests.tolist()):
+        raw = full_logits[batch, position, :real_vocab]
+        natural = model_oracle._stable_ids(
+            raw, real_vocab_size=real_vocab, k=cfg["teacher_topk_ipc_k"]
+        )
+        token = int(required[row])
+        support = sorted(natural if token in natural else (*natural[:-1], token))
+        assert ids[row].tolist() == support
+        torch.testing.assert_close(values[row], raw[support], rtol=1e-5, atol=1e-5)
+        torch.testing.assert_close(
+            log_z[row], (raw / cfg["temperature"]).logsumexp(-1), rtol=1e-5, atol=1e-5
+        )
+        membership_ids = model_oracle._stable_ids(
+            raw,
+            real_vocab_size=real_vocab,
+            k=cfg["prefix_bidir_v3_noise_filter_topk"] or cfg["teacher_topk_ipc_k"],
+        )
+        assert bool(membership[row]) == (token in membership_ids)
+    del reader
+    gc.collect()
+    return {
+        "status": "PASS",
+        "requested_forced_slots": int(requests.shape[0]),
+        "rtol": 1e-5,
+        "atol": 1e-5,
+    }
+
+
+def sparse_export(model, data, index, cfg, mbs, storage):
+    from model_oracle import chunks_from_ids
+
+    ids = data[f"teacher_{index}_input_ids"]
+    chunks = chunks_from_ids(
+        data[f"alignment_{index}_student_chunk_id"],
+        data[f"alignment_{index}_teacher_chunk_id"],
+        data[f"alignment_{index}_pair_valid"],
+    )
+    s_spans = torch.tensor([[c.student for c in row] for row in chunks])
+    t_spans = torch.tensor([[c.teacher for c in row] for row in chunks])
+    forces = build_native_force_token_ids(
+        ids,
+        s_spans,
+        t_spans,
+        data[f"alignment_{index}_pair_valid"],
+        kl_chunk_shift=cfg["kl_chunk_shift"],
+        teacher_real_vocab_size=cfg["teacher_vocab_sizes"][index],
+        sample_mask=data["sample_mask"],
+    )
+    if ps.get_tensor_model_parallel_rank() == 0 and storage is None:
+        storage = SparseTeacherStorage.allocate(
+            batch_size=ids.shape[0],
+            local_sequence_length=ids.shape[1] // ps.get_context_parallel_world_size(),
+            k=cfg["teacher_topk_ipc_k"],
+            device=torch.device("cuda", torch.cuda.current_device()),
+        )
+    processor = SparseTeacherLogitsPostProcessor(
+        k=cfg["teacher_topk_ipc_k"],
+        temperature=cfg["temperature"],
+        real_vocab_size=cfg["teacher_vocab_sizes"][index],
+        noise_filter_k=cfg["prefix_bidir_v3_noise_filter_topk"],
+        output_storage=storage,
+    )
+    observations = []
+    with torch.no_grad():
+        for start in range(0, ids.shape[0], mbs):
+            output = forward(model, ids[start : start + mbs])
+            processor(
+                BatchedDataDict(
+                    force_include_token_ids=forces[start : start + mbs].cuda()
+                ),
+                None,
+            )(output)
+            observations.append(oracle_full_logits(output))
+    torch.cuda.synchronize()
+    records = []
+    if storage is not None:
+        storage.export_handles(get_reusable_cuda_ipc_handle)
+        records = [
+            storage.sample_record(
+                sample_index=b,
+                full_sequence_length=ids.shape[1],
+                cp_rank=ps.get_context_parallel_rank(),
+                cp_size=ps.get_context_parallel_world_size(),
+                real_vocab_size=cfg["teacher_vocab_sizes"][index],
+                temperature=cfg["temperature"],
+                membership_k=cfg["prefix_bidir_v3_noise_filter_topk"]
+                or cfg["teacher_topk_ipc_k"],
+            )
+            for b in range(ids.shape[0])
+        ]
+        for b, record in enumerate(records):
+            record["batch_item_id"] = int(data["batch_item_id"][b])
+    payload, observation = (
+        gather_records(records, ids.shape[0]),
+        torch.cat(observations),
+    )
+    payload_check = check_sparse_payload(payload, observation, forces, cfg, index)
+    return payload, observation, storage, payload_check
+
+
+def dense_export(model, ids, mbs, batch_item_ids):
+    """Use the production dense teacher postprocessor and legacy wire layout."""
+    cp, tp = (
+        ps.get_context_parallel_world_size(),
+        ps.get_tensor_model_parallel_world_size(),
+    )
+    cp_rank, tp_rank = (
+        ps.get_context_parallel_rank(),
+        ps.get_tensor_model_parallel_rank(),
+    )
+    processor = FullLogitsPostProcessor(
+        {
+            "sequence_packing": {"enabled": False},
+            "megatron_cfg": {"context_parallel_size": cp},
+        }
+    )
+    observations, rows = [], []
+    with torch.no_grad():
+        for start in range(0, ids.shape[0], mbs):
+            output = forward(model, ids[start : start + mbs])
+            observations.append(oracle_full_logits(output))
+            _, result = processor(
+                BatchedDataDict(input_ids=ids[start : start + mbs].cuda()), None
+            )(output)
+            rows.append(result["full_logits"])
+    backing = allocate_reusable_cuda_tensor(
+        (1, ids.shape[0], ids.shape[1] // cp, rows[0].shape[-1]),
+        dtype=torch.float32,
+        device=torch.device("cuda", torch.cuda.current_device()),
+    )
+    backing[0].copy_(torch.cat(rows))
+    torch.cuda.synchronize()
+    handle = get_reusable_cuda_ipc_handle(backing)
+    width = backing.shape[-1]
+    records = [
+        dict(
+            actual_shape=(ids.shape[1] // cp, width),
+            full_seq_len=ids.shape[1],
+            full_vocab_size=width * tp,
+            global_seq_start=cp_rank * (ids.shape[1] // cp),
+            tp_rank=tp_rank,
+            tp_size=tp,
+            cp_rank=cp_rank,
+            cp_size=cp,
+            vocab_start_index=tp_rank * width,
+            vocab_end_index=(tp_rank + 1) * width,
+            dtype=torch.float32,
+            payload_ipc=handle,
+            buf_idx=0,
+            sample_index_in_buf=b,
+            batch_item_id=int(batch_item_ids[b]),
+        )
+        for b in range(ids.shape[0])
+    ]
+    return gather_records(records, ids.shape[0]), torch.cat(observations), backing
+
+
+def capture_forward_rng():
+    return (
+        torch.get_rng_state(),
+        torch.cuda.get_rng_state(),
+        {
+            name: state.clone()
+            for name, state in get_cuda_rng_tracker().get_states().items()
+        },
+    )
+
+
+def compare_model_gradients(
+    model, logits, actual_gradient, reference_gradient, input_ids, forward_rng
+):
+    """Compare every used parameter gradient before any clipping or update."""
+    # The reference objective already divides by the whole DP step's token or
+    # chunk count. Summing CP-local and DP-local parameter contributions gives
+    # its synchronized gradient; dividing again by DP would change the math.
+    replica_group = ps.get_data_parallel_group(with_context_parallel=True)
+
+    def synchronize_gradients():
+        for parameter in model.parameters():
+            if parameter.grad is not None:
+                dist.all_reduce(parameter.grad, group=replica_group)
+
+    model.zero_grad(set_to_none=True)
+    torch.autograd.backward(logits, actual_gradient)
+    synchronize_gradients()
+    observed = {
+        name: parameter.grad.detach().cpu().clone()
+        for name, parameter in model.named_parameters()
+        if parameter.grad is not None
+    }
+    model.zero_grad(set_to_none=True)
+    # TE2.15 consumes its saved tensor objects on the first backward even when
+    # PyTorch retain_graph=True. Recompute an identical frozen-weight forward
+    # with the original RNG states and assert its logits before the second VJP.
+    cpu_rng, cuda_rng, tracker_rng = forward_rng
+    tracker = get_cuda_rng_tracker()
+    saved_tracker = tracker.get_states()
+    try:
+        with torch.random.fork_rng(devices=[torch.cuda.current_device()]):
+            torch.set_rng_state(cpu_rng)
+            torch.cuda.set_rng_state(cuda_rng)
+            tracker.set_states(tracker_rng)
+            reference_logits = forward(model, input_ids)
+    finally:
+        tracker.set_states(saved_tracker)
+    torch.testing.assert_close(
+        reference_logits.detach(), logits.detach(), rtol=1e-5, atol=1e-5
+    )
+    torch.autograd.backward(reference_logits, reference_gradient)
+    synchronize_gradients()
+    errors = torch.zeros(4, dtype=torch.float64)
+    used = 0
+    for name, parameter in model.named_parameters():
+        if parameter.grad is None:
+            assert name not in observed
+            continue
+        reference = parameter.grad.detach().cpu().float().flatten()
+        actual = observed.pop(name).float().flatten()
+        for begin in range(0, actual.numel(), 1_000_000):
+            a, b = (
+                actual[begin : begin + 1_000_000].double(),
+                reference[begin : begin + 1_000_000].double(),
+            )
+            errors += torch.tensor(
+                [(a - b).square().sum(), a.square().sum(), b.square().sum(), a.numel()]
+            )
+        used += 1
+    assert not observed
+    assert used > 0, "No model parameter gradients were compared"
+    errors = errors.cuda()
+    dist.all_reduce(errors)
+    squared_error, actual_squared, ref_squared, count = errors.cpu().tolist()
+    result = dict(
+        relative_l2=(squared_error / max(ref_squared, 1e-60)) ** 0.5,
+        relative_norm=abs(actual_squared**0.5 - ref_squared**0.5)
+        / max(ref_squared**0.5, 1e-30),
+        reference_norm=ref_squared**0.5,
+        parameter_tensors_per_rank=used,
+        synchronized_cp_dp_group_size=dist.get_world_size(replica_group),
+        synchronization="SUM over CP and DP; objective uses full-step DP denominators",
+        reference_forward="Fresh graph, same frozen weights/input/RNG; logits match rtol=atol=1e-5",
+        compared_elements_including_replicas=int(count),
+    )
+    assert result["relative_l2"] <= 0.02 and result["relative_norm"] <= 0.02, result
+    model.zero_grad(set_to_none=True)
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("case", type=Path)
+    parser.add_argument("--steps", type=int, default=1)
+    parser.add_argument("--fixture-manifest", type=Path)
+    parser.add_argument("--corpus", type=Path)
+    args = parser.parse_args()
+    case = args.case.resolve()
+    validation = Path(__file__).resolve().parent
+    manifest = json.loads(
+        (args.fixture_manifest or validation / "fixture_manifest.json").read_text()
+    )
+    config = yaml.safe_load((case / "resolved_config.yaml").read_text())
+    cfg = dict(config["loss_fn"])
+    teachers = config["teachers"]
+    assert all(t["megatron_cfg"]["enabled"] for t in teachers), (
+        "Mixed-backend exporter requires its separate actual-policy integration harness."
+    )
+    assert cfg["teacher_topk_ipc_k"] > 0 or not any(
+        t["is_cross_tokenizer"] for t in teachers
+    )
+    assert not cfg["prefix_bidir_v3_position_0_kl"], (
+        "Native sparse recipes must disable unsupported position-0 mismatch KL"
+    )
+    roles = [
+        next(
+            role
+            for role, info in manifest["models"].items()
+            if info["snapshot_path"] == t["model_name"]
+        )
+        for t in teachers
+    ]
+    cfg.update(
+        student_vocab_size=manifest["models"]["student"]["real_tokenizer_vocab_size"],
+        teacher_vocab_sizes=[
+            manifest["models"][role]["real_tokenizer_vocab_size"] for role in roles
+        ],
+        teacher_is_cross_tokenizer=[t["is_cross_tokenizer"] for t in teachers],
+        teacher_weights=[t["weight"] for t in teachers],
+        projection_matrix_paths=[None] * len(teachers),
+        pseudo_target_paths=[
+            t.get("aligner", {}).get("pseudo_target_path") for t in teachers
+        ],
+        reverse_pseudo_target_paths=[
+            t.get("aligner", {}).get("reverse_pseudo_target_path") for t in teachers
+        ],
+    )
+    torch.set_num_threads(4)
+    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
+    dist.init_process_group("nccl", timeout=timedelta(minutes=10))
+    tp = config["policy"]["megatron_cfg"]["tensor_model_parallel_size"]
+    cp = config["policy"]["megatron_cfg"]["context_parallel_size"]
+    start = time.monotonic()
+    models = [load_model(t["model_name"], tp, cp).eval() for t in teachers]
+    student = load_model(config["policy"]["model_name"], tp, cp).train()
+    dp_rank, dp_size = ps.get_data_parallel_rank(), ps.get_data_parallel_world_size()
+    placement = [None] * dist.get_world_size()
+    dist.all_gather_object(
+        placement,
+        dict(
+            rank=dist.get_rank(),
+            host=socket.gethostname(),
+            local_device=torch.cuda.current_device(),
+            dp_rank=dp_rank,
+            tp_rank=ps.get_tensor_model_parallel_rank(),
+            cp_rank=ps.get_context_parallel_rank(),
+        ),
+    )
+    for replica in range(dp_size):
+        owners = [entry for entry in placement if entry["dp_rank"] == replica]
+        assert len(owners) == tp * cp
+        assert len({entry["host"] for entry in owners}) == 1, (
+            "An IPC model-parallel group crosses node boundaries",
+            owners,
+        )
+        assert len({entry["local_device"] for entry in owners}) == tp * cp
+    corpus_path = (
+        args.corpus
+        or validation / "runs/fixture-preparation-20261010/collated_corpus.json"
+    )
+    original = json.loads(corpus_path.read_text())["batch"]
+    tensor_data = {
+        k: torch.tensor(
+            v["values"], dtype=getattr(torch, v["dtype"].removeprefix("torch."))
+        )
+        for k, v in original.items()
+        if isinstance(v, dict) and "values" in v
+    }
+    chains = {
+        i: (
+            model_oracle.read_chains(cfg["pseudo_target_paths"][i]),
+            model_oracle.read_chains(cfg["reverse_pseudo_target_paths"][i]),
+        )
+        for i, cross in enumerate(cfg["teacher_is_cross_tokenizer"])
+        if cross
+    }
+    storages = [None] * len(teachers)
+    reports = []
+    loss_fn = CrossTokenizerDistillationLossFn(cfg)
+    for step in range(args.steps):
+        chosen = ((torch.arange(4) + dp_rank * 4 + step * 3) % 16).long()
+        data = {
+            k: v[chosen]
+            for k, v in tensor_data.items()
+            if not k.startswith(("teacher_", "alignment_"))
+        }
+        data["batch_item_id"] = chosen + step * 16
+        for i, role in enumerate(roles):
+            if cfg["teacher_is_cross_tokenizer"][i]:
+                source_index = 0 if role == "teacher_a" else 1
+                for key, value in tensor_data.items():
+                    for prefix in ("teacher_", "alignment_"):
+                        if key.startswith(f"{prefix}{source_index}_"):
+                            data[
+                                key.replace(
+                                    f"{prefix}{source_index}_", f"{prefix}{i}_", 1
+                                )
+                            ] = value[chosen]
+        counts = torch.tensor(
+            [
+                (data["token_mask"][:, 1:] * data["sample_mask"][:, None]).sum(),
+                (data["kd_token_mask"][:, 1:] * data["sample_mask"][:, None]).sum(),
+                *[
+                    (
+                        data[f"alignment_{i}_pair_valid"] * data["sample_mask"][:, None]
+                    ).sum()
+                    if cross
+                    else 0
+                    for i, cross in enumerate(cfg["teacher_is_cross_tokenizer"])
+                ],
+            ],
+            device="cuda",
+            dtype=torch.float32,
+        )
+        dist.all_reduce(counts, group=ps.get_data_parallel_group())
+        token_denominator, kd_denominator, *chunk_values = counts.cpu().tolist()
+        chunk_denominators = {
+            i: value
+            for i, value in enumerate(chunk_values)
+            if cfg["teacher_is_cross_tokenizer"][i]
+        }
+        payloads, teacher_observations, payload_checks = [], [], []
+        dense_owners = []
+        for i, model in enumerate(models):
+            if cfg["teacher_is_cross_tokenizer"][i]:
+                payload, observation, storages[i], payload_check = sparse_export(
+                    model, data, i, cfg, teachers[i]["logprob_batch_size"], storages[i]
+                )
+                payload_checks.append(payload_check)
+            else:
+                payload, observation, owner = dense_export(
+                    model,
+                    data["input_ids"],
+                    teachers[i]["logprob_batch_size"],
+                    data["batch_item_id"],
+                )
+                dense_owners.append(owner)
+                payload_checks.append(
+                    {"status": "DENSE_VALUES_CHECKED_VIA_KL_REFERENCE"}
+                )
+            payloads.append(payload)
+            teacher_observations.append(observation)
+        for begin in (0, 2):
+            local_data = {k: v[begin : begin + 2] for k, v in data.items()}
+            batch = BatchedDataDict({k: v.cuda() for k, v in local_data.items()})
+            for i, cross in enumerate(cfg["teacher_is_cross_tokenizer"]):
+                batch[f"teacher_{i}_{'sparse' if cross else 'full'}_logits_ipc"] = (
+                    payloads[i][begin : begin + 2]
+                )
+            forward_rng = capture_forward_rng()
+            logits = forward(student, local_data["input_ids"])
+            observed_full = oracle_full_logits(logits).requires_grad_()
+            teacher_rows = [raw[begin : begin + 2] for raw in teacher_observations]
+            fixture = model_oracle.sparse_fixture(
+                local_data,
+                observed_full,
+                teacher_rows,
+                cfg,
+                token_denominator,
+                chunk_denominators,
+                chains,
+            )
+            reference_loss, reference_metrics = model_oracle.full_objective(
+                fixture, teacher_rows, local_data, observed_full, cfg, kd_denominator
+            )
+            full_gradient = torch.autograd.grad(reference_loss, observed_full)[0]
+            owned_positions = positions(
+                data["input_ids"].shape[1], ps.get_context_parallel_rank(), cp
+            )
+            vocab_start = ps.get_tensor_model_parallel_rank() * logits.shape[-1]
+            expected_gradient = (
+                full_gradient[
+                    :, owned_positions, vocab_start : vocab_start + logits.shape[-1]
+                ]
+                .contiguous()
+                .cuda()
+            )
+
+            def forbidden(*args, **kwargs):
+                raise AssertionError(
+                    "Native production path reconstructed/relayed a sequence"
+                )
+
+            with ExitStack() as stack:
+                for name in (
+                    "cp_load_balanced_to_contiguous",
+                    "rebuild_teacher_full_logits_from_ipc",
+                    "rebuild_teacher_sparse_logits_from_ipc",
+                    "allgather_cp_contiguous_tensor",
+                ):
+                    stack.enter_context(patch.object(loss_utils, name, forbidden))
+                loss, metrics = wrap_loss_fn_with_input_preparation(
+                    logits,
+                    batch,
+                    torch.tensor(4 * dp_size, device="cuda"),
+                    counts[0],
+                    loss_fn,
+                    partial(
+                        prepare_loss_input,
+                        native_cp_enabled=True,
+                        native_sparse_enabled=True,
+                        native_same_tokenizer_enabled=True,
+                    ),
+                    vocab_parallel_rank=ps.get_tensor_model_parallel_rank(),
+                    vocab_parallel_group=ps.get_tensor_model_parallel_group(),
+                    context_parallel_group=ps.get_context_parallel_group(),
+                    global_valid_kd_toks=counts[1],
+                    global_valid_chunks_by_idx={
+                        i: counts[i + 2] for i in chunk_denominators
+                    },
+                )
+                actual_gradient = torch.autograd.grad(loss, logits, retain_graph=True)[
+                    0
+                ]
+            gradient_error = model_oracle.gradient_errors(
+                actual_gradient, expected_gradient
+            )
+            assert (
+                gradient_error["relative_l2"] <= 0.02
+                and gradient_error["relative_norm"] <= 0.02
+            ), gradient_error
+            cp_loss = loss.detach().clone()
+            dist.all_reduce(cp_loss, group=ps.get_context_parallel_group())
+            torch.testing.assert_close(
+                cp_loss.cpu(), reference_loss.detach(), rtol=0.02, atol=0.005
+            )
+            for name, expected in reference_metrics.items():
+                assert name in metrics, f"Production did not report {name}"
+                actual = torch.as_tensor(metrics[name]).detach().cpu().to(expected)
+                torch.testing.assert_close(
+                    actual,
+                    expected.detach(),
+                    rtol=0.02,
+                    atol=0.005,
+                    msg=lambda message,
+                    name=name: f"Real model metric {name}: {message}",
+                )
+            parameter_error = compare_model_gradients(
+                student,
+                logits,
+                actual_gradient,
+                expected_gradient,
+                local_data["input_ids"],
+                forward_rng,
+            )
+            reports.append(
+                dict(
+                    step=step,
+                    microbatch=begin // 2,
+                    sample_indices=chosen[begin : begin + 2].tolist(),
+                    reference={
+                        k: float(v.detach()) for k, v in reference_metrics.items()
+                    },
+                    production={
+                        k: float(v.detach())
+                        if isinstance(v, torch.Tensor) and v.numel() == 1
+                        else v
+                        for k, v in metrics.items()
+                        if isinstance(v, (int, float))
+                        or isinstance(v, torch.Tensor)
+                        and v.numel() == 1
+                    },
+                    loss_cp_sum=float(cp_loss),
+                    dlogits=gradient_error,
+                    parameter_gradients=parameter_error,
+                    no_relayout_guard="PASS",
+                    teacher_payload_checks=payload_checks,
+                )
+            )
+            del (
+                loss,
+                logits,
+                actual_gradient,
+                expected_gradient,
+                observed_full,
+                full_gradient,
+                batch,
+                fixture,
+            )
+            gc.collect()
+        # Every reader has gone out of scope before reusing the producer buffers.
+        torch.cuda.synchronize()
+        dist.barrier()
+        del payloads, dense_owners
+        gc.collect()
+    result = dict(
+        status="PASS",
+        rank=dist.get_rank(),
+        tp=tp,
+        cp=cp,
+        dp=dp_size,
+        dp_rank=dp_rank,
+        weights_loaded=True,
+        placement=placement,
+        node_local_ipc_groups="PASS; each DP replica's TP/CP producer-consumer group shares one host",
+        elapsed_seconds=time.monotonic() - start,
+        settings_adjustment={},
+        reports=reports,
+        scope="Actual pinned-weight MCore forward and native IPC loss, independent selected-support oracle, all-parameter preclip gradient comparison. Optimizer updates/evaluation are the companion controller run.",
+    )
+    (case / f"reference-rank{dist.get_rank()}.json").write_text(
+        json.dumps(result, indent=2) + "\n"
+    )
+    dist.barrier()
+    storages.clear()
+    gc.collect()
+    torch.cuda.synchronize()
+    ps.destroy_model_parallel()
+    dist.destroy_process_group()
+
+
+if __name__ == "__main__":
+    main()

@@ -2110,8 +2110,9 @@ def export_teacher_logits_and_pack(
     student steps and are released at enclosing train/validation exit or error.
     Shared by the train loop and ``validate`` so the forward+pack sequence can't
     drift between them. ``reusable_dense_ipc`` is an internal capability of the
-    native student consumer; eligible same-tokenizer Megatron teachers retain
-    their dense row layout while exporting explicitly owned reusable handles.
+    native student consumer; eligible Megatron teachers retain their dense row
+    layout while exporting explicitly owned reusable handles to same-tokenizer
+    or legacy cross-tokenizer readers.
     """
     occurrence_ids = batch.get("batch_item_id")
     if batch_uid is not None:
@@ -2204,7 +2205,6 @@ def export_teacher_logits_and_pack(
             packing_side_id=f"teacher_{i}" if packing_plan is not None else None,
             reusable_dense_ipc=(
                 reusable_dense_ipc
-                and same_vocab
                 and packing_plan is None
                 and _supports_native_xtoken_rows(teacher_policy)
             ),

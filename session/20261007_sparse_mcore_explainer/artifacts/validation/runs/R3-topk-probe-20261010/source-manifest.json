@@ -1,0 +1,8 @@
+{
+  "allocation_job_id": "19992100",
+  "scope": "Bounded saved-teacher importance-vector topk probe on GPU7; no model or additional allocation",
+  "file_sha256": {
+    "launcher/driver.sh": "bd1a009de142b1e7fbb8de11dd79f79532c248230bf82a9929846d570266209f",
+    "launcher/probe_same_topk.py": "66edac861ba2a8de222267b42a14893895459b3e60f2506fef63667903619faa"
+  }
+}

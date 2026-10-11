@@ -1,0 +1,24 @@
+{
+  "status": "SCOPED_PASS_PROJECT_BLOCKED_BY_EXISTING_DEPENDENCY_IMPORTS",
+  "project_exit_code": 1,
+  "project_reported_errors": 11,
+  "dependency_issues": [
+    "transfer_queue API missing StorageManagerFactory/mooncake_utils/bootstrap",
+    "fastokens missing",
+    "awscrt auth/io/s3/http missing"
+  ],
+  "reported_error_files_unchanged_since_initial_head": {
+    "nemo_rl/data_plane/adapters/tq_mooncake_checkpoint.py": true,
+    "nemo_rl/data_plane/adapters/transfer_queue.py": true,
+    "nemo_rl/utils/fastokens.py": true,
+    "nemo_rl/utils/weight_transfer_stream.py": true
+  },
+  "initial_head": "da97802f5288e2c372055f01b7c1a5c0ee1647fd",
+  "scoped_exit_code": 0,
+  "scoped_errors_shown": 0,
+  "scoped_file": "nemo_rl/algorithms/x_token/native_same_tokenizer.py",
+  "scoped_sha256": "c4ea66ab4a8ef67e7d2247a6be7b0300c22c61f2778da4ca1fbc7f62373a576b",
+  "command_prefix": "PYTHONPATH='/lustre/fsw/portfolios/coreai/users/avenkateshha/nemo_rl/RL:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/experiments/xtoken-smoke/xtoken-distillation/xtoken-offset-rebased-2n100-20260928-092950/runtime/python' UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline",
+  "project_command": "pyrefly check --config pyrefly.toml --output-format min-text",
+  "scoped_command": "pyrefly check --config pyrefly.toml nemo_rl/algorithms/x_token/native_same_tokenizer.py"
+}

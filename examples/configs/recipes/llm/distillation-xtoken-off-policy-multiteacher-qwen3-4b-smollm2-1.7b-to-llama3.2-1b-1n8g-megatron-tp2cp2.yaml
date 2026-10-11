@@ -1,0 +1,116 @@
+defaults: ../../xtoken_off_policy_distillation.yaml
+
+# Small native sparse MCore integration run: two distinct tokenizer pairs,
+# independent forward/reverse prefix tables, and unequal teacher microbatches.
+# Set XTOKEN_TEXT_DATA to a text corpus (for example JSONL with a "text" field)
+# and set the four XTOKEN_*_TABLE paths below to existing subtoken artifacts.
+# Validation reuses this functional fixture; it is not a held-out quality test.
+distillation:
+  num_prompts_per_step: 8
+  max_num_steps: 3
+  max_num_epochs: 3
+  val_period: 1
+  val_at_start: true
+  val_at_end: true
+
+loss_fn:
+  teacher_topk_ipc_k: 64
+  common_indices_from_subtoks: true
+  kl_chunk_shift: true
+  dynamic_loss_scaling: false
+
+policy:
+  train_global_batch_size: 8
+  train_micro_batch_size: 2
+  logprob_batch_size: 2
+  max_total_sequence_length: 256
+  make_sequence_length_divisible_by: 8
+  logprob_chunk_size: 64
+  dtensor_cfg:
+    enabled: false
+  optimizer: null
+  scheduler: null
+  megatron_cfg:
+    enabled: true
+    tensor_model_parallel_size: 2
+    context_parallel_size: 2
+    optimizer:
+      lr: 1.0e-6
+      min_lr: 1.0e-6
+    scheduler:
+      lr_warmup_iters: 0
+      lr_warmup_init: 1.0e-6
+
+# OmegaConf replaces teacher lists wholesale. Each entry supplies all required
+# policy fields; shared backend/static-batching blocks resolve from the student.
+teachers:
+  - model_name: Qwen/Qwen3-4B
+    tokenizer:
+      name: Qwen/Qwen3-4B
+    is_cross_tokenizer: true
+    aligner:
+      projection_matrix_path: null
+      pseudo_target_path: ${oc.env:XTOKEN_QWEN_FORWARD_TABLE}
+      reverse_pseudo_target_path: ${oc.env:XTOKEN_QWEN_REVERSE_TABLE}
+    weight: 0.3
+    train_global_batch_size: ${policy.train_global_batch_size}
+    train_micro_batch_size: 1
+    logprob_batch_size: 1
+    max_total_sequence_length: ${policy.max_total_sequence_length}
+    make_sequence_length_divisible_by: ${policy.make_sequence_length_divisible_by}
+    precision: ${policy.precision}
+    logprob_chunk_size: ${policy.logprob_chunk_size}
+    offload_optimizer_for_logprob: false
+    dtensor_cfg: ${policy.dtensor_cfg}
+    megatron_cfg: ${policy.megatron_cfg}
+    max_grad_norm: ${policy.max_grad_norm}
+    dynamic_batching: ${policy.dynamic_batching}
+    sequence_packing: ${policy.sequence_packing}
+    optimizer: null
+    scheduler: null
+  - model_name: HuggingFaceTB/SmolLM2-1.7B
+    tokenizer:
+      name: HuggingFaceTB/SmolLM2-1.7B
+    is_cross_tokenizer: true
+    aligner:
+      projection_matrix_path: null
+      pseudo_target_path: ${oc.env:XTOKEN_SMOLLM_FORWARD_TABLE}
+      reverse_pseudo_target_path: ${oc.env:XTOKEN_SMOLLM_REVERSE_TABLE}
+    weight: 0.7
+    train_global_batch_size: ${policy.train_global_batch_size}
+    train_micro_batch_size: 2
+    logprob_batch_size: 2
+    max_total_sequence_length: ${policy.max_total_sequence_length}
+    make_sequence_length_divisible_by: ${policy.make_sequence_length_divisible_by}
+    precision: ${policy.precision}
+    logprob_chunk_size: ${policy.logprob_chunk_size}
+    offload_optimizer_for_logprob: false
+    dtensor_cfg: ${policy.dtensor_cfg}
+    megatron_cfg: ${policy.megatron_cfg}
+    max_grad_norm: ${policy.max_grad_norm}
+    dynamic_batching: ${policy.dynamic_batching}
+    sequence_packing: ${policy.sequence_packing}
+    optimizer: null
+    scheduler: null
+
+data:
+  max_input_seq_length: 256
+  num_workers: 0
+  train:
+    data_files: ${oc.env:XTOKEN_TEXT_DATA}
+    characters_per_sample: null
+    split_validation_size: 0.0
+    seed: 42
+  validation:
+    dataset_name: arrow_text
+    processor: kd_data_processor
+    data_files: ${oc.env:XTOKEN_TEXT_DATA}
+    split: train
+    text_key: text
+    characters_per_sample: null
+    split_validation_size: 0.0
+    seed: 42
+logger:
+  log_dir: logs/distillation-xtoken-off-policy-multiteacher-qwen3-4b-smollm2-1.7b-to-llama3.2-1b-1n8g-megatron-tp2cp2
+  tensorboard_enabled: true
+  monitor_gpus: false

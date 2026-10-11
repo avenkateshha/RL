@@ -1,0 +1,40 @@
+{
+  "status": "PASS",
+  "checks": [
+    "ruff check",
+    "ruff check --select I",
+    "ruff format --check",
+    "git diff --check"
+  ],
+  "command_prefix": "UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline",
+  "files": [
+    "nemo_rl/algorithms/x_token/loss_utils.py",
+    "nemo_rl/algorithms/x_token/native_same_tokenizer.py",
+    "nemo_rl/algorithms/xtoken_off_policy_distillation.py",
+    "nemo_rl/distributed/worker_groups.py",
+    "nemo_rl/models/policy/lm_policy.py",
+    "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py",
+    "nemo_rl/models/policy/workers/megatron_policy_worker.py",
+    "tests/unit/algorithms/x_token/test_native_same_tokenizer.py",
+    "tests/unit/algorithms/x_token/test_xtoken_off_policy_distillation.py",
+    "tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py",
+    "tests/unit/distributed/test_process_lifetime.py",
+    "tests/unit/models/policy/test_dtensor_sparse_ipc.py"
+  ],
+  "source_sha256": {
+    "nemo_rl/algorithms/x_token/loss_utils.py": "3dc38e79454a285d84ef55a1db6d25464ab4233c2ae6db6cbea237f5a1533879",
+    "nemo_rl/algorithms/x_token/native_same_tokenizer.py": "c4ea66ab4a8ef67e7d2247a6be7b0300c22c61f2778da4ca1fbc7f62373a576b",
+    "nemo_rl/algorithms/xtoken_off_policy_distillation.py": "c508ec7b728ba1a345e7ef512c0e32af25e654f41087464a929567df4de703ef",
+    "nemo_rl/distributed/worker_groups.py": "f61cc928ff54f296413ebdd27afa02e8cf2955605947f21e4efbb6a92cb696af",
+    "nemo_rl/models/policy/lm_policy.py": "332c4b1f09f8f155d958bd29ee68ee430bc8b3d2f0316b87599c4868e545d988",
+    "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py": "958db36cafeec75a0ab714886aa38cb52be54f9c9ecf7f728ace0e8c3a0677fd",
+    "nemo_rl/models/policy/workers/megatron_policy_worker.py": "c3aacd7038eb135ec07334a2577de19097f1dd2a4b1d6cd883c49c08c657ad8b",
+    "tests/unit/algorithms/x_token/test_native_same_tokenizer.py": "d3c0235dbced0b87b46083c1f19534bfd65207a6c3b9fbb8e3b27b8771dca105",
+    "tests/unit/algorithms/x_token/test_xtoken_off_policy_distillation.py": "82801d771a65145b8ab89a0202334248c6a0da7dab13c9cd2413bc940bda4862",
+    "tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py": "59f2dff690582af46ea3c25bec3f746d232b35327fc694bf3473135ba2832f88",
+    "tests/unit/distributed/test_process_lifetime.py": "d68f5479c849c676e3a517ec9a8256d1b7299c05dbb034eba0ea6b18edac084e",
+    "tests/unit/models/policy/test_dtensor_sparse_ipc.py": "79906a9dcc2122dae357f855d8ab37ec4f0ca8eeac9b981c1597b31a3723bef9"
+  },
+  "review": "Independent functional reviews report no actionable issue. The final change reorders only imports in the two policy workers; runtime is frozen on these bytes for remaining matrix cases.",
+  "type_check_result": "See ../checkpoint5-types-20261010/results.json; scoped pass, project dependency-import failures remain."
+}

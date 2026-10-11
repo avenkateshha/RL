@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "status": "FIXTURES_AND_MCORE_FORWARD_VERIFIED_INTEGRATION_PENDING",
+  "recorded_date": "2026-10-10",
+  "repo_head": "da97802f5288e2c372055f01b7c1a5c0ee1647fd",
+  "reference_commit": "5acd78e948d2bc9061255e4d0474ed3aa1d9586b",
+  "models": {
+    "student": {
+      "model_id": "meta-llama/Llama-3.2-1B",
+      "revision": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "snapshot_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "real_tokenizer_vocab_size": 128256,
+      "config_architectures": [
+        "LlamaForCausalLM"
+      ],
+      "fingerprints": {
+        "config.json": "bfb5d39c327ee5c3a65e3574596ff30b052a445cfc59a25bdf3b4c0c5a44f4d2",
+        "tokenizer.json": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+        "tokenizer_config.json": "8004530facf809ac432114de2a4dcc65fcb632da5ec16d666091aeb6a2ee444a"
+      },
+      "file_presence_verified": true,
+      "model_weights_loaded": true,
+      "runtime_conversion_forward_status": "PASS_TP2_CP2_PP1_NATIVE_FORWARD",
+      "runtime_conversion_forward_artifact": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/student-model-forward.json"
+    },
+    "teacher_a": {
+      "model_id": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "snapshot_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "real_tokenizer_vocab_size": 151669,
+      "config_architectures": [
+        "Qwen3ForCausalLM"
+      ],
+      "fingerprints": {
+        "config.json": "8ba006f74fecfaaeb392872a60f4a480e7ec9860153d2e1b769ec81f9a147f8a",
+        "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101"
+      },
+      "file_presence_verified": true,
+      "model_weights_loaded": true,
+      "runtime_conversion_forward_status": "PASS_TP2_CP2_PP1_NATIVE_FORWARD",
+      "runtime_conversion_forward_artifact": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_a-model-forward.json",
+      "dtensor_runtime_forward_export_status": "PASS_TP2_CP2_DP1_REAL_FORWARD_AND_SINGLE_FRESH_CONSUMER",
+      "dtensor_runtime_forward_export_artifact": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/results.json"
+    },
+    "teacher_b": {
+      "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+      "revision": "effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "snapshot_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+      "real_tokenizer_vocab_size": 49152,
+      "config_architectures": [
+        "LlamaForCausalLM"
+      ],
+      "fingerprints": {
+        "config.json": "33397f6af8090f7290f27ce6fb1cd23a95fd0915a5c648dfd10b6002aaf7fc48",
+        "tokenizer.json": "9ca9acddb6525a194ec8ac7a87f24fbba7232a9a15ffa1af0c1224fcd888e47c",
+        "tokenizer_config.json": "4bb9af56a342753d39374f4016a16574cab299fe088e896f425ce3c433f61424"
+      },
+      "file_presence_verified": true,
+      "model_weights_loaded": true,
+      "runtime_conversion_forward_status": "PASS_TP2_CP2_PP1_NATIVE_FORWARD",
+      "runtime_conversion_forward_artifact": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_b-model-forward.json",
+      "dtensor_runtime_forward_export_status": "PASS_TP2_CP2_DP1_REAL_FORWARD_AND_SINGLE_FRESH_CONSUMER",
+      "dtensor_runtime_forward_export_artifact": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-dtensor-consumers-20261010/results.json"
+    },
+    "teacher_c_same_tokenizer": {
+      "model_id": "meta-llama/Llama-3.2-3B",
+      "revision": "13afe5124825b4f3751f836b40dafda64c1ed062",
+      "snapshot_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062",
+      "real_tokenizer_vocab_size": 128256,
+      "config_architectures": [
+        "LlamaForCausalLM"
+      ],
+      "fingerprints": {
+        "config.json": "35f063e9f381e8678eea34bc56c3ecef3c6d10149f6b2cbdf27b8ee1bad3073d",
+        "tokenizer.json": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+        "tokenizer_config.json": "8004530facf809ac432114de2a4dcc65fcb632da5ec16d666091aeb6a2ee444a"
+      },
+      "file_presence_verified": true,
+      "model_weights_loaded": true,
+      "runtime_conversion_forward_status": "PASS_TP2_CP2_PP1_NATIVE_FORWARD",
+      "runtime_conversion_forward_artifact": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-model-smoke-20261010/teacher_c_same_tokenizer-model-forward.json"
+    }
+  },
+  "plaintext_corpus": {
+    "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/examples.jsonl",
+    "sha256": "276efc1feddf2eda873de5c7fcffd8e4af6bb50041973a60667114ccbe04666a",
+    "records": 16,
+    "status": "PRODUCTION_TEXT_COLLATOR_VERIFIED",
+    "dataset_adapter_and_masks": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/collated_corpus.json"
+  },
+  "tables": {
+    "teacher_a": [
+      {
+        "direction": "fwd",
+        "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/guihongl/nemo_rl_mcore/projection/subtoks_llama3p2_1b_qwen3_4b_fwd.pt",
+        "sha256": "2863369b43f250983b5109b5bd8c367503c24dbd98ceac6ae6233cce49d400ac",
+        "n_max": 8,
+        "status": "EXACT_PINNED_TOKENIZER_ROWS_VALIDATED",
+        "source_tokenizer_revision_recorded_by_original_builder": false,
+        "validation_result": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/results.json",
+        "source_model_role": "student",
+        "target_model_role": "teacher_a"
+      },
+      {
+        "direction": "rev",
+        "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/guihongl/nemo_rl_mcore/projection/subtoks_llama3p2_1b_qwen3_4b_rev.pt",
+        "sha256": "bf2401d4a00e27b070f9a3c512bd2b081305f0ae716c149ad1b626361e2cc76f",
+        "n_max": 8,
+        "status": "EXACT_PINNED_TOKENIZER_ROWS_VALIDATED",
+        "source_tokenizer_revision_recorded_by_original_builder": false,
+        "validation_result": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/results.json",
+        "source_model_role": "teacher_a",
+        "target_model_role": "student"
+      }
+    ],
+    "teacher_b": [
+      {
+        "direction": "fwd",
+        "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/tables/subtoks_llama3p2_1b_smollm2_1p7b_fwd.pt",
+        "sha256": "cea74664f31b8fa7ef93ec20392964e8a181761757f179fb2d6799e8747b24ed",
+        "status": "EXACT_PINNED_TOKENIZER_ROWS_VALIDATED",
+        "n_max": 8,
+        "source_model_role": "student",
+        "target_model_role": "teacher_b",
+        "builder_argv": [
+          "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/examples/xtoken_mcore_tpcp/build_subtoks_table.py",
+          "--src",
+          "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08",
+          "--dst",
+          "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "--N_max",
+          "8",
+          "--out",
+          "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/tables/subtoks_llama3p2_1b_smollm2_1p7b_fwd.pt"
+        ],
+        "validation_result": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/results.json"
+      },
+      {
+        "direction": "rev",
+        "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/tables/subtoks_llama3p2_1b_smollm2_1p7b_rev.pt",
+        "sha256": "9e5eb1c9e0ce5b26092df622df2f1d31d00101ba54478977b22c3d40b53000f2",
+        "status": "EXACT_PINNED_TOKENIZER_ROWS_VALIDATED",
+        "n_max": 8,
+        "source_model_role": "teacher_b",
+        "target_model_role": "student",
+        "builder_argv": [
+          "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/examples/xtoken_mcore_tpcp/build_subtoks_table.py",
+          "--src",
+          "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "--dst",
+          "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08",
+          "--N_max",
+          "8",
+          "--out",
+          "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixtures/tables/subtoks_llama3p2_1b_smollm2_1p7b_rev.pt"
+        ],
+        "validation_result": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/results.json"
+      }
+    ],
+    "teacher_c_same_tokenizer": []
+  },
+  "table_builder": {
+    "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/examples/xtoken_mcore_tpcp/build_subtoks_table.py",
+    "sha256": "1b6314ce7ef39dcde749436fcd94cca96cab51f278acf3c514fc2aeaea81e4ca",
+    "mode": "CPU tokenizer-only; offline exact snapshots; both directions; default exact-match/special-role/canonicalization settings recorded by builder",
+    "executed": true
+  },
+  "real_model_test_defaults": {
+    "seed": 1234,
+    "sparse_k": 64,
+    "max_sequence_tokens_per_model": 256,
+    "student_micro_batch_size": 2,
+    "teacher_a_micro_batch_size": 1,
+    "teacher_b_micro_batch_size": 2,
+    "teacher_c_micro_batch_size": 2,
+    "student_microbatches_per_dp_step": 2,
+    "global_batch_size": "4 * DP",
+    "optimizer_steps": 3,
+    "evaluate": true,
+    "teacher_weights": [
+      0.3,
+      0.7
+    ],
+    "pipeline_parallel_size": 1,
+    "sequence_packing": false,
+    "dynamic_scaling_variants": [
+      false,
+      true
+    ],
+    "teacher_b_padding_note": "Existing make_sequence_length_divisible_by=TP*CP*4 for teacherB (16 atTP2CP2); other sides useTP*CP*2 (8). Fixed16text collator pads student/Qwen to24 and SmolLM2 to32.",
+    "sparse_objective_settings": {
+      "prefix_bidir_v3_position_0_kl": false,
+      "prefix_bidir_v3_mismatch_pos0_alpha": 0.0,
+      "prefix_bidir_v3_mismatch_loss_beta": 1.0,
+      "reason": "Native sparse supported objective, as required by plan; dense legacy R6 retains exemplar position-zero behavior."
+    },
+    "R1_topology": "DP1 fixed acrossTP/CP=(1,1),(2,1),(1,2),(2,2), using1,2,2,4 GPUs respectively"
+  },
+  "pending_before_runtime_validation": [
+    "Complete implementation checkpoints through4b and run R1-R6 with loss/reference/preclip-gradient, IPC lifetime and no-relayout evidence."
+  ],
+  "results": "Pinned tokenizer tables and production corpus collation passed. All4 exact pinned weights converted and ran finite native MCore TP2/CP2/PP1 forwards, B1/T32. Full R1-R6 integration remains NOT_RUN."
+}

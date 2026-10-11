@@ -1,0 +1,191 @@
+"""Test-only post-controller process-exit proof and closed actor-log snapshot.
+
+Retain ordinary Policy instances until the successful controller returns. Then
+use their actual cleanup and existing OS process observers, student first, and
+copy Ray logs after worker exit. Training and its IPC lifetime context are not
+replaced. This helper is never invoked for teardown after a failed controller.
+"""
+
+from functools import wraps
+import inspect
+import json
+from pathlib import Path
+
+
+class ControllerTeardown:
+    def __init__(self, run: Path):
+        self.run = run
+        self.policies = []
+        self.reports = []
+        self.policy_class = None
+        self.original_initialize = None
+
+    def install(self):
+        from nemo_rl.models.policy.lm_policy import Policy
+
+        original = Policy.__init__
+        signature = inspect.signature(original)
+
+        @wraps(original)
+        def initialize(policy, *args, **kwargs):
+            bound = signature.bind(policy, *args, **kwargs)
+            bound.apply_defaults()
+            original(policy, *args, **kwargs)
+            self.policies.append(
+                (
+                    policy,
+                    bound.arguments["name_prefix"],
+                    str(bound.arguments["config"]["model_name"]),
+                )
+            )
+
+        Policy.__init__ = initialize
+        self.policy_class = Policy
+        self.original_initialize = original
+
+    def verify_and_shutdown(self):
+        errors = []
+        try:
+            assert self.policies, "No actual policies were recorded"
+            ordered = sorted(self.policies, key=lambda item: item[1] != "student")
+            for policy, name, model in ordered:
+                group = policy.worker_group
+                report = {
+                    "policy": name,
+                    "model_name": model,
+                    "workers": len(group.workers),
+                    "os_identity_captured": False,
+                    "actual_backend_cleanup": False,
+                    "os_process_exit_confirmed": False,
+                    "errors": [],
+                }
+                # The successful training invocation has already completed all
+                # consumers and its original IPC lifetime context. Attempt every
+                # policy's cleanup even when one teardown verification fails.
+                try:
+                    assert report["workers"] > 0, (
+                        "Workers exited before identity capture"
+                    )
+                    group.record_worker_processes(timeout=30.0)
+                    report["os_identity_captured"] = True
+                except Exception as error:
+                    report["errors"].append(
+                        f"identity capture: {type(error).__name__}: {error}"
+                    )
+                try:
+                    report["actual_backend_cleanup"] = bool(policy.shutdown())
+                except Exception as error:
+                    report["errors"].append(
+                        f"backend cleanup: {type(error).__name__}: {error}"
+                    )
+                finally:
+                    try:
+                        report["os_process_exit_confirmed"] = bool(
+                            group.shutdown(wait_for_termination=True, timeout=30.0)
+                        )
+                    except Exception as error:
+                        report["errors"].append(
+                            f"OS exit wait: {type(error).__name__}: {error}"
+                        )
+                self.reports.append(report)
+                try:
+                    self._write_result()
+                except OSError as error:
+                    report["errors"].append(
+                        f"report write: {type(error).__name__}: {error}"
+                    )
+                if not (
+                    report["os_identity_captured"]
+                    and report["actual_backend_cleanup"]
+                    and report["os_process_exit_confirmed"]
+                    and not report["errors"]
+                ):
+                    errors.append(report)
+        finally:
+            self.restore()
+        assert not errors, errors
+
+    def restore(self):
+        """Restore initialization even when the controller raised before teardown."""
+        if self.policy_class is not None:
+            assert self.original_initialize is not None
+            self.policy_class.__init__ = self.original_initialize
+
+    def _write_result(self):
+        result = {
+            "status": "PASS"
+            if len(self.reports) == len(self.policies)
+            and all(
+                item["os_identity_captured"]
+                and item["actual_backend_cleanup"]
+                and item["os_process_exit_confirmed"]
+                and not item["errors"]
+                for item in self.reports
+            )
+            else "INCOMPLETE",
+            "scope": "Successful actual controller returned from its IPC lifetime context; explicit original backend cleanup then existing node-pinned OS process-exit observer, student before teachers",
+            "policies": self.reports,
+        }
+        (self.run / "controller-process-exit.json").write_text(
+            json.dumps(result, indent=2) + "\n"
+        )
+
+    def copy_ray_logs(self):
+        import ray
+        from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
+        def snapshot_node(run_path, node_id):
+            from pathlib import Path
+            import shutil
+
+            destination = Path(run_path) / "ray-final-logs" / node_id
+            sessions = []
+            actor_stderr_files = []
+            for session in sorted(Path("/tmp/ray").glob("session_[0-9]*")):
+                source = session / "logs"
+                if not source.is_dir():
+                    continue
+                target = destination / session.name
+                shutil.copytree(source, target, dirs_exist_ok=True)
+                sessions.append(session.name)
+                actor_stderr_files.extend(
+                    str(path.relative_to(Path(run_path)))
+                    for path in target.glob("worker-*.err")
+                )
+            return {
+                "node_id": node_id,
+                "sessions": sessions,
+                "actor_stderr_files": actor_stderr_files,
+            }
+
+        if ray.is_initialized():
+            task = ray.remote(num_cpus=0, max_retries=0)(snapshot_node)
+            refs = [
+                task.options(
+                    scheduling_strategy=NodeAffinitySchedulingStrategy(
+                        node["NodeID"], soft=False
+                    )
+                ).remote(str(self.run), node["NodeID"])
+                for node in ray.nodes()
+                if node["Alive"]
+            ]
+            nodes = ray.get(refs, timeout=30.0)
+        else:
+            nodes = [snapshot_node(str(self.run), "local-ray-not-initialized")]
+        process_report = self.run / "controller-process-exit.json"
+        exits_confirmed = (
+            process_report.exists()
+            and json.loads(process_report.read_text())["status"] == "PASS"
+        )
+        (self.run / "ray-log-snapshot.json").write_text(
+            json.dumps(
+                {
+                    "scope": "Node-pinned copies from every live Ray node; post-worker-exit only when exits_confirmed=true. Stderr absence does not prove CUDA IPC counter validity.",
+                    "exits_confirmed": exits_confirmed,
+                    "nodes": nodes,
+                    "process_exit_report": str(process_report),
+                },
+                indent=2,
+            )
+            + "\n"
+        )

@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "scope": "Successful actual controller returned from its IPC lifetime context; explicit original backend cleanup then existing node-pinned OS process-exit observer, student before teachers",
+  "policies": [
+    {
+      "policy": "student",
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08",
+      "workers": 2,
+      "os_identity_captured": true,
+      "actual_backend_cleanup": true,
+      "os_process_exit_confirmed": true,
+      "errors": []
+    },
+    {
+      "policy": "teacher_0",
+      "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+      "workers": 2,
+      "os_identity_captured": true,
+      "actual_backend_cleanup": true,
+      "os_process_exit_confirmed": true,
+      "errors": []
+    }
+  ]
+}

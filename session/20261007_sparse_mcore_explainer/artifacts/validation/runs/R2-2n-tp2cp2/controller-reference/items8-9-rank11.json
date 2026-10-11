@@ -1,0 +1,60 @@
+{
+  "status": "PASS",
+  "rank": 11,
+  "dp_rank": 2,
+  "tp_rank": 1,
+  "cp_rank": 1,
+  "item_ids": [
+    8,
+    9
+  ],
+  "teacher_backends": [
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ],
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ]
+  ],
+  "legacy_sparse_teacher_indices": [],
+  "legacy_dense_teacher_indices": [],
+  "native_sparse_teacher_indices": [
+    0,
+    1
+  ],
+  "native_dense_teacher_indices": [],
+  "production_layout_calls": {
+    "cp_load_balanced_to_contiguous": 0,
+    "rebuild_teacher_sparse_logits_from_ipc": 0,
+    "rebuild_teacher_full_logits_from_ipc": 0,
+    "allgather_cp_contiguous_tensor": 0
+  },
+  "token_denominator": 192.0,
+  "kd_denominator": 192.0,
+  "chunk_denominators": {
+    "0": 370.0,
+    "1": 485.0
+  },
+  "reference_metrics": {
+    "loss": 0.09893718361854553,
+    "ce_loss": 0.5551174283027649,
+    "kl_loss": 0.04342544078826904,
+    "kl_loss_scale": 1.0,
+    "accuracy": 0.1666666716337204,
+    "kl_loss_t0": 0.06769344210624695,
+    "kl_loss_t1": 0.0330248661339283,
+    "teacher_0/weighted_kl": 0.020308032631874084,
+    "teacher_1/weighted_kl": 0.02311740629374981
+  },
+  "dlogits": {
+    "relative_l2": 1.0187906566804495e-05,
+    "relative_norm": 1.7572048501749516e-06,
+    "absolute_l2": 7.890078270489578e-10,
+    "reference_norm": 7.744553033297354e-05,
+    "max_absolute": 5.638867150992155e-10
+  },
+  "gradient_kind": "actual controller loss dlogits before MCore schedule scaling and clipping",
+  "reference_kind": "Independent native teacher oracle plus retained CP1 legacy objective on identical full-sequence dense/sparse teacher values; independent CE and aggregation",
+  "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/controller-reference/items8-9-rank11.pt",
+  "capture_sha256": "d3a067792938a267e545cf57fe5a054ac25d3e84e0de30162c75389b9f2f205e"
+}

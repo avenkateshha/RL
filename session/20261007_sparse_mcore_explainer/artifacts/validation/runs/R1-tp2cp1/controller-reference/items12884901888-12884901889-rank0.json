@@ -1,0 +1,46 @@
+{
+  "status": "PASS",
+  "rank": 0,
+  "dp_rank": 0,
+  "tp_rank": 0,
+  "cp_rank": 0,
+  "item_ids": [
+    12884901888,
+    12884901889
+  ],
+  "teacher_backends": [
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ]
+  ],
+  "legacy_sparse_teacher_indices": [],
+  "native_sparse_teacher_indices": [
+    0
+  ],
+  "native_dense_teacher_indices": [],
+  "production_layout_calls": {
+    "cp_load_balanced_to_contiguous": 0,
+    "rebuild_teacher_sparse_logits_from_ipc": 0,
+    "rebuild_teacher_full_logits_from_ipc": 0,
+    "allgather_cp_contiguous_tensor": 0
+  },
+  "token_denominator": 46.0,
+  "kd_denominator": 46.0,
+  "chunk_denominators": {
+    "0": 80.0
+  },
+  "reference_metrics": {
+    "loss": 0.6522693037986755,
+    "ce_loss": 2.092810869216919,
+    "kl_loss": 0.44298821687698364,
+    "kl_loss_scale": 1.0,
+    "accuracy": 0.2916666567325592,
+    "kl_loss_t0": 0.44298821687698364,
+    "teacher_0/weighted_kl": 0.44298821687698364
+  },
+  "dlogits": null,
+  "gradient_kind": "actual controller loss dlogits before MCore schedule scaling and clipping",
+  "reference_kind": "Independent native teacher oracle plus retained CP1 legacy objective on identical full-sequence sparse exports; independent CE and aggregation",
+  "capture_path": null,
+  "capture_sha256": null
+}

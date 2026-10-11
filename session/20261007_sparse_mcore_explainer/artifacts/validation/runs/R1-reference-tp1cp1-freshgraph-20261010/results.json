@@ -1,0 +1,23 @@
+{
+  "status": "PASS_REFERENCE_ONLY",
+  "job_id": "19991170",
+  "slurm_state": "COMPLETED",
+  "exit_code": "0:0",
+  "elapsed": "00:03:10",
+  "checkpoint": "fcc943c5eab4690a4faa1892d80b9d56cb8d1564",
+  "source_checks_before_after": "PASS",
+  "owned_launcher_config_fixture_checks_before_after": "PASS",
+  "microbatches": 2,
+  "all_parameter_tensors_per_rank": 98,
+  "student_parameters_compared_per_microbatch": 1235814400,
+  "max_dlogits_relative_l2": 3.620161929210101e-05,
+  "max_parameter_gradient_relative_l2": 0.008299292945648035,
+  "max_parameter_gradient_relative_norm": 0.0015170563257958499,
+  "gradient_tolerance": 0.02,
+  "scope": "Actual pinned MCore teacher/student forwards; native raw IPC payload and guarded sparse objective; independent loss/CE/per-teacher KD/dlogits and all-parameter bare-MCore VJP per microbatch. This does not yet verify actual DDP accumulated optimizer preclip gradients or controller updates/evaluation. Those require the instrumented controller and first-step optimizer replay.",
+  "reference_forward": "Fresh deterministic student graph for each VJP; same inputs, frozen weights and restored RNG, logits match rtol=atol=1e-5.",
+  "first_failures_preserved": [
+    "R1-reference-tp1cp1-20261010",
+    "R1-reference-tp1cp1-devicefix-20261010"
+  ]
+}

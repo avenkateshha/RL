@@ -1,0 +1,575 @@
+{
+  "status": "PASS_METADATA_AUDIT",
+  "scope": "Read-only documentation correction. Every original runtime/config remains byte-identical; this audit does not establish numerical acceptance.",
+  "method": "Compare generic preparation metadata against each resolved configuration and the pinned SmolLM2 fixture identity.",
+  "runs": [
+    {
+      "run": "R1-optimizer-replay-tp1cp1-20261010",
+      "runtime_sha256": "af735bce151d66675d0a3ba32be147b7bc4c366eb79402b2887612841a867478",
+      "resolved_config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 4,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 2
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R1-reference-tp1cp1-20261010",
+      "runtime_sha256": "a470adfb0250c77f25aa85a7c490eeb660e0ac517d7db8a578fb04cc02f8066e",
+      "resolved_config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 4,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 2
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R1-reference-tp1cp1-devicefix-20261010",
+      "runtime_sha256": "a470adfb0250c77f25aa85a7c490eeb660e0ac517d7db8a578fb04cc02f8066e",
+      "resolved_config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 4,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 2
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R1-reference-tp1cp1-freshgraph-20261010",
+      "runtime_sha256": "a470adfb0250c77f25aa85a7c490eeb660e0ac517d7db8a578fb04cc02f8066e",
+      "resolved_config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 4,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 2
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R1-reference-tp2cp2-20261010",
+      "runtime_sha256": "2ccf94e85e651a36acc90c9545dcab694d0bdf717fc1366562ade67167a0f25a",
+      "resolved_config_sha256": "7b96b8640146e2656f09242b75f9d0693ab2e7d76b9a729cf533df603c3f3b48",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R1-tp1cp1",
+      "runtime_sha256": "af735bce151d66675d0a3ba32be147b7bc4c366eb79402b2887612841a867478",
+      "resolved_config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 4,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 2
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R1-tp1cp2",
+      "runtime_sha256": "14adf6a5be2bfff6643a76ec3f05cca4773e1c418a6220c4de1e4a1ed1de2e71",
+      "resolved_config_sha256": "eba6dd7dae9aa10e3d8d3232aac81add1537728efad2fe2d28b167acd9df1d70",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 8,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 4
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R1-tp2cp1",
+      "runtime_sha256": "6c8418220dcc6ab6ba3d6200806864e1967752bb7c50d85c955b02144e0e9502",
+      "resolved_config_sha256": "6cd935b2d1f73e799934a0b2a7c5d566dbe9dceff88e2849a171a8c1df5f5c7f",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 8,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 4
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R1-tp2cp2",
+      "runtime_sha256": "5439ed4d33546b309726fe3c4bd170b43d31c5a6772768055fd9ee0b87aec22c",
+      "resolved_config_sha256": "7b96b8640146e2656f09242b75f9d0693ab2e7d76b9a729cf533df603c3f3b48",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R2-2n-optimizer-replay-20261010",
+      "runtime_sha256": "5e24a57dfb04aac7497869503fad9e96889afa0f73fdeb5b717983ca255dce6c",
+      "resolved_config_sha256": "30d13fed6dbd8d85b2c5865444ce0369abf663761307854e7c83abb5f742e029",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R2-2n-tp2cp2",
+      "runtime_sha256": "c74fe9d19de1dea123ff07e52b01f93f39b88fa4825a454c4d76018e5bf225ce",
+      "resolved_config_sha256": "30d13fed6dbd8d85b2c5865444ce0369abf663761307854e7c83abb5f742e029",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R2-tp2cp2",
+      "runtime_sha256": "4d4f243ed2d5058ab57d19b4c2edfa241e46de164c69d86f997a68a828be9f0e",
+      "resolved_config_sha256": "eb9b0106b46172e51083f531df9f25db3a533e11af4710eadb7b9ed06002e498",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R2-tp2cp2-reversed",
+      "runtime_sha256": "ba0c87ad575816c7a52f665b73118a4b3c251f91c4cb74037de5ee949b083636",
+      "resolved_config_sha256": "78846ed13a5f649c46e416278ab8bc296261bfc8eea9e5b0743679b890f0639e",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R3-dynamic",
+      "runtime_sha256": "c10250bc1a54797668614c55ad245c7208d838694eaf7d938942a9d313060407",
+      "resolved_config_sha256": "06e18f24b782eb9b51f24bd62f63cc428632a040d3e3bb3fe2931f7371c36831",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R3-fixed",
+      "runtime_sha256": "5bf99eb68cc5429db946d536bc3a6665104dad23a862635e1b47890d94c0e96a",
+      "resolved_config_sha256": "62babf08aca8003ed268d2216e712590b53c388934a8449330bb759d6b20b8ff",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R3-fixed-cuda-support-20261010",
+      "runtime_sha256": "329d1ca98349becdb7d142d362f5dc9f0f91913e35d3b62c0126357a373641c9",
+      "resolved_config_sha256": "9b0247a34af6fa3e71fb0281b1c057c7b15091a2466313acf1f8c8bd832acdc6",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R3-fixed-tar-logs-20261010",
+      "runtime_sha256": "74e1a2ce3fad7fd79176a86e738dad61b18addbc6f8b6d5f8bcabe64fed654db",
+      "resolved_config_sha256": "f902d782457927d47648d0496fc968db3aa43d2fe2f1e90949fbc31a9af1fc77",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R4-dtensor-mcore",
+      "runtime_sha256": "12982ce2edf4409afeef452bdfed26628c9fef37015b81b9faf30427ca1cf19c",
+      "resolved_config_sha256": "d8f16ea905a51072542b35b387427182ece03e8726530f29fc4dfb93b9a793b7",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R4-dtensor-mcore-observed-20261010",
+      "runtime_sha256": "b3b0c4adf84e2df40d2b5061465af33372b37dca9b6b85ef6d6e77e1c01df9e2",
+      "resolved_config_sha256": "06ac77ceec5ef3bfe3784e7bdcc5c16f7121ff486d51fd0173ef50edde45ecca",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R4-dtensor-mcore-reusable-20261010",
+      "runtime_sha256": "1e2161cd15eab63f16431c9f59503661378d3922af9c70ee7fed590ebff1bfb8",
+      "resolved_config_sha256": "fa30387ddd63a452860f2d81ca4ce29e78e6ae5b45891d6d6ae9f9d0ff71103f",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R4-mcore-dtensor",
+      "runtime_sha256": "d9694bc790f866bb1b8c09220267bcd7c03aab0c3e7efbe476d740904dfee063",
+      "resolved_config_sha256": "3b75001888cf4c9ab2c839d50b76714b50f31e0b343f7e9f73f0d07a7a51b030",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R4-mcore-dtensor-reusable-20261010",
+      "runtime_sha256": "62e86de866d206ff7fa043c2c8136023e33ec30c999bad5bc1eff0410193047e",
+      "resolved_config_sha256": "3b75001888cf4c9ab2c839d50b76714b50f31e0b343f7e9f73f0d07a7a51b030",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R4-optimizer-replay-mcore-dtensor-20261010",
+      "runtime_sha256": "1b2c542835fd6d70156fd333312f79bdf328599a142e50659990d75532ca5070",
+      "resolved_config_sha256": "3b75001888cf4c9ab2c839d50b76714b50f31e0b343f7e9f73f0d07a7a51b030",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+          "make_sequence_length_divisible_by": 16
+        }
+      ],
+      "actual_smollm2_padding_divisibility": 16,
+      "clarification_required": false,
+      "clarification": "Preparation metadata agrees with the actual configured SmolLM2 teacher."
+    },
+    {
+      "run": "R5-averaged",
+      "runtime_sha256": "a9ca642d00ae528a6b63cdad2c16bbea151c312f28602a799c21d33647e3be13",
+      "resolved_config_sha256": "763cc1ee11290afc961ca2db835cc98269317b07394a3e0b4e81514ef78c6b08",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08",
+          "make_sequence_length_divisible_by": 8
+        },
+        {
+          "teacher_index": 1,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R5-dynamic",
+      "runtime_sha256": "45fb8e42fb09abb6cfb3cb5374f4d805900ced0cf0dd9ed8877de1badb1932b4",
+      "resolved_config_sha256": "80fb3374fb572cb086a6c97a1706a9e22e95abadacfecfb560d0a5f6da3d5a03",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R5-fixed",
+      "runtime_sha256": "5b9667d85f97f17ca0c40472d9a66eec285020719d02b82a0dd2ee5c0d2c44f1",
+      "resolved_config_sha256": "4aad6f766bcb104951dd733814f21108e3a2f4cf0796fada093c1054c78a0b04",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-3B/snapshots/13afe5124825b4f3751f836b40dafda64c1ed062",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R6-dense-cross",
+      "runtime_sha256": "893ee054ab912bb5ad08ef0354f3eb047341843d2ff46334c7b5adb168332c55",
+      "resolved_config_sha256": "a8897f049a85522aaa5b8ce72d78e0c2041ca9d12eb6d3ec668fbf80957f4ae6",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R6-dense-cross-reusable-20261010",
+      "runtime_sha256": "f8844367a93dccefcfab5b8123fc1380d1493cf9de4228b068a5e07e5369d586",
+      "resolved_config_sha256": "f7dfb33e6996c8e2ff6cfc6fd1c153291a4ddbbff12a37cc78e6c357bb30f819",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    },
+    {
+      "run": "R6-dtensor-sparse",
+      "runtime_sha256": "bf9b04ab2dc4a4fdd3818747264ce8bfda0f5fecd2a75703722ec6d413986544",
+      "resolved_config_sha256": "7fd74c61c8753264447cd76d4deaba389f12a2d991135a9a844163257f8b2bcb",
+      "original_padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+      "original_teacher_b_padding_divisibility": 16,
+      "actual_teachers": [
+        {
+          "teacher_index": 0,
+          "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+          "make_sequence_length_divisible_by": 8
+        }
+      ],
+      "actual_smollm2_padding_divisibility": null,
+      "clarification_required": true,
+      "clarification": "The preparation-time rationale copied the two-cross-tokenizer recipe's SmolLM2 note. This run has no SmolLM2 teacher; the recorded resolved-config settings above are authoritative. No objective or executed setting changed."
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "status": "PASS",
+  "job_id": "19993994",
+  "slurm_state": "COMPLETED",
+  "exit_code": "0:0",
+  "elapsed": "00:08:08",
+  "allocated_resources": "billing=16,cpu=256,gres/gpu=16,mem=4000000M,node=2",
+  "controller_run": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2",
+  "tp": 2,
+  "cp": 2,
+  "dp": 4,
+  "optimizer_steps": [
+    1,
+    2,
+    3
+  ],
+  "evaluation_steps": [
+    3
+  ],
+  "numerical_microbatch_reports": 128,
+  "training_dlogits_reports": 96,
+  "evaluation_loss_metric_reports": 32,
+  "max_dlogits_relative_l2": 0.00026498779582505327,
+  "actual_preclip_grad_norms": [
+    13.910754203796387,
+    10.43652629852295,
+    6.217358112335205
+  ],
+  "actual_step_loss": [
+    0.8913823813199997,
+    0.8287620171904564,
+    0.7547923512756824
+  ],
+  "native_only_no_student_relayout_or_full_reconstruction_reports": 128,
+  "legacy_cross_tokenizer_consumer_reports": 0,
+  "independent_source_verification": {
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-optimizer-replay-20261010": {
+      "status": "PASS",
+      "scope": "Independent post-run source/config/launcher verification against frozen pre-submission hashes",
+      "source_files": 383,
+      "owned_files": 13,
+      "mismatches": []
+    },
+    "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2": {
+      "status": "PASS",
+      "scope": "Independent post-run source/config/launcher verification against frozen pre-submission hashes",
+      "source_files": 386,
+      "owned_files": 14,
+      "mismatches": []
+    }
+  },
+  "cuda_ipc_warning_scan": {
+    "files_scanned": 1087,
+    "matches": [],
+    "verified_archives": [
+      {
+        "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/89703f590067b898d9cd46913f629b285622e3d1609b34a31e30264d/session_2026-10-10_16-19-57_905171_3479445.tar.gz",
+        "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/89703f590067b898d9cd46913f629b285622e3d1609b34a31e30264d/session_2026-10-10_16-19-57_905171_3479445.members.json",
+        "members_verified": 205,
+        "log_members_scanned": 204
+      },
+      {
+        "path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/b00bc04be5da5565c5509bbea17d8a2e0c5c485aa9bbb8d2c394e376/session_2026-10-10_16-19-57_905171_3479445.tar.gz",
+        "manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/ray-final-logs/b00bc04be5da5565c5509bbea17d8a2e0c5c485aa9bbb8d2c394e376/session_2026-10-10_16-19-57_905171_3479445.members.json",
+        "members_verified": 879,
+        "log_members_scanned": 878
+      }
+    ],
+    "scope": "Only retained raw logs were scanned. Absence of warnings does not prove clean IPC counters or complete worker teardown."
+  },
+  "worker_process_exit": {
+    "status": "PASS",
+    "scope": "Successful actual controller returned from its IPC lifetime context; explicit original backend cleanup then existing node-pinned OS process-exit observer, student before teachers",
+    "policies": [
+      {
+        "policy": "student",
+        "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--meta-llama--Llama-3.2-1B/snapshots/4e20de362430cd3b72f300e6b0f18e50e7166e08",
+        "workers": 16,
+        "os_identity_captured": true,
+        "actual_backend_cleanup": true,
+        "os_process_exit_confirmed": true,
+        "errors": []
+      },
+      {
+        "policy": "teacher_0",
+        "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--Qwen--Qwen3-4B/snapshots/1cfa9a7208912126459214e8b04321603b3df60c",
+        "workers": 16,
+        "os_identity_captured": true,
+        "actual_backend_cleanup": true,
+        "os_process_exit_confirmed": true,
+        "errors": []
+      },
+      {
+        "policy": "teacher_1",
+        "model_name": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/hf/hub/models--HuggingFaceTB--SmolLM2-1.7B/snapshots/effd688a12921b4cc83e3312b6feb579f70f9c71",
+        "workers": 16,
+        "os_identity_captured": true,
+        "actual_backend_cleanup": true,
+        "os_process_exit_confirmed": true,
+        "errors": []
+      }
+    ]
+  },
+  "larger_memory_tests": "EXCLUDED",
+  "scope": "Actual controller three updates plus evaluation and companion first-step preclip optimizer replay.",
+  "scheduler_step_notes": [
+    {
+      "step": "19993994.1",
+      "state": "CANCELLED",
+      "exit_code": "0:15",
+      "scope": "Background Ray worker service on second node was terminated after successful head/driver completion, as the historical launcher exits with the head step status. All48 policy actor OS exits and per-node archive snapshots were confirmed before batch exit; this is not a training failure."
+    }
+  ],
+  "optimizer_replay": {
+    "status": "PASS",
+    "run": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-optimizer-replay-20261010",
+    "ranks": 16,
+    "microbatches_per_rank": 2,
+    "range_coverage": "PASS: every TP-local element owned exactly once across CP+DP",
+    "covered_parameter_elements_per_tp_rank": [
+      617940992
+    ],
+    "max_relative_l2": 0.009809617820152773,
+    "max_relative_norm_error": 0.0005711285881217119,
+    "actual_norm_including_tp_replicas": 13.917779349342247,
+    "reference_norm_including_tp_replicas": 13.925732733416844,
+    "scope": "Actual first optimizer step after prepare_grads before clipping/update; all MBs and owned parameter ranges compared to independent-reference VJP at pinned initial weights."
+  }
+}

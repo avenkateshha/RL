@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "tests": 13,
+  "expected_tests": 13,
+  "skipped": 0,
+  "failure": 0,
+  "error": 0,
+  "backend": "mcore",
+  "cuda_visible": true,
+  "test_file": "tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py",
+  "scope": "Exact cached actor interpreter, isolated from numerical capture and Ray driver address; every focused test must execute without skips",
+  "log": "preflight-pytest.log",
+  "junit": "preflight-junit.xml"
+}

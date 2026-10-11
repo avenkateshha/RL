@@ -1,0 +1,306 @@
+[
+  {
+    "case": "R1-tp1cp1",
+    "config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332",
+    "status": "PASS",
+    "accepted_run": "R1-tp1cp1",
+    "attempts": [
+      {
+        "run": "R1-tp1cp1",
+        "status": "PASS",
+        "job_id": "19991383",
+        "submitted_utc": "2026-10-10T21:33:38.258533+00:00",
+        "result": "runs/R1-tp1cp1/results.json",
+        "config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332"
+      }
+    ]
+  },
+  {
+    "case": "R1-tp2cp1",
+    "config_sha256": "6cd935b2d1f73e799934a0b2a7c5d566dbe9dceff88e2849a171a8c1df5f5c7f",
+    "status": "PASS",
+    "accepted_run": "R1-tp2cp1",
+    "attempts": [
+      {
+        "run": "R1-tp2cp1",
+        "status": "PASS",
+        "job_id": "19992100",
+        "submitted_utc": "2026-10-10T22:06:05.262002+00:00",
+        "result": "runs/R1-tp2cp1/results.json",
+        "config_sha256": "6cd935b2d1f73e799934a0b2a7c5d566dbe9dceff88e2849a171a8c1df5f5c7f"
+      }
+    ]
+  },
+  {
+    "case": "R1-tp1cp2",
+    "config_sha256": "eba6dd7dae9aa10e3d8d3232aac81add1537728efad2fe2d28b167acd9df1d70",
+    "status": "PASS",
+    "accepted_run": "R1-tp1cp2",
+    "attempts": [
+      {
+        "run": "R1-tp1cp2",
+        "status": "PASS",
+        "job_id": "19991553",
+        "submitted_utc": "2026-10-10T21:43:26.122587+00:00",
+        "result": "runs/R1-tp1cp2/results.json",
+        "config_sha256": "eba6dd7dae9aa10e3d8d3232aac81add1537728efad2fe2d28b167acd9df1d70"
+      }
+    ]
+  },
+  {
+    "case": "R1-tp2cp2",
+    "config_sha256": "7b96b8640146e2656f09242b75f9d0693ab2e7d76b9a729cf533df603c3f3b48",
+    "status": "PASS",
+    "accepted_run": "R1-tp2cp2",
+    "attempts": [
+      {
+        "run": "R1-tp2cp2",
+        "status": "PASS",
+        "job_id": "19992724",
+        "submitted_utc": "2026-10-10T22:23:40.166365+00:00",
+        "result": "runs/R1-tp2cp2/results.json",
+        "config_sha256": "7b96b8640146e2656f09242b75f9d0693ab2e7d76b9a729cf533df603c3f3b48"
+      }
+    ]
+  },
+  {
+    "case": "R2-tp2cp2",
+    "config_sha256": "eb9b0106b46172e51083f531df9f25db3a533e11af4710eadb7b9ed06002e498",
+    "status": "PASS",
+    "accepted_run": "R2-tp2cp2",
+    "attempts": [
+      {
+        "run": "R2-tp2cp2",
+        "status": "PASS",
+        "job_id": "19992929",
+        "submitted_utc": "2026-10-10T22:32:48.738163+00:00",
+        "result": "runs/R2-tp2cp2/results.json",
+        "config_sha256": "eb9b0106b46172e51083f531df9f25db3a533e11af4710eadb7b9ed06002e498"
+      }
+    ]
+  },
+  {
+    "case": "R2-tp2cp2-reversed",
+    "config_sha256": "78846ed13a5f649c46e416278ab8bc296261bfc8eea9e5b0743679b890f0639e",
+    "status": "PASS",
+    "accepted_run": "R2-tp2cp2-reversed",
+    "attempts": [
+      {
+        "run": "R2-tp2cp2-reversed",
+        "status": "PASS",
+        "job_id": "19994688",
+        "submitted_utc": "2026-10-10T23:49:26.161292+00:00",
+        "result": "runs/R2-tp2cp2-reversed/results.json",
+        "config_sha256": "78846ed13a5f649c46e416278ab8bc296261bfc8eea9e5b0743679b890f0639e"
+      }
+    ]
+  },
+  {
+    "case": "R2-2n-tp2cp2",
+    "config_sha256": "30d13fed6dbd8d85b2c5865444ce0369abf663761307854e7c83abb5f742e029",
+    "status": "PASS",
+    "accepted_run": "R2-2n-tp2cp2",
+    "attempts": [
+      {
+        "run": "R2-2n-tp2cp2",
+        "status": "PASS",
+        "job_id": "19993994",
+        "submitted_utc": "2026-10-10T23:18:34.821989+00:00",
+        "result": "runs/R2-2n-tp2cp2/results.json",
+        "config_sha256": "30d13fed6dbd8d85b2c5865444ce0369abf663761307854e7c83abb5f742e029"
+      }
+    ]
+  },
+  {
+    "case": "R3-fixed",
+    "config_sha256": "62babf08aca8003ed268d2216e712590b53c388934a8449330bb759d6b20b8ff",
+    "status": "PASS",
+    "accepted_run": "R3-fixed-tar-logs-20261010",
+    "attempts": [
+      {
+        "run": "R3-fixed",
+        "status": "FAIL_REFERENCE_SUPPORT_MISMATCH_RETRY_REQUIRED",
+        "job_id": "19991885",
+        "submitted_utc": "2026-10-10T21:58:14.923715+00:00",
+        "result": "runs/R3-fixed/results.json",
+        "config_sha256": "62babf08aca8003ed268d2216e712590b53c388934a8449330bb759d6b20b8ff"
+      },
+      {
+        "run": "R3-fixed-cuda-support-20261010",
+        "status": "FAIL_PROJECT_INODE_QUOTA_RETRY_REQUIRED",
+        "job_id": "19992163",
+        "submitted_utc": "2026-10-10T22:10:23.534409+00:00",
+        "result": "runs/R3-fixed-cuda-support-20261010/results.json",
+        "config_sha256": "9b0247a34af6fa3e71fb0281b1c057c7b15091a2466313acf1f8c8bd832acdc6"
+      },
+      {
+        "run": "R3-fixed-tar-logs-20261010",
+        "status": "PASS",
+        "job_id": "19992723",
+        "submitted_utc": "2026-10-10T22:23:39.646368+00:00",
+        "result": "runs/R3-fixed-tar-logs-20261010/results.json",
+        "config_sha256": "f902d782457927d47648d0496fc968db3aa43d2fe2f1e90949fbc31a9af1fc77"
+      }
+    ]
+  },
+  {
+    "case": "R3-dynamic",
+    "config_sha256": "06e18f24b782eb9b51f24bd62f63cc428632a040d3e3bb3fe2931f7371c36831",
+    "status": "PASS",
+    "accepted_run": "R3-dynamic",
+    "attempts": [
+      {
+        "run": "R3-dynamic",
+        "status": "PASS",
+        "job_id": "19994429",
+        "submitted_utc": "2026-10-10T23:33:56.805174+00:00",
+        "result": "runs/R3-dynamic/results.json",
+        "config_sha256": "06e18f24b782eb9b51f24bd62f63cc428632a040d3e3bb3fe2931f7371c36831"
+      }
+    ]
+  },
+  {
+    "case": "R4-mcore-dtensor",
+    "config_sha256": "3b75001888cf4c9ab2c839d50b76714b50f31e0b343f7e9f73f0d07a7a51b030",
+    "status": "PASS",
+    "accepted_run": "R4-mcore-dtensor-reusable-20261010",
+    "attempts": [
+      {
+        "run": "R4-mcore-dtensor",
+        "status": "PASS_NUMERICAL_PENDING_LEGACY_LIFETIME_AUDIT",
+        "job_id": "19991476",
+        "submitted_utc": "2026-10-10T21:40:20.598947+00:00",
+        "result": "runs/R4-mcore-dtensor/results.json",
+        "config_sha256": "3b75001888cf4c9ab2c839d50b76714b50f31e0b343f7e9f73f0d07a7a51b030"
+      },
+      {
+        "run": "R4-mcore-dtensor-reusable-20261010",
+        "status": "PASS",
+        "job_id": "19993796",
+        "submitted_utc": "2026-10-10T23:07:16.562740+00:00",
+        "result": "runs/R4-mcore-dtensor-reusable-20261010/results.json",
+        "config_sha256": "3b75001888cf4c9ab2c839d50b76714b50f31e0b343f7e9f73f0d07a7a51b030"
+      }
+    ]
+  },
+  {
+    "case": "R4-dtensor-mcore",
+    "config_sha256": "d8f16ea905a51072542b35b387427182ece03e8726530f29fc4dfb93b9a793b7",
+    "status": "PASS",
+    "accepted_run": "R4-dtensor-mcore-reusable-20261010",
+    "attempts": [
+      {
+        "run": "R4-dtensor-mcore",
+        "status": "FAIL_POST_CONTROLLER_TEARDOWN_AND_OBSERVER_COVERAGE",
+        "job_id": "19991907",
+        "submitted_utc": "2026-10-10T21:58:42.645795+00:00",
+        "result": "runs/R4-dtensor-mcore/results.json",
+        "config_sha256": "d8f16ea905a51072542b35b387427182ece03e8726530f29fc4dfb93b9a793b7"
+      },
+      {
+        "run": "R4-dtensor-mcore-observed-20261010",
+        "status": "PASS_NUMERICAL_LEGACY_IPC_LIFETIME_FAILURE",
+        "job_id": "19992921",
+        "submitted_utc": "2026-10-10T22:32:15.746126+00:00",
+        "result": "runs/R4-dtensor-mcore-observed-20261010/results.json",
+        "config_sha256": "06ac77ceec5ef3bfe3784e7bdcc5c16f7121ff486d51fd0173ef50edde45ecca"
+      },
+      {
+        "run": "R4-dtensor-mcore-reusable-20261010",
+        "status": "PASS",
+        "job_id": "19993411",
+        "submitted_utc": "2026-10-10T22:50:31.647014+00:00",
+        "result": "runs/R4-dtensor-mcore-reusable-20261010/results.json",
+        "config_sha256": "fa30387ddd63a452860f2d81ca4ce29e78e6ae5b45891d6d6ae9f9d0ff71103f"
+      }
+    ]
+  },
+  {
+    "case": "R5-fixed",
+    "config_sha256": "4aad6f766bcb104951dd733814f21108e3a2f4cf0796fada093c1054c78a0b04",
+    "status": "PASS",
+    "accepted_run": "R5-fixed",
+    "attempts": [
+      {
+        "run": "R5-fixed",
+        "status": "PASS",
+        "job_id": "19994577",
+        "submitted_utc": "2026-10-10T23:42:22.857514+00:00",
+        "result": "runs/R5-fixed/results.json",
+        "config_sha256": "4aad6f766bcb104951dd733814f21108e3a2f4cf0796fada093c1054c78a0b04"
+      }
+    ]
+  },
+  {
+    "case": "R5-dynamic",
+    "config_sha256": "80fb3374fb572cb086a6c97a1706a9e22e95abadacfecfb560d0a5f6da3d5a03",
+    "status": "PASS",
+    "accepted_run": "R5-dynamic",
+    "attempts": [
+      {
+        "run": "R5-dynamic",
+        "status": "PASS",
+        "job_id": "19994716",
+        "submitted_utc": "2026-10-10T23:50:29.824725+00:00",
+        "result": "runs/R5-dynamic/results.json",
+        "config_sha256": "80fb3374fb572cb086a6c97a1706a9e22e95abadacfecfb560d0a5f6da3d5a03"
+      }
+    ]
+  },
+  {
+    "case": "R5-averaged",
+    "config_sha256": "763cc1ee11290afc961ca2db835cc98269317b07394a3e0b4e81514ef78c6b08",
+    "status": "PASS",
+    "accepted_run": "R5-averaged",
+    "attempts": [
+      {
+        "run": "R5-averaged",
+        "status": "PASS",
+        "job_id": "19994428",
+        "submitted_utc": "2026-10-10T23:33:56.319358+00:00",
+        "result": "runs/R5-averaged/results.json",
+        "config_sha256": "763cc1ee11290afc961ca2db835cc98269317b07394a3e0b4e81514ef78c6b08"
+      }
+    ]
+  },
+  {
+    "case": "R6-dense-cross",
+    "config_sha256": "a8897f049a85522aaa5b8ce72d78e0c2041ca9d12eb6d3ec668fbf80957f4ae6",
+    "status": "PASS",
+    "accepted_run": "R6-dense-cross-reusable-20261010",
+    "attempts": [
+      {
+        "run": "R6-dense-cross",
+        "status": "FAIL_REFERENCE_CONFIGURATION_GUARD_AND_DENSE_IPC_LIFETIME",
+        "job_id": "19993412",
+        "submitted_utc": "2026-10-10T22:50:32.262627+00:00",
+        "result": "runs/R6-dense-cross/results.json",
+        "config_sha256": "a8897f049a85522aaa5b8ce72d78e0c2041ca9d12eb6d3ec668fbf80957f4ae6"
+      },
+      {
+        "run": "R6-dense-cross-reusable-20261010",
+        "status": "PASS",
+        "job_id": "19993795",
+        "submitted_utc": "2026-10-10T23:07:16.116393+00:00",
+        "result": "runs/R6-dense-cross-reusable-20261010/results.json",
+        "config_sha256": "f7dfb33e6996c8e2ff6cfc6fd1c153291a4ddbbff12a37cc78e6c357bb30f819"
+      }
+    ]
+  },
+  {
+    "case": "R6-dtensor-sparse",
+    "config_sha256": "7fd74c61c8753264447cd76d4deaba389f12a2d991135a9a844163257f8b2bcb",
+    "status": "PASS",
+    "accepted_run": "R6-dtensor-sparse",
+    "attempts": [
+      {
+        "run": "R6-dtensor-sparse",
+        "status": "PASS",
+        "job_id": "19994584",
+        "submitted_utc": "2026-10-10T23:42:40.242294+00:00",
+        "result": "runs/R6-dtensor-sparse/results.json",
+        "config_sha256": "7fd74c61c8753264447cd76d4deaba389f12a2d991135a9a844163257f8b2bcb"
+      }
+    ]
+  }
+]

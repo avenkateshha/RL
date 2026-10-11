@@ -1,0 +1,26 @@
+"""Check pinned model architecture conversion without allocating weights."""
+import json
+from pathlib import Path
+import traceback
+from megatron.bridge import AutoBridge
+from transformers import AutoConfig
+
+run=Path(__file__).resolve().parents[1]
+validation=run.parents[1]
+manifest=json.loads((validation/'fixture_manifest.json').read_text())
+report={'status':'PASS','scope':'Pinned config -> Bridge -> MCore provider; weights and forward NOT_RUN','models':{}}
+for role,model in manifest['models'].items():
+    try:
+        config=AutoConfig.from_pretrained(model['snapshot_path'],local_files_only=True)
+        bridge=AutoBridge.from_hf_config(config)
+        provider=bridge.to_megatron_provider(load_weights=False)
+        provider.tensor_model_parallel_size=2
+        provider.pipeline_model_parallel_size=1
+        provider.context_parallel_size=2
+        provider.finalize()
+        report['models'][role]={'status':'PASS','revision':model['revision'],'provider_class':type(provider).__module__+'.'+type(provider).__name__,'num_layers':provider.num_layers,'hidden_size':provider.hidden_size,'num_attention_heads':provider.num_attention_heads,'num_query_groups':provider.num_query_groups,'vocab_size':provider.vocab_size,'tp':2,'cp':2,'pp':1}
+    except Exception:
+        report['status']='FAIL'
+        report['models'][role]={'status':'FAIL','traceback':traceback.format_exc()}
+(run/'model-provider-results.json').write_text(json.dumps(report,indent=2)+'\n')
+print(json.dumps(report,indent=2),flush=True)

@@ -1,0 +1,30 @@
+{
+  "status": "PASS",
+  "scope": "Exact source delta for R4 reusable and companion R6 dense audit before any subsequent dense-transport fix. Captured while source is frozen; this records source provenance, not completed GPU acceptance.",
+  "baseline_commit": "fcc943c5eab4690a4faa1892d80b9d56cb8d1564",
+  "patch": "source.patch",
+  "patch_sha256": "8107b13248444fae0114ea43d447c4f85e63cec91bdbaff6d9990c9a55ed35d1",
+  "source_sha256": {
+    "nemo_rl/algorithms/x_token/loss_utils.py": "2836a8701458878c5c4a8aa7afacb92c73675b5ab451cc8825f11e9427a3fc22",
+    "nemo_rl/algorithms/x_token/native_same_tokenizer.py": "c4ea66ab4a8ef67e7d2247a6be7b0300c22c61f2778da4ca1fbc7f62373a576b",
+    "nemo_rl/distributed/worker_groups.py": "f61cc928ff54f296413ebdd27afa02e8cf2955605947f21e4efbb6a92cb696af",
+    "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py": "23b68268b113a9ef1d28888a81f3d51c10d37f0d0c6eb4e802fb24ec5f63b48e",
+    "tests/unit/models/policy/test_dtensor_sparse_ipc.py": "79906a9dcc2122dae357f855d8ab37ec4f0ca8eeac9b981c1597b31a3723bef9"
+  },
+  "complete_manifest_baseline_check": {
+    "source_files": 387,
+    "baseline_differences_exactly_captured": [
+      "nemo_rl/algorithms/x_token/loss_utils.py",
+      "nemo_rl/algorithms/x_token/native_same_tokenizer.py",
+      "nemo_rl/distributed/worker_groups.py",
+      "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py",
+      "tests/unit/models/policy/test_dtensor_sparse_ipc.py"
+    ],
+    "status": "PASS"
+  },
+  "reverse_apply_check": "PASS (read-only --check; no working-tree mutation)",
+  "applicable_runs": [
+    "R4-dtensor-mcore-reusable-20261010",
+    "R6-dense-cross"
+  ]
+}

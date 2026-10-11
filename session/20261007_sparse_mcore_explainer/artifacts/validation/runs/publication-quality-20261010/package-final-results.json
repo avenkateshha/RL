@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "scope": "Final packaging-only check after required license-header addition; historical six-check evidence unchanged. No historical Python source rewritten.",
+  "checks": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "--offline",
+        "python",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_frozen_python_package.py"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "--offline",
+        "ruff",
+        "check",
+        "--select",
+        "D,F,I",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/package_frozen_python.py",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_frozen_python_package.py"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "--offline",
+        "ruff",
+        "format",
+        "--check",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/package_frozen_python.py",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_frozen_python_package.py"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "source_hashes": {
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/package_frozen_python.py": "75fb84d669fd94a87bf8fd400f7e9b3cdc4d497fd3371488521d70acb98239b5",
+    "session/20261007_sparse_mcore_explainer/artifacts/validation/verify_frozen_python_package.py": "19a9ceabd86c17b580d2c8feb6ea6bdd5f954b368483693b8d6f58ec82ca673e"
+  },
+  "source_hashes_before_after": "PASS"
+}

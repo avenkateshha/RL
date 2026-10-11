@@ -251,7 +251,7 @@ def compute_native_same_tokenizer_kl(
     )
     batch, sequence = torch.nonzero(mask != 0, as_tuple=True)
     if not full_vocab and k == 0:
-        return logits.sum() * 0
+        return logits.sum(dtype=torch.float32) * 0
     geometry = _KLGeometry(
         temperature=temperature,
         reverse=loss_fn.reverse_kl,

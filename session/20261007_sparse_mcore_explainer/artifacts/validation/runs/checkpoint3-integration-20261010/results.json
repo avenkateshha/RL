@@ -1,0 +1,33 @@
+{
+  "status": "PASS_WITH_TEARDOWN_WARNING_UNDER_REVIEW",
+  "job_id": "19989936",
+  "pytest_passed": 76,
+  "skipped": 0,
+  "suites": {
+    "megatron": {
+      "tests": 14,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "duration_seconds": 57.578
+    },
+    "utils": {
+      "tests": 56,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "duration_seconds": 8.352
+    },
+    "policy": {
+      "tests": 6,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "duration_seconds": 11.533
+    }
+  },
+  "source_validation": "Before and after checks PASS",
+  "slurm_accounting": "slurm-accounting.txt",
+  "warning": "PyTorch CudaIPCTypes.cpp producer terminated before all shared CUDA tensors released at pytest shutdown. Transport agent investigating fixture teardown; passing runtime assertions alone do not dismiss this warning.",
+  "scope": "Actual CUDA IPC storage and peer-process reader with synthetic logits, production producer postprocessing, padding/guards/public dispatch/native adapter. Not actual-model KD integration."
+}

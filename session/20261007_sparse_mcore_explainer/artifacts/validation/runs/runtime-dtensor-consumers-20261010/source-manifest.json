@@ -1,0 +1,30 @@
+{
+  "root_head": "310d4dcfdf0b0433d1d1c15beea9dffd6202aed7",
+  "recorded_utc": "2026-10-10T20:51:11.572523+00:00",
+  "file_sha256": {
+    "nemo_rl/models/automodel/nemotron_h_cp.py": "2f5c03269d6c4b7d8fde10805889fce6e1de81073900d787c0ac0937d75a81b9",
+    "nemo_rl/models/automodel/checkpoint.py": "78249aaa169577ab14b49b504f89ea966975f5b0e9fcc5bc4a5665c6f8924503",
+    "nemo_rl/models/automodel/train.py": "5534f56e06ae640c89d2dfc019c50514da5fdb5b7470d9502949c4f3055b787c",
+    "nemo_rl/models/automodel/__init__.py": "05b7a7dd9408434f37d08ddfbcf9dce2534d2b8319a0b0df44d85f2a887e68b8",
+    "nemo_rl/models/automodel/data.py": "654601f1a4dcc189de361743d2940dd2a31c7c61607d31d55fb7aad5ddb1982f",
+    "nemo_rl/models/automodel/setup.py": "6a9d668cf65c981f2f388465992227f98c45451abbe428ca11f4c7c2031f09d3",
+    "nemo_rl/models/automodel/config.py": "cb3c2ffebf00f11e7665333836cb12997b2e465e06c8ddb39c0631448f960550",
+    "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py": "49205970b61e7c6f5c4bd6909f7fe67868230d42330f22a67d51a7e7921900fb"
+  },
+  "scope": "Small actual DTensor runtime/forward/export and one separate IPC consumer per producer; full R4 repeated/mixed-consumer parity remains later.",
+  "owned_file_sha256": {
+    "teacher_a-config.yaml": "f8cb42cde257daa711cebcf6a22dd9f46191b76dae52dd71d5c43ec7b6b03d1b",
+    "collated_corpus.json": "98e2632982adbc3aead495709f92b6cd68b9305c45b8e9433565e0f80e291b6b",
+    "teacher_b-config.yaml": "b741d5cd0cd4b43899aa1620a4511855a08510d31e5b3d67fcdde5370f912755",
+    "launcher/runtime-env.sh": "ff916775700a9dd3779924a0c075ff7e3a4128150a16bcfe2fef32fd8986e3b8",
+    "launcher/sitecustomize.py": "0aed5c290f15e18c0ecbf2f4c89fc701f36b7a343155c1c178d2e1589a10a78f",
+    "launcher/driver.sh": "a91d0059a5a6f96611988e6beffe9a5ea42b994cb7cfcca6151fcdd17ba3cb18",
+    "launcher/preflight.sub": "e2ff93a22e76dee921ac8b54832fa25d8f2949e708495100b1fd0d668dfe5c89",
+    "launcher/dtensor_preflight.py": "722e9c39277a040547a1aa71d6cdb380d6eaa466016dd66f5f1d5b545131d643",
+    "launcher/model_oracle.py": "f26ad4a5477f45d3627deaf225c6a46bf1aa5f8ba6e66a8738006a3bde1e8b3f",
+    "launcher/submit.py": "79315be9854a5bac104b7a1e34a35c0a8983a01f2a56fc9ee527d8a896916c4a",
+    "launcher/check_sources.py": "c715f3722a3dfd71ce288fc13f8b44d8fe4b531464ffd24cf0016f2f74b202b7",
+    "launcher/controller_reference.py": "db1258ff9498d7a1b10fb15dde25be71423345eeb0cbe6031863eccdd49712b4",
+    "launcher/environment.json": "8a888ccc8fc7fe27b4ab54fa4be7e87bb911a3c98a2c6fb20f141c7a0b0ba234"
+  }
+}

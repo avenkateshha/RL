@@ -1,0 +1,15 @@
+{
+  "status": "PASS_HOST_PROCESS_LIFETIME",
+  "passed": 17,
+  "skipped": 0,
+  "duration_seconds": 43.18,
+  "command": "PYTHONPATH=\"$PWD:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/experiments/xtoken-smoke/xtoken-distillation/xtoken-offset-rebased-2n100-20260928-092950/runtime/python\" UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline python -m pytest --confcutdir=tests/unit/distributed tests/unit/distributed/test_process_lifetime.py -q",
+  "exit_code": 0,
+  "source_sha256_after_execution": {
+    "nemo_rl/distributed/worker_groups.py": "f61cc928ff54f296413ebdd27afa02e8cf2955605947f21e4efbb6a92cb696af",
+    "tests/unit/distributed/test_process_lifetime.py": "d68f5479c849c676e3a517ec9a8256d1b7299c05dbb034eba0ea6b18edac084e",
+    "nemo_rl/distributed/process_lifetime.py": "bc7074d77835306011c8e9b695ab3d03046b159d8f0936e88b6e6c1a092e0ce3"
+  },
+  "quality": "Changed-file Ruff, format, git diff --check PASS",
+  "scope": "Actual Ray2.56.1 method signature metadata for healthy and dependency-fallback classes, failure/retry semantics and real localRay actors with OS PID/starttime disappearance. No model/CUDA/controller acceptance; intended-container rerun pending."
+}

@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "rank": 6,
+  "dp_rank": 1,
+  "tp_rank": 0,
+  "cp_rank": 1,
+  "item_ids": [
+    4,
+    5
+  ],
+  "teacher_backends": [
+    [
+      "DTensorPolicyWorkerV2.actual_forward"
+    ],
+    [
+      "MegatronPolicyWorker.actual_forward"
+    ]
+  ],
+  "legacy_sparse_teacher_indices": [
+    0
+  ],
+  "legacy_dense_teacher_indices": [],
+  "native_sparse_teacher_indices": [
+    1
+  ],
+  "native_dense_teacher_indices": [],
+  "production_layout_calls": {
+    "cp_load_balanced_to_contiguous": 1,
+    "rebuild_teacher_sparse_logits_from_ipc": 1,
+    "rebuild_teacher_full_logits_from_ipc": 0,
+    "allgather_cp_contiguous_tensor": 2
+  },
+  "token_denominator": 108.0,
+  "kd_denominator": 108.0,
+  "chunk_denominators": {
+    "0": 178.0,
+    "1": 236.0
+  },
+  "reference_metrics": {
+    "loss": 0.20997652411460876,
+    "ce_loss": 1.205459713935852,
+    "kl_loss": 0.0894305408000946,
+    "kl_loss_scale": 1.0,
+    "accuracy": 0.23076923191547394,
+    "kl_loss_t0": 0.11480674147605896,
+    "kl_loss_t1": 0.07855502516031265,
+    "teacher_0/weighted_kl": 0.03444202244281769,
+    "teacher_1/weighted_kl": 0.054988518357276917
+  },
+  "dlogits": {
+    "relative_l2": 3.98449023667454e-05,
+    "relative_norm": 2.0492672936947198e-06,
+    "absolute_l2": 1.912925167463738e-07,
+    "reference_norm": 0.004800928233821619,
+    "max_absolute": 1.0221265256404877e-07
+  },
+  "gradient_kind": "actual controller loss dlogits before MCore schedule scaling and clipping",
+  "reference_kind": "Independent native teacher oracle plus retained CP1 legacy objective on identical full-sequence dense/sparse teacher values; independent CE and aggregation",
+  "capture_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R4-dtensor-mcore-reusable-20261010/controller-reference/items4-5-rank6.pt",
+  "capture_sha256": "966eda0121e63f06f9a92e052f330f8eca6dbcb3a28a47971480f766ec3c7fed"
+}

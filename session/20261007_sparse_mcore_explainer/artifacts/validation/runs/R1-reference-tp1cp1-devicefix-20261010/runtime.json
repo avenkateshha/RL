@@ -1,0 +1,47 @@
+{
+  "status": "NOT_RUN",
+  "reason": "Implementation checkpoints and MCore runtime validation pending.",
+  "source_head_at_preparation": "7e6492b1b5c192bc9949d87405a469ab018c9770",
+  "config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332",
+  "fixture_manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/fixture_manifest.json",
+  "fixture_preparation": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/fixture-preparation-20261010/results.json",
+  "tp": 1,
+  "cp": 1,
+  "dp": 1,
+  "pp": 1,
+  "nodes": 1,
+  "gpus_per_node_used": 1,
+  "gpus_per_node_allocated": 8,
+  "global_batch_size": 4,
+  "student_micro_batch_size": 2,
+  "student_microbatches_per_dp_step": 2,
+  "max_sequence_length": 256,
+  "teacher_b_padding_divisibility": 4,
+  "padding_rationale": "Distinct SmolLM2 padded sequence length exercises separate teacher CP geometry using existing padding setting.",
+  "sparse_k": 64,
+  "optimizer_steps": 3,
+  "evaluate": true,
+  "dynamic_loss_scaling": false,
+  "full_step_normalizers": "Compute independently per teacher with production collator; retain in run log.",
+  "tolerances": {
+    "cpu_gloo_fp32": {
+      "rtol": 0.0001,
+      "atol": 0.0001
+    },
+    "gpu_bfloat16": {
+      "loss_rtol": 0.02,
+      "loss_atol": 0.005,
+      "gradient_relative_l2_max": 0.02,
+      "gradient_norm_relative_error_max": 0.02
+    },
+    "note": "Predetermined before submission. Compare pre-clip gradients; matching clipped updates do not establish parity."
+  },
+  "required_evidence": [
+    "3 optimizer steps and final evaluation",
+    "per-teacher weighted KD and CE once",
+    "pre-clip gradient parity against same-grouping reference",
+    "student native row/no-relayout checks",
+    "consecutive IPC generations without stale or cross-teacher values"
+  ],
+  "larger_memory_tests": "EXCLUDED"
+}

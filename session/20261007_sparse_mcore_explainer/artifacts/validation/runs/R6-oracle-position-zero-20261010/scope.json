@@ -1,0 +1,39 @@
+{
+  "status": "PASS",
+  "source": "session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R6-dense-cross/resolved_config.yaml",
+  "sha256": "a8897f049a85522aaa5b8ce72d78e0c2041ca9d12eb6d3ec668fbf80957f4ae6",
+  "loss_values": {
+    "kl_type": "mixed",
+    "mixed_kl_weight": 0.5,
+    "zero_outside_topk": false,
+    "temperature": 1.0,
+    "vocab_topk": 64,
+    "reverse_kl": false,
+    "kl_loss_weight": 1.0,
+    "ce_loss_scale": 0.1,
+    "dynamic_loss_scaling": false,
+    "common_indices_from_subtoks": true,
+    "kl_chunk_shift": true,
+    "prefix_bidir_v3_loss_fn": "kl",
+    "prefix_bidir_v3_last_pos_loss_fn": null,
+    "prefix_bidir_v3_jsd_beta": 0.5,
+    "prefix_bidir_v3_position_0_kl": true,
+    "prefix_bidir_v3_noise_filter_topk": 0,
+    "teacher_topk_ipc_k": 0,
+    "teacher_topk_ipc_support_mode": "row_topk",
+    "teacher_topk_ipc_keep_realized": true,
+    "kd_loss_mode": "sum",
+    "sum_weights_metric": null,
+    "alpha": 1.0,
+    "normalize_teacher_by_vocab": false
+  },
+  "scope": "Read-only branch audit of exact failed R6 resolved configuration; retry configuration is unchanged. This is not GPU acceptance.",
+  "guards": {
+    "native_cross_positive_k": "Only native cross branch; legacy dense has explicit K0 guard.",
+    "native_cross_position_zero_disabled": "Only native cross branch after fix; retained dense and sparse objectives receive original setting.",
+    "legacy_sparse_noise_filter_off": "Only when an actual legacy sparse payload is present; not imposed on dense.",
+    "same_tokenizer_common_k_nonnegative": "Only same_tokenizer_kl; no R6 cross-tokenizer dispatch.",
+    "legacy_dense_indices": "Must uniquely identify cross-tokenizer teachers and cannot overlap sparse indices.",
+    "coefficient_defaults": "No alpha/beta or deprecated override supplied; verifier removes its native fixture overrides to exercise the same retained defaults."
+  }
+}

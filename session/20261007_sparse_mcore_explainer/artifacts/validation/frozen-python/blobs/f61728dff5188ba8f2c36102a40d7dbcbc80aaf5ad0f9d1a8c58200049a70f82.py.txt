@@ -1,0 +1,13 @@
+import importlib,inspect,json,os,sys,traceback
+from pathlib import Path
+import ray
+result={'python':sys.executable,'ray_version':ray.__version__,'ray_source':ray.__file__,'scope':'Actual MCore driver interpreter imports actual DTensor module; no actor/model construction'}
+try:
+ module=importlib.import_module('nemo_rl.models.policy.workers.dtensor_policy_worker_v2')
+ actor=module.DTensorPolicyWorkerV2
+ metadata=actor.__ray_metadata__
+ result.update(status='IMPORT_PASS',modified_raycall_signature=str(inspect.signature(metadata.modified_class.__ray_call__)),ray_metadata_signature=str(metadata.method_meta.signatures['__ray_call__']))
+except Exception as error:
+ result.update(status='IMPORT_FAIL',exception_type=type(error).__name__,error=str(error),traceback=traceback.format_exc())
+Path(sys.argv[1]).write_text(json.dumps(result,indent=2)+'\n')
+print(json.dumps(result,indent=2),flush=True)

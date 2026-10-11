@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "optimizer_steps_recorded": [
+    1,
+    2,
+    3
+  ],
+  "evaluation_steps_recorded": [
+    3
+  ],
+  "metrics_file": "controller-metrics.jsonl",
+  "scope": "Actual controller updates/evaluation; independent gradient parity is recorded by the companion reference/capture harness."
+}

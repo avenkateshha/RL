@@ -1,0 +1,15 @@
+{
+  "historical_job": "19467093",
+  "historical_launcher": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/experiments/xtoken-smoke/xtoken-distillation/xtoken-offset-rebased-2n100-20260928-092950/launcher/ray-runtime.sub",
+  "historical_launcher_sha256": "0792388e8fc66876b40562e7f393aebcf784e176f1912e7e8a8bbd330d5f47d7",
+  "adaptations": [
+    "8GPU node Slurm and Ray topology retained",
+    "MCore driver/head interpreter selected",
+    "Backend-specific actor registry uses cached MCore/DTensor interpreters",
+    "Exact committed Bridge/MCore source snapshots and pinned Lens/Automodel/Transformers overlay",
+    "45min small-test resource limit",
+    "Pinned fixture config and run-owned outputs"
+  ],
+  "dependency_source_manifest": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/runtime-preflight-pinned-20261010/runtime/source-provenance.json",
+  "runtime_status": "Require PASS MCore preflight and model conversion before acceptance; generated launcher does not establish runtime compatibility."
+}

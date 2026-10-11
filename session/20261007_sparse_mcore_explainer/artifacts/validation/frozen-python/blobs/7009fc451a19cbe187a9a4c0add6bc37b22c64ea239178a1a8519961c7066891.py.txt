@@ -1,0 +1,22 @@
+"""Adapted from job 19467093's run-owned submit/environment/srun workflow."""
+from datetime import datetime, timezone
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+run = Path(__file__).resolve().parents[1]
+env = dict(os.environ)
+for key in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_HUB_TOKEN", "WANDB_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"):
+    env.pop(key, None)
+env.update(json.loads((run / "launcher/environment.json").read_text()))
+command = ["sbatch", "--parsable", "--nodes=1", "--gres=gpu:8", "--exclusive", "--account=coreai_dlalgo_genai", "--partition=interactive", "--time=00:15:00", "--job-name=xtoken-checkpoint3-final", "--output=" + str(run / "slurm-%j.out"), "--chdir=" + env["REPO_ROOT"], str(run / "launcher/preflight.sub")]
+assert not (run / "submission.json").exists(), "Already submitted"
+result = subprocess.run(command, env=env, capture_output=True, text=True)
+record = {"command": command, "utc": datetime.now(timezone.utc).isoformat(), "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+(run / "submission.json").write_text(json.dumps(record, indent=2) + "\n")
+(run / "command.txt").write_text("python " + str(Path(__file__).resolve()) + "\n")
+print(result.stdout, end="")
+print(result.stderr, end="", file=sys.stderr)
+sys.exit(result.returncode)

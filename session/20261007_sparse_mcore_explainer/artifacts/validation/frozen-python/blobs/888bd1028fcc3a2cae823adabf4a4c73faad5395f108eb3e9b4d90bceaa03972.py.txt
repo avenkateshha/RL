@@ -1,0 +1,53 @@
+"""Use cached backend-specific interpreters through the public actor registry."""
+import os
+from pathlib import Path
+import runpy
+import sys
+import hashlib
+import json
+import math
+from nemo_rl.distributed.ray_actor_environment_registry import ACTOR_ENVIRONMENT_REGISTRY
+from nemo_rl.utils.logger import Logger
+
+run=Path(os.environ['RUN_DIR'])
+runtime=json.loads((run/'runtime.json').read_text())
+def verify_sources():
+    repo=Path(os.environ['REPO_ROOT'])
+    assert hashlib.sha256((run/'resolved_config.yaml').read_bytes()).hexdigest()==runtime['resolved_config_sha256_at_submission'], 'resolved_config.yaml'
+    for name,expected in runtime['source_sha256_at_submission'].items():
+        assert hashlib.sha256((repo/name).read_bytes()).hexdigest()==expected, name
+    for name,expected in runtime['launcher_sha256_at_submission'].items():
+        assert hashlib.sha256((run/name).read_bytes()).hexdigest()==expected, name
+    print('Controller source and owned launcher hashes verified.', flush=True)
+verify_sources()
+original_log_metrics=Logger.log_metrics
+metric_records=[]
+def json_metric(value):
+    if hasattr(value,'detach'):
+        value=value.detach().cpu()
+    if hasattr(value,'tolist'):
+        return value.tolist()
+    raise TypeError('Unsupported metric type: '+type(value).__name__)
+def recorded_log_metrics(self,metrics,step,prefix='',step_metric=None,step_finished=False):
+    record={'step':step,'prefix':prefix,'metrics':metrics}
+    encoded=json.dumps(record,default=json_metric)
+    metric_records.append(json.loads(encoded))
+    with (run/'controller-metrics.jsonl').open('a') as stream:
+        stream.write(encoded+'\n')
+    return original_log_metrics(self,metrics,step,prefix,step_metric,step_finished)
+Logger.log_metrics=recorded_log_metrics
+ACTOR_ENVIRONMENT_REGISTRY['nemo_rl.models.policy.workers.megatron_policy_worker.MegatronPolicyWorker'] = '/opt/ray_venvs/nemo_rl.models.policy.workers.megatron_policy_worker.MegatronPolicyWorker/bin/python'
+ACTOR_ENVIRONMENT_REGISTRY['nemo_rl.models.policy.workers.dtensor_policy_worker_v2.DTensorPolicyWorkerV2'] = '/opt/ray_venvs/nemo_rl.models.policy.workers.dtensor_policy_worker_v2.DTensorPolicyWorkerV2/bin/python'
+sys.argv=['examples/run_xtoken_off_policy_distillation.py','--config',str(run/'resolved_config.yaml'),'--resolved-config-output',str(run/'runtime_resolved_config.yaml')]
+try:
+    runpy.run_path(str(Path(os.environ['REPO_ROOT'])/'examples/run_xtoken_off_policy_distillation.py'),run_name='__main__')
+    training=[record for record in metric_records if record['prefix']=='train']
+    validation=[record for record in metric_records if record['prefix']=='validation']
+    assert [record['step'] for record in training]==list(range(1,runtime['optimizer_steps']+1)), training
+    assert any(record['step']==runtime['optimizer_steps'] for record in validation), validation
+    for record in training:
+        for name in ('loss','ce_loss','kl_loss','grad_norm'):
+            assert math.isfinite(float(record['metrics'][name])), (record['step'],name)
+    (run/'controller-completion.json').write_text(json.dumps({'status':'PASS','optimizer_steps_recorded':[r['step'] for r in training],'evaluation_steps_recorded':[r['step'] for r in validation],'metrics_file':'controller-metrics.jsonl','scope':'Actual controller updates/evaluation; independent gradient parity is recorded by the companion reference/capture harness.'},indent=2)+'\n')
+finally:
+    verify_sources()

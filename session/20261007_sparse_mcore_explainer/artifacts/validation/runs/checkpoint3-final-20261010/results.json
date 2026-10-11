@@ -1,0 +1,88 @@
+{
+  "status": "PASS",
+  "job_id": "19990413",
+  "scope": "Final Stage3 focused producer/reader/lifetime integration. Actual R1-R6 pinned model numerical/training acceptance remains pending.",
+  "checks": {
+    "dense_adapter": {
+      "tests": 42,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "dense_cuda": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "lifetime": {
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "orchestration": {
+      "tests": 184,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "policy": {
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "primitives": {
+      "tests": 40,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "producer": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "raw": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "wrapper": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0
+    }
+  },
+  "totals": {
+    "tests": 340,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "source_hash_checks": "PASS before and after all focused commands;394 files",
+  "cuda_ipc_shutdown_warning_scan": {
+    "status": "PASS",
+    "matched_lines": {},
+    "patterns": [
+      "Producer process has been terminated",
+      "CudaIPCTypes",
+      "CUDA IPC.*(leak|underflow)"
+    ]
+  },
+  "legacy_torch_counter_diagnostic": "Excluded from clean replacement batch; separately confirmed1->0->-1 in job19990303.",
+  "large_memory_tests": "EXCLUDED"
+}

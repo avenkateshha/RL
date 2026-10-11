@@ -1,0 +1,43 @@
+from pathlib import Path
+import hashlib,json,os,shutil,tarfile
+v=Path('/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation')
+staging=Path('/tmp/xtoken-ray-log-archives-20261010');staging.mkdir(exist_ok=True)
+roots=[]
+for name in ('R3-fixed','R4-dtensor-mcore','R1-tp2cp1','R3-fixed-cuda-support-20261010'):
+ r=v/'runs'/name
+ roots.extend(r.glob('driver-logs/*/ray'))
+ if (r/'ray-final-logs').exists():roots.append(r/'ray-final-logs')
+def digest_file(path):
+ d=hashlib.sha256()
+ with path.open('rb') as f:
+  for block in iter(lambda:f.read(1048576),b''):d.update(block)
+ return d.hexdigest()
+records=[]
+for root in roots:
+ rel=root.relative_to(v);label='__'.join(rel.parts);archive=staging/(label+'.tar.gz')
+ members=[]
+ for p in sorted(root.rglob('*')):
+  if p.is_symlink():members.append({'path':str(p.relative_to(v)),'kind':'symlink','target':os.readlink(p)})
+  elif p.is_file():members.append({'path':str(p.relative_to(v)),'kind':'file','bytes':p.stat().st_size,'sha256':digest_file(p)})
+ with tarfile.open(archive,'w:gz',compresslevel=1) as tar:tar.add(root,arcname=str(rel),recursive=True)
+ with tarfile.open(archive,'r:gz') as tar:
+  for item in members:
+   info=tar.getmember(item['path'])
+   if item['kind']=='symlink':assert info.issym() and info.linkname==item['target']
+   else:
+    d=hashlib.sha256();f=tar.extractfile(info)
+    for block in iter(lambda:f.read(1048576),b''):d.update(block)
+    assert info.size==item['bytes'] and d.hexdigest()==item['sha256'],item['path']
+ record={'original_tree':str(root),'archive_staging':str(archive),'archive_sha256':digest_file(archive),'archive_bytes':archive.stat().st_size,'members':members,'status':'VERIFIED_BEFORE_REMOVAL'}
+ manifest=staging/(label+'.json');manifest.write_text(json.dumps(record,indent=2)+'\n')
+ for item in members:
+  p=v/item['path']
+  if item['kind']=='file':assert digest_file(p)==item['sha256'],str(p)
+ shutil.rmtree(root)
+ destination=root.parents[2] if root.name=='ray' else root.parent
+ target_dir=destination/'archived-raw-logs';target_dir.mkdir(exist_ok=True)
+ target=target_dir/archive.name;shutil.copy2(archive,target);assert digest_file(target)==record['archive_sha256']
+ record.update(archive_path=str(target),status='ARCHIVED_VERIFIED_EXPANDED_TREE_REMOVED',restore_command='tar -xzf '+str(target)+' -C '+str(v))
+ (target_dir/(label+'.json')).write_text(json.dumps(record,indent=2)+'\n');records.append({'tree':str(rel),'files':len(members),'archive':str(target),'sha256':record['archive_sha256']})
+ print(json.dumps(records[-1]),flush=True)
+(staging/'results.json').write_text(json.dumps({'status':'PASS','trees':records},indent=2)+'\n')

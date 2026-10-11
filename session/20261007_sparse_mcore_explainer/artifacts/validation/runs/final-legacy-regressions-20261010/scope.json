@@ -1,0 +1,12 @@
+{
+  "scope": "Existing focused CPU chat/EOT, global chunk normalizers, legacy dense/sparse v6 and matrix-free dispatch, bounded TP2CP2 Gloo CE/v6 loss-gradient-structure regressions. No large memory test or GPU proof.",
+  "environment": "Host uv --no-sync --offline with historical Lens/transformers overlay; CUDA hidden; no installs.",
+  "expected_optional_skips": "Two external cross-repository parity tests require separate XTOKEN_UPSTREAM_ROOT; local retained-reference and sharded parity tests still execute.",
+  "targets": [
+    "tests/unit/algorithms/x_token/test_chat_eot_supervision.py",
+    "tests/unit/algorithms/x_token/test_global_chunk_normalization.py",
+    "tests/unit/algorithms/x_token/test_v6_loss_parity.py",
+    "tests/unit/algorithms/x_token/test_ce_sharded_student_memory.py",
+    "tests/unit/algorithms/x_token/test_v6_sharded_student_memory.py"
+  ]
+}

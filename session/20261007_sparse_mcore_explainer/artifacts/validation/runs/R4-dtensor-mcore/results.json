@@ -1,0 +1,29 @@
+{
+  "status": "FAIL_POST_CONTROLLER_TEARDOWN_AND_OBSERVER_COVERAGE",
+  "job_id": "19991907",
+  "controller_numerical_status": "PASS",
+  "controller_optimizer_steps": [
+    1,
+    2,
+    3
+  ],
+  "controller_evaluation_steps": [
+    3
+  ],
+  "numerical_microbatch_reports": 80,
+  "training_dlogits_reports": 48,
+  "max_dlogits_relative_l2": 0.0001001438116869878,
+  "optimizer_replay": "NOT_RUN: post-controller teardown assertion stopped bundled driver before replay",
+  "teardown_report": "controller-process-exit.json",
+  "teardown_failure": "DTensor teacher_0 healthy identity capture raised TypeError: too many positional arguments; student and MCore teacher process identity/correct cleanup/OS disappearance passed. All backend shutdowns attempted.",
+  "legacy_counter_coverage": "FAIL: zero counter events; post-import base-class wrapper missed actual Ray-wrapped DTensor methods. No counter-lifetime conclusion.",
+  "raw_actor_stderr": "Saved per-node snapshots; ray-log-snapshot.json exits_confirmed=false because DTensor identity capture failed.",
+  "independent_source_verification": {
+    "status": "PASS",
+    "scope": "Independent post-run source/config/launcher verification against frozen pre-submission hashes",
+    "source_files": 386,
+    "owned_files": 16,
+    "mismatches": []
+  },
+  "larger_memory_tests": "EXCLUDED"
+}

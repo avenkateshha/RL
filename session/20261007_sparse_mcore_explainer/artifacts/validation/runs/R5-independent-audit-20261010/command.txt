@@ -1,0 +1,60 @@
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 .venv/bin/python - <<'PY'
+from pathlib import Path
+import hashlib
+import json
+import torch
+
+run = Path('session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-averaged')
+capture_path = run / 'controller-reference/items0-1-rank0.pt'
+capture = torch.load(capture_path, map_location='cpu', weights_only=False)
+student = capture['student_full_logits']
+teachers = capture['teacher_full_logits']
+cfg = capture['loss_config']
+assert cfg['teacher_weights'] == [0.3, 0.7]
+assert cfg['kd_loss_mode'] == 'averaged_logits'
+assert cfg['teacher_is_cross_tokenizer'] == [False, False]
+assert cfg['teacher_topk_ipc_k'] == 0 and cfg['vocab_topk'] == 64
+mask = capture['data']['kd_token_mask'] * capture['data']['sample_mask'][:, None]
+valid = torch.cat((mask[:, 1:], torch.zeros_like(mask[:, :1])), 1)
+temperature = cfg['temperature']
+averaged = 0.3 * teachers[0] + 0.7 * teachers[1]
+
+def kl(teacher, support=None):
+    s = student if support is None else student[..., support]
+    t = teacher if support is None else teacher[..., support]
+    student_logp = (s / temperature).log_softmax(-1)
+    teacher_logp = (t / temperature).log_softmax(-1)
+    return float(((teacher_logp.exp() * (teacher_logp - student_logp)).sum(-1) * valid).sum() * temperature**2 / capture['kd_denominator'])
+
+full_kl = kl(averaged)
+individual_kl = 0.3 * kl(teachers[0]) + 0.7 * kl(teachers[1])
+importance = averaged.masked_fill(~valid.bool()[..., None], -torch.inf).flatten(0, 1).max(0).values
+common_kl = kl(averaged, importance.topk(64).indices)
+assert abs(full_kl - capture['reference_metrics']['kl_loss']) < 1e-7
+assert abs(individual_kl - full_kl) > 1e-3
+assert abs(common_kl - full_kl) > 1e-3
+observation_paths = [run / f'teacher-observations/teacher{i}/0.pt' for i in range(2)]
+observations = [torch.load(path, map_location='cpu', weights_only=False) for path in observation_paths]
+assert observations[0]['model_name'] != observations[1]['model_name']
+assert torch.equal(observations[0]['input_ids'], observations[1]['input_ids'])
+assert not torch.equal(observations[0]['logits'], observations[1]['logits'])
+source_paths = [
+    Path('nemo_rl/algorithms/loss/loss_functions.py'),
+    Path('nemo_rl/algorithms/x_token/native_same_tokenizer.py'),
+    run / 'launcher/reference_capture/model_oracle.py',
+    run / 'launcher/reference_capture/controller_reference.py',
+]
+print(json.dumps({
+    'status': 'PASS',
+    'scope': 'Independent CPU expressions on actual captured first-step tensors; this probe does not execute a model or GPU test.',
+    'item_ids': capture['item_ids'],
+    'weighted_logits_full_vocab_kl': full_kl,
+    'captured_reference_kl': capture['reference_metrics']['kl_loss'],
+    'weighted_individual_full_vocab_kls': individual_kl,
+    'averaged_logits_common64_kl': common_kl,
+    'teacher_raw_logits_l2_difference': float((teachers[0] - teachers[1]).norm()),
+    'teacher_real_vocab': cfg['teacher_vocab_sizes'],
+    'teacher_models': [observation['model_name'] for observation in observations],
+    'input_and_source_sha256': {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in [capture_path, *observation_paths, *source_paths]},
+}, indent=2))
+PY

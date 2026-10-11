@@ -1,0 +1,171 @@
+"""Observe existing DTensor export counters without importing CUDA handles.
+
+Run-owned diagnostic only. The 64-byte RefcountedMapAllocator header and signed
+64-bit slot interpretation are exactly those exercised by job 19990303's
+``reusable-ipc-early-20261010/launcher/ipc_refcount_probe.py`` (1 -> 0 -> -1).
+No extra export, CUDA import, consumer, or collective is introduced here.
+"""
+
+import hashlib
+import inspect
+import json
+import os
+import struct
+import time
+from dataclasses import asdict, dataclass
+from functools import wraps
+from pathlib import Path
+from weakref import WeakKeyDictionary
+
+_FIELDS = (
+    "topk_logits_ipc",
+    "topk_indices_ipc",
+    "log_z_ipc",
+    "gt_in_topk_ipc",
+)
+_PATCHED = set()
+
+
+@dataclass(frozen=True)
+class CounterSlot:
+    sample_index: int
+    field: str
+    shm_name: str
+    slot: int
+    tensor_shape: tuple[int, ...]
+    dtype: str
+    storage_handle_sha256: str
+    descriptor_sha256: str
+
+
+@dataclass(frozen=True)
+class PendingExport:
+    generation: int
+    slots: tuple[CounterSlot, ...]
+
+
+def parse_counter_slot(handle, *, sample_index, field) -> CounterSlot:
+    """Bind the real Torch rebuild signature; never rebuild its CUDA storage."""
+    from torch.multiprocessing.reductions import rebuild_cuda_tensor
+
+    arguments = inspect.signature(rebuild_cuda_tensor).bind(*handle[0]).arguments
+    name = arguments["ref_counter_handle"].decode()
+    slot = arguments["ref_counter_offset"]
+    if (
+        not isinstance(slot, int)
+        or slot < 0
+        or not name.startswith("/")
+        or not name[1:]
+        or "/" in name[1:]
+    ):
+        raise ValueError("Unexpected Torch CUDA IPC shared-counter metadata")
+    storage_hash = hashlib.sha256(arguments["storage_handle"]).hexdigest()
+    shape = tuple(arguments["tensor_size"])
+    dtype = str(arguments["dtype"])
+    identity = json.dumps(
+        [name, slot, storage_hash, shape, dtype], separators=(",", ":")
+    )
+    return CounterSlot(
+        sample_index,
+        field,
+        name,
+        slot,
+        shape,
+        dtype,
+        storage_hash,
+        hashlib.sha256(identity.encode()).hexdigest(),
+    )
+
+
+def read_counter(slot: CounterSlot) -> int:
+    """Read a mapped atomic int64 as bytes, without changing its reference count."""
+    descriptor = os.open("/dev/shm/" + slot.shm_name.lstrip("/"), os.O_RDONLY)
+    try:
+        value = os.pread(descriptor, 8, 64 + slot.slot * 8)
+    finally:
+        os.close(descriptor)
+    if len(value) != 8:
+        raise ValueError("Torch CUDA IPC counter mapping is shorter than its slot")
+    return struct.unpack("q", value)[0]
+
+
+def _write_observation(worker, pending: PendingExport, stage: str) -> None:
+    counters = []
+    for slot in pending.slots:
+        record = asdict(slot)
+        try:
+            record["value"] = read_counter(slot)
+        except (OSError, ValueError) as error:
+            record["value"] = None
+            record["read_error"] = f"{type(error).__name__}: {error}"
+        counters.append(record)
+    tp_rank = worker.tp_mesh.get_local_rank()
+    event = {
+        "schema_version": 1,
+        "stage": stage,
+        "generation": pending.generation,
+        "time_ns": time.time_ns(),
+        "pid": os.getpid(),
+        "model_name": worker.cfg["model_name"],
+        "rank": worker.rank,
+        "tp_rank": tp_rank,
+        "cp_rank": worker.cp_mesh.get_local_rank(),
+        "dp_rank": worker.dp_mesh.get_local_rank(),
+        "controller_selects_output": tp_rank == 0,
+        "counter_mapping_header_bytes": 64,
+        "counters": counters,
+        "negative_counter_count": sum(
+            item["value"] is not None and item["value"] < 0 for item in counters
+        ),
+        "read_error_count": sum("read_error" in item for item in counters),
+    }
+    directory = Path(os.environ["XTOKEN_NUMERICAL_CAPTURE_RUN"]) / "legacy-ipc-counters"
+    directory.mkdir(parents=True, exist_ok=True)
+    # Each process appends only its own observations. Keep no Tensor references.
+    with (directory / f"rank{worker.rank}-pid{os.getpid()}.jsonl").open("a") as stream:
+        stream.write(json.dumps(event, sort_keys=True) + "\n")
+
+
+def patch_dtensor_worker(module) -> None:
+    """Patch the plain implementation inherited by the Ray actor after import."""
+    implementation = module.DTensorPolicyWorkerV2Impl
+    if implementation in _PATCHED:
+        return
+    original_export = implementation.get_topk_logits_ipc
+    original_release = implementation.release_ipc_buffer
+    pending = WeakKeyDictionary()
+    generations = WeakKeyDictionary()
+
+    @wraps(original_export)
+    def export(worker, *args, **kwargs):
+        previous = pending.pop(worker, None)
+        if previous is not None:
+            # The controller has finished the prior student call before asking
+            # this producer for another generation. Read before slots can reuse.
+            _write_observation(worker, previous, "before_next_export")
+        result = original_export(worker, *args, **kwargs)
+        generation = generations.get(worker, 0) + 1
+        generations[worker] = generation
+        slots = tuple(
+            parse_counter_slot(handle[field], sample_index=index, field=field)
+            for index, handle in enumerate(result["per_sample_handles"])
+            for field in _FIELDS
+            if field in handle
+        )
+        current = PendingExport(generation, slots)
+        pending[worker] = current
+        # The wrapper has not returned these handles to the controller yet.
+        _write_observation(worker, current, "after_export")
+        return result
+
+    @wraps(original_release)
+    def release(worker, *args, **kwargs):
+        previous = pending.pop(worker, None)
+        if previous is not None:
+            # Observe before releasing producer slabs or unlinking counter files.
+            _write_observation(worker, previous, "before_release")
+        return original_release(worker, *args, **kwargs)
+
+    implementation.get_topk_logits_ipc = export
+    implementation.release_ipc_buffer = release
+    _PATCHED.add(implementation)

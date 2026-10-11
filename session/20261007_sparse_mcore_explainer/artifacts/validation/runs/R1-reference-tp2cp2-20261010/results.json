@@ -1,0 +1,21 @@
+{
+  "status": "PASS_REFERENCE_ONLY",
+  "job_id": "19991376",
+  "slurm_state": "COMPLETED",
+  "exit_code": "0:0",
+  "elapsed": "00:05:06",
+  "tp": 2,
+  "cp": 2,
+  "dp": 1,
+  "ranks": 4,
+  "microbatches_per_rank": 2,
+  "source_checks_before_after": "PASS",
+  "owned_file_checks_before_after": "PASS",
+  "targeted_fp16_zero_k_cuda_regression": "PASS1/0skip",
+  "max_dlogits_relative_l2": 0.0001240848719890026,
+  "max_parameter_gradient_relative_l2": 0.009123677139243513,
+  "max_parameter_gradient_relative_norm": 0.0009928724935636603,
+  "gradient_tolerance": 0.02,
+  "scope": "Actual pinned MCore TP2CP2 teacher/student, native raw IPC and guarded objective, independent loss/CE/KD/dlogits, bare-MCore allparameter VJP per microbatch. Actual optimizer preclip accumulation is a separate controller/replay.",
+  "diagnostic_steps": "Read-only nvidia-smi step.1 with --gres=none returned6 because that diagnostic cgroup had no GPU devices. Repeated step.2 with assigned GPUs succeeded; main test step.0 and overall batch completed0:0. This diagnostic is separate from test verdict."
+}

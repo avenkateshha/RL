@@ -1,0 +1,126 @@
+"""Small actual DTensor-V2 worker construction/forward/export preflight."""
+
+import argparse
+import gc
+import inspect
+import json
+import os
+from pathlib import Path
+from unittest.mock import patch
+
+import ray
+import torch
+import torch.distributed as dist
+import yaml
+
+from nemo.lens.groups import SpanRegistry
+import nemo_automodel
+from nemo_rl.distributed.batched_data_dict import BatchedDataDict
+from nemo_rl.models.automodel.setup import setup_distributed, setup_model_and_optimizer
+from nemo_rl.models.automodel.train import SparseLogitsPostProcessor
+from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
+from nemo_rl.models.policy.workers.dtensor_policy_worker_v2 import (
+    DTensorPolicyWorkerV2Impl,
+)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("run", type=Path)
+    parser.add_argument("--role", choices=("teacher_a", "teacher_b"))
+    args = parser.parse_args()
+    runtime = {
+        "torch": torch.__version__,
+        "ray": ray.__version__,
+        "automodel_source": str(nemo_automodel.__file__),
+        "SpanRegistry": str(inspect.getfile(SpanRegistry)),
+        "worker_source": inspect.getfile(DTensorPolicyWorkerV2Impl),
+        "setup_distributed": str(inspect.signature(setup_distributed)),
+        "setup_model_and_optimizer": str(inspect.signature(setup_model_and_optimizer)),
+        "sparse_postprocessor": str(
+            inspect.signature(SparseLogitsPostProcessor.__call__)
+        ),
+    }
+    if args.role is None:
+        (args.run / "import-api.json").write_text(json.dumps(runtime, indent=2) + "\n")
+        print("Actual cached DTensor interpreter imports PASS", flush=True)
+        return
+    local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(local_rank)
+    torch.set_num_threads(4)
+    config = yaml.safe_load((args.run / f"{args.role}-config.yaml").read_text())
+    # The implementation itself sets up real DTensor meshes and loads weights.
+    # Ray only provides this physical GPU ordinal to its optional NUMA binder.
+    with patch.object(ray, "get_gpu_ids", return_value=[local_rank]):
+        worker = DTensorPolicyWorkerV2Impl(
+            config, init_optimizer=False, init_reference_model=False
+        )
+    corpus = json.loads((args.run / "collated_corpus.json").read_text())["batch"]
+    index = 0 if args.role == "teacher_a" else 1
+    tensor = lambda name: torch.tensor(corpus[name]["values"][:2])
+    ids = tensor(f"teacher_{index}_input_ids").long()
+    force = torch.cat((ids[:, 1:], torch.full_like(ids[:, :1], -1)), dim=1)
+    data = BatchedDataDict(
+        input_ids=ids,
+        input_lengths=tensor(f"teacher_{index}_input_lengths").long(),
+        token_mask=tensor(f"teacher_{index}_token_mask").float(),
+        sample_mask=tensor("sample_mask").float(),
+        batch_item_id=torch.arange(2),
+        force_include_token_ids=force,
+    )
+    vocab = 151669 if index == 0 else 49152
+    result = worker.get_topk_logits_ipc(
+        data,
+        k=64,
+        temperature=1.3,
+        vocab_size=vocab,
+        micro_batch_size=1 if index == 0 else 2,
+        support_mode="row_topk",
+        gt_filter_topk=64,
+    )
+    assert len(result["per_sample_handles"]) == 2
+    shapes = []
+    for record in result["per_sample_handles"]:
+        tensors = {
+            name: rebuild_cuda_tensor_from_ipc(record[name], local_rank)
+            for name in (
+                "topk_logits_ipc",
+                "topk_indices_ipc",
+                "log_z_ipc",
+                "gt_in_topk_ipc",
+            )
+        }
+        assert tensors["topk_logits_ipc"].shape[-1] == 64
+        assert torch.isfinite(tensors["topk_logits_ipc"]).all()
+        assert torch.isfinite(tensors["log_z_ipc"]).all()
+        assert (
+            (tensors["topk_indices_ipc"] >= 0) & (tensors["topk_indices_ipc"] < vocab)
+        ).all()
+        shapes.append({name: list(value.shape) for name, value in tensors.items()})
+        del tensors
+    gc.collect()
+    torch.cuda.synchronize()
+    dist.barrier()
+    worker.release_ipc_buffer()
+    runtime.update(
+        status="PASS",
+        role=args.role,
+        rank=dist.get_rank(),
+        tp=worker.tp_size,
+        cp=worker.cp_size,
+        dp=worker.dp_size,
+        real_weights=True,
+        sparse_shapes=shapes,
+        scope="Actual DTensor-V2 implementation constructor, model forward and legacy sparse export. Numerical mixed-consumer acceptance remains separate.",
+    )
+    (args.run / f"{args.role}-rank{dist.get_rank()}.json").write_text(
+        json.dumps(runtime, indent=2) + "\n"
+    )
+    del worker
+    gc.collect()
+    torch.cuda.synchronize()
+    dist.destroy_process_group()
+
+
+if __name__ == "__main__":
+    main()

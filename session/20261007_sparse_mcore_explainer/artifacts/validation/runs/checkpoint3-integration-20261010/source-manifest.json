@@ -1,0 +1,28 @@
+{
+  "root_head": "7e6492b1b5c192bc9949d87405a469ab018c9770",
+  "recorded_utc": "2026-10-10T20:18:10.604264+00:00",
+  "file_sha256": {
+    "nemo_rl/models/megatron/sparse_teacher.py": "acfada5bf692a1d504361760619cd0517a23ba0073c58c10f93063b2435f258c",
+    "nemo_rl/models/megatron/train.py": "dc0f7dd3e2d0406b1484c8ce94de4e0efbb3efda2d40f5b4cd5a0448ad089e6b",
+    "nemo_rl/models/megatron/data.py": "66c6bf540edb7d5117006d3e9c2edf5d6b11233d2ccb025e5f80cae0def91f55",
+    "nemo_rl/models/policy/workers/megatron_policy_worker.py": "f82af3104259cd379d3874223123772dc4ba33894260760706bc311b42a44f86",
+    "nemo_rl/models/policy/lm_policy.py": "812a097b96c50867d0b7dac568524be1ed0ccb396198d5bfba7b0b87d4a2b935",
+    "nemo_rl/models/policy/interfaces.py": "2adef9eccfc7efe819cef42503a293e02b512735c10d7a627cbea92e4ca8f177",
+    "nemo_rl/algorithms/x_token/utils.py": "1e7fccab8f21ef790129a220f9c843ef1a6ecbe62eb19d4029e36bc4e95c969a",
+    "nemo_rl/algorithms/x_token/loss_utils.py": "c365c2c5a02b5ac37a2698ccb6c715684ecad0c47eb63506d701295df414b0fd",
+    "nemo_rl/algorithms/x_token/dense_teacher.py": "a6d33b09206f1b4740e1b7bfbdf11ddbc7a21f82f1fb16535f06d93bbe01d7a8",
+    "nemo_rl/algorithms/x_token/sparse_teacher.py": "69ac0df3e1291017a9978bd22fb4469823002c8e54c1bed9cde5552e976d0ec3",
+    "nemo_rl/algorithms/loss/loss_input.py": "c143261db5ae19ff2b3706a64a615f8630a89a392ff04e8674309024e4c25414",
+    "nemo_rl/distributed/sparse_topk.py": "907af32e81e3cae6d22e9717503c515b5d45cb7365d0b390ec821f9de0e0f22e",
+    "nemo_rl/distributed/selected_logprobs.py": "a24479ec817ae1b0edc2e5a71f9b2766f85a40f074eeda881a63bc16157e41e0",
+    "tests/unit/models/megatron/test_xtoken_padding.py": "6ed51f136312ee960d5d50297b5474ee223ffcb04ac1bead811dbd782ba37c8e",
+    "tests/unit/models/megatron/test_sparse_teacher_producer.py": "73cb1d99ad4533d5e4a9d5ffd09bfc411cfc4d6159e7177353dbf619854fe55f",
+    "tests/unit/models/policy/test_sparse_ipc_dispatch.py": "8892553b8ed2e01c735087f75f869ca52c562973a68cb24ce42e007d12116fbf",
+    "tests/unit/algorithms/x_token/test_utils.py": "e7266a4be407a2ae3a5742168c9d30194d732b9dc19dcedc147a9f8ee3276a44",
+    "tests/unit/algorithms/x_token/test_native_dense_reader.py": "9744c378a28276f48499f6793a3848bd116f6c28205ecfd20fc7f55021f48d7d",
+    "tests/unit/algorithms/x_token/test_native_loss_input.py": "939913887abbfd2d66207218d7627e47d388c10bf0070281305fb928349f18fc"
+  },
+  "container_sha256": "e732418238a33ffc08d3bafa52e90b1e7a78b53104cc0aebb80d3f9b868b0cf9",
+  "expected_tests": 76,
+  "scope": "Stage3 padding, guards, producer postprocess, sparse CUDA IPC lifecycle, policy dispatch, native adapter/dense reader. GPU producer tests use tiny generated logits; actual model integration later."
+}

@@ -1,0 +1,170 @@
+[
+  {
+    "case": "R1-tp1cp1",
+    "status": "PASS",
+    "config_sha256": "4ce71b9087ad0d2a6b9bbba23ff646d9ed96b7f3af62b1e5115315aaa7e65332",
+    "teacher_routes": [
+      "native_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R1-tp1cp2",
+    "status": "PASS",
+    "config_sha256": "eba6dd7dae9aa10e3d8d3232aac81add1537728efad2fe2d28b167acd9df1d70",
+    "teacher_routes": [
+      "native_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R1-tp2cp1",
+    "status": "PASS",
+    "config_sha256": "6cd935b2d1f73e799934a0b2a7c5d566dbe9dceff88e2849a171a8c1df5f5c7f",
+    "teacher_routes": [
+      "native_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R1-tp2cp2",
+    "status": "PASS",
+    "config_sha256": "7b96b8640146e2656f09242b75f9d0693ab2e7d76b9a729cf533df603c3f3b48",
+    "teacher_routes": [
+      "native_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R2-2n-tp2cp2",
+    "status": "PASS",
+    "config_sha256": "30d13fed6dbd8d85b2c5865444ce0369abf663761307854e7c83abb5f742e029",
+    "teacher_routes": [
+      "native_sparse",
+      "native_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R2-tp2cp2",
+    "status": "PASS",
+    "config_sha256": "eb9b0106b46172e51083f531df9f25db3a533e11af4710eadb7b9ed06002e498",
+    "teacher_routes": [
+      "native_sparse",
+      "native_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R2-tp2cp2-reversed",
+    "status": "PASS",
+    "config_sha256": "78846ed13a5f649c46e416278ab8bc296261bfc8eea9e5b0743679b890f0639e",
+    "teacher_routes": [
+      "native_sparse",
+      "native_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R3-dynamic",
+    "status": "PASS",
+    "config_sha256": "06e18f24b782eb9b51f24bd62f63cc428632a040d3e3bb3fe2931f7371c36831",
+    "teacher_routes": [
+      "native_sparse",
+      "native_same_reusable_dense"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R3-fixed",
+    "status": "PASS",
+    "config_sha256": "62babf08aca8003ed268d2216e712590b53c388934a8449330bb759d6b20b8ff",
+    "teacher_routes": [
+      "native_sparse",
+      "native_same_reusable_dense"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R4-dtensor-mcore",
+    "status": "PASS",
+    "config_sha256": "d8f16ea905a51072542b35b387427182ece03e8726530f29fc4dfb93b9a793b7",
+    "teacher_routes": [
+      "legacy_dtensor_sparse",
+      "native_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R4-mcore-dtensor",
+    "status": "PASS",
+    "config_sha256": "3b75001888cf4c9ab2c839d50b76714b50f31e0b343f7e9f73f0d07a7a51b030",
+    "teacher_routes": [
+      "native_sparse",
+      "legacy_dtensor_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R5-averaged",
+    "status": "PASS",
+    "config_sha256": "763cc1ee11290afc961ca2db835cc98269317b07394a3e0b4e81514ef78c6b08",
+    "teacher_routes": [
+      "native_same_reusable_dense",
+      "native_same_reusable_dense"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R5-dynamic",
+    "status": "PASS",
+    "config_sha256": "80fb3374fb572cb086a6c97a1706a9e22e95abadacfecfb560d0a5f6da3d5a03",
+    "teacher_routes": [
+      "native_same_reusable_dense"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R5-fixed",
+    "status": "PASS",
+    "config_sha256": "4aad6f766bcb104951dd733814f21108e3a2f4cf0796fada093c1054c78a0b04",
+    "teacher_routes": [
+      "native_same_reusable_dense"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R6-dense-cross",
+    "status": "PASS",
+    "config_sha256": "a8897f049a85522aaa5b8ce72d78e0c2041ca9d12eb6d3ec668fbf80957f4ae6",
+    "teacher_routes": [
+      "legacy_dense_cross"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  },
+  {
+    "case": "R6-dtensor-sparse",
+    "status": "PASS",
+    "config_sha256": "7fd74c61c8753264447cd76d4deaba389f12a2d991135a9a844163257f8b2bcb",
+    "teacher_routes": [
+      "legacy_dtensor_sparse"
+    ],
+    "native_student_eligible": true,
+    "scope": "Schema and actual controller eligibility helpers on resolved policy settings, without actor/model execution"
+  }
+]

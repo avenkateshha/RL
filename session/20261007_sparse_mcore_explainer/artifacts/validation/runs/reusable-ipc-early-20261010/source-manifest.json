@@ -1,0 +1,18 @@
+{
+  "root_head": "7e6492b1b5c192bc9949d87405a469ab018c9770",
+  "recorded_utc": "2026-10-10T20:31:05.085654+00:00",
+  "file_sha256": {
+    "nemo_rl/utils/reusable_cuda_ipc.py": "60b64d12a4a52785831f0da6417c701fded14dae3009b665600a92d1ef250cc1",
+    "tests/unit/distributed/test_reusable_cuda_ipc.py": "e95b4bcfd597e6eb770f908d84fbf48b0945a80e90908a13d1cc291b82eeed13",
+    "nemo_rl/models/megatron/train.py": "dc0f7dd3e2d0406b1484c8ce94de4e0efbb3efda2d40f5b4cd5a0448ad089e6b",
+    "nemo_rl/models/policy/utils.py": "8a7c36d6577d0c40cd77164b9d2df04f43b9751aac53d5789eb0795df9e13371",
+    "nemo_rl/models/policy/lm_policy.py": "a2bc9eb4c706bc1022f1253ed14c49154e5b12e6fa5f787451e790faee575298",
+    "nemo_rl/models/policy/interfaces.py": "2adef9eccfc7efe819cef42503a293e02b512735c10d7a627cbea92e4ca8f177",
+    "nemo_rl/algorithms/xtoken_off_policy_distillation.py": "93557c27336a6f86b23dc0af1bb7bd6b073f1e58a2a5b1dd82822bb0af09e460",
+    "tests/unit/algorithms/x_token/test_megatron_cp_normalization.py": "14de9c595bdd94c6dc87e4f37608b712cac029e78be227937bfa52db8cb5364e",
+    "tests/unit/algorithms/x_token/test_xtoken_off_policy_distillation.py": "986725507e8d016aa0fa2ced5f051d747118b1d8624776ed9cee55641766462b",
+    "tests/unit/models/policy/test_sparse_ipc_dispatch.py": "d85e77f5072376a227e9fd08a1c01f0309bdbb084d35ea52082897be1098c9d9",
+    "tests/unit/models/policy/test_utils.py": "1ef505ed9f41c4b885d86d9f7075128a5d648b392885d3189af8cc770d618cf3"
+  },
+  "scope": "Early raw reusable CUDA IPC fanout/open-close/lifetime tests and corrected legacy-counter diagnostic, controller identity/lifetime/public dispatch and schedule compensation tests."
+}

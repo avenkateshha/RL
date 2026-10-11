@@ -1,0 +1,29 @@
+{
+  "status": "PASS",
+  "scope": "CPU mocked lifecycle and local tar archive fixture; no actual Ray actor/OS/CUDA proof",
+  "checks": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "python",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_controller_teardown.py"
+      ],
+      "returncode": 0,
+      "source_sha256": "ecf91a023e0500d51637615d1c8d46d7743972f3cf6ca4fd03381150a21a2ae5"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "python",
+        "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/verify_ray_log_archives.py"
+      ],
+      "returncode": 0,
+      "source_sha256": "8cc3e28db5e806f3000a25548c3fdf75742c15b56cb04654f2b2d6ff536d047d"
+    }
+  ],
+  "helper_sha256": "562b1cb8dcf66c70ff19cfa5d43a646d7d14710f00fd3083717b3289b1890480"
+}

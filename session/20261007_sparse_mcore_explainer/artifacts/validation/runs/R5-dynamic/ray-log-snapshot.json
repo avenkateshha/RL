@@ -1,0 +1,644 @@
+{
+  "scope": "Node-pinned tar snapshots from every live Ray node; post-worker-exit only when exits_confirmed=true. Stderr absence does not prove CUDA IPC counter validity.",
+  "exits_confirmed": true,
+  "nodes": [
+    {
+      "node_id": "e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde",
+      "archives": [
+        {
+          "path": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "sha256": "2ee7b407e24da8b7b64934a46c7ab93fd18642e528f35df30870377ced3c5b8a",
+          "member_manifest": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.members.json",
+          "files": 839
+        }
+      ],
+      "actor_stderr_members": [
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-01488a1b365911c3cc5474bb573bcea1194e84e15f95840f8cca7555-ffffffff-3718511.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-044e3af054c3334aa92f7771b50f7840645f9d69d0cfed204d55cc9e-01000000-3726250.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-0587057e3b6eb722bfb2994be65a369e7d666382ac3b6af12a4e99ab-01000000-3726266.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-0843e1cdb31a42d2c4236751c6d5638ccf757dbe648cf4b9d0b5930e-ffffffff-3717341.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-0a015cb61aba47fb7d93427f9fcf51a724336b5d37d688428fead34d-ffffffff-3718282.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-0dd13e339841dcd9e3399640498159a0b25858e7cd7418df2f379340-ffffffff-3717355.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-0e8fa6bc394842819c734dd8f29d1a42fe761a39f16f61bb19595270-01000000-3729391.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-0e9dd6431d2ee791dbc7b01ca004ab3b06411ebc1d43f58ca22b455e-ffffffff-3717365.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-0ea4342966396ed99d07b5e3feeb8966c19c2631203eefa5d3947988-ffffffff-3718614.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-103e1bfd8fdd6576a5aa07c448bdb5e7c1b8256ff1e9ebaaed500446-ffffffff-3717359.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-108ef84ec4ab4e225df46bae9e99d75518e4518a71f9935e214b1fe5-ffffffff-3717381.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-135612d46029fd9ef39972fab40d9b34146a893a55de59b567e49f49-ffffffff-3718118.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-143992a2b6114f39c6230c51a86548ee5f3e1d5d5b399a83229e5e2f-ffffffff-3717628.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-1545749a673e7777e935377a47b933a8eac913ee236c11c426c0b2e6-ffffffff-3719064.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-1634dfe442ae300e4c51ec20b6bf7eeed773838ce58cfe2d691790f2-ffffffff-3719277.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-163c9c1f378276b4d47780bd574455bcb96bec8ba7b345688207e324-ffffffff-3718542.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-18fa28368599dcf22012931766d5665b7a46eb0ab43e4ef149c6ecc3-ffffffff-3717361.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-19779b829bef740d33c02aca621dafd681cbc8ea5508faa69018814f-ffffffff-3719254.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-19d2b1b0e24fdf8b2e1fc5f946561dec90aa3624c8da41a90f84e048-ffffffff-3718341.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-1b2d789c876c1a6af27d4009aa01e6023073f3d1811f9ab18a9c4bdc-01000000-3724763.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-1d58f1fb17f1eadb1ed941896aa107d340fd156c00a2671311e7a253-01000000-3724759.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-1dd2306d731ac60770cbbcf4de01af1d512defc08e43abfe4f5a4a0f-ffffffff-3717386.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-1e5edab6520218c2268eca14cfb811dcb8e7cfeb20531e8825a3b1c3-ffffffff-3719180.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-21ad37e6dbf256b7002f125b91543f24b8770a85b37380c99028df68-01000000-3726221.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-238d7f1ea0ac2631b7e289708e8a41c692b0440f58d98e651f5187c5-ffffffff-3717656.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-259911e016b51bec207f1d29beeca7083ddcb851454cc76d8b7ed2fd-ffffffff-3718894.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-264e1765a57a4ad5925daedf49029468f8435c36effb180aa3207402-ffffffff-3718417.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-271b112a6a77ee402d09a4089c1946a169b87f845293c239984a8d8b-ffffffff-3718727.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-272f49b859b2aec1f3fcc213bc461e09944eb2e0a6469109e970442d-ffffffff-3717468.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-290f66da268ddd4b97cc0f6e7ea5728883bff59bf4cff0294a0036b8-ffffffff-3717356.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-2a0b07cfe07c7483578aeecb0fd546fe58a13e565731b47618db3bde-ffffffff-3717394.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-2a17c9f8051202198ad571ed4a26d943189ecdef66d42d194990be71-ffffffff-3717342.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-2b062ddc782115523ba1630d58d3c83c64f7f34148510426afdbc93f-ffffffff-3717513.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-2d216662dc554fca6bd9009b6091a33e3050cdcae1cdc7c983cbcf37-ffffffff-3719094.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-2d264b2f656168b4a4ac6226cb60b8a8e1510202a26e68f0435adbaa-ffffffff-3717378.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-2d59a974e237b468f94f914fdb64f10814065ad79a27451ec9cd2aa9-01000000-3724156.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-2dee185a1c159466b1e370c0523d37f7c92461373786e86baf9bfbcd-ffffffff-3717395.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-2fc4da58fa162d75d6cf10708059bbbfe80ad4040ba8011c8ccfafef-01000000-3729971.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-3100698582bd053493ad5874b5ad2042908726e934f2d6e65032bc79-ffffffff-3717367.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-34e84bfe0b6e7ffa922e60590f5ad682f2032d9500710ec8b2b1fc2d-ffffffff-3717354.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-36a73b0c5f618b1092dd28dc92a0cdc55bfac2a38863694b911b6b77-ffffffff-3717396.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-3724e67fdb9eb9d216c514f5e42ac7a59f334e8e0677589be46cfc2b-ffffffff-3717371.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-3729228c87500c9c5f465f358b41b22cd37d63dd86964633e5eb37ae-ffffffff-3718309.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-37d2ae7a552ffb1fb7a03598fbfd9243dd2af23732aa51ce93a57653-ffffffff-3719439.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-38e05cbdeb507a8472e4bb565a339ffe108d622b884347f140126131-ffffffff-3717391.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-3b8938c3615fc4a7e7e0e70e58c3b8ad5db699376d50362f57729121-ffffffff-3718647.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-3ca3193adef068c0270d2bf7f005445abb3cca21a0c521b37e1ff62f-ffffffff-3717629.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-3d33e4f80fa357aaca2e0bda5ea5b13dc5ae1f6f86ecd2d2e0f7b29c-ffffffff-3718246.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-3fdc1e7069348ed2c7cdb18e3be4286855d1cbd9177274f323c7df31-01000000-3729937.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-419398f2507708c741fc7f045bc9b58b8d6a24f95c7fbd82c5369788-ffffffff-3718237.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-43132cef1e7663af08be35f7e64269191ad188e61b474e9a5168b8de-ffffffff-3717385.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-4328ed1ce315485871b756ab0b20fb17176d1cbc3d6b0a4c14343227-ffffffff-3719440.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-46de3950a7005e270b464773db0748a544b913a32404cc8a1e53e493-ffffffff-3717384.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-474f752249522172558b578f9be89c9eef56f427e3f8a9a8e2e14e99-ffffffff-3717531.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-48852c15f2749f4af87a6234e9f88a6480f042e2f49828091137266a-ffffffff-3717380.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-4acd54a72ee3705b83bf0ecce7dfe688a48157e8849eb9ddca37ef7d-ffffffff-3717655.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-512e3c48d4ce3818a40289b0ba5dd94bb1ac2d741bc65ea7718508ce-ffffffff-3717590.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-515bf122a68b68e04b5f55e8a0b0b780ba15daf9bd310d901c2fa84e-ffffffff-3717392.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-51eb74d470e11441eaa9da2b1d7611c2bb3b928a1e36adbfc52d7031-01000000-3726275.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-52a10de1f8a5b77ad7686c69910fb0180916a531d82d27f610c7ea36-ffffffff-3718143.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-53007599094f43397c0e97f8577fbd3d1b692ddc60939864b749d278-ffffffff-3717654.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-53f226c0a54e4799461e1c6a5b973dc01b5b4e6b3a20302de0164710-01000000-3729987.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-56a9d2a8e769e7ba6a85681e94272ebf646393b8c8791ca6fad4824c-ffffffff-3718432.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-57032342b41525479687f35863cbfcd5c6655632b5664e5f5c6500e9-ffffffff-3717345.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-57f1e2d33d873c453ddaad01878b711466ac12f8da54ef773a769365-ffffffff-3717398.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-607fb6b059e2eca5481bf7e2881c6e0018c5736da804f55ac92cafc1-01000000-3724762.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-60ea4b205537408a09b5c2d3ccfbce8cf314e26ce9761c59ab4b0139-01000000-3729955.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-6131b4bc65a91639190bc390987e8a33adbd1a0c56036bd53cdd310a-ffffffff-3717344.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-65d1610266ad5d441a6ca5f87a89778fc2b5dcf23a72d82523538fe9-ffffffff-3717539.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-6afd8973b7df4af330a89a4803c6031beff93cfc3beb2ec69e3d8345-ffffffff-3718422.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-7148da20b29239a25f58b3ce41971800dd792e9ad20c709b49962b0d-ffffffff-3719391.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-7262aca2e70daa55c6aa358a563d43c5c39e2173b6d914389ecf3ffb-ffffffff-3717348.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-72ddd6b597b6ab0bd121cd2a8803ea09a9eef7ecef788dd3ca113243-ffffffff-3717340.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-7825f49a81bfee2ea82c105d19ab78f552fe2b002166d12fa4bcc16b-ffffffff-3718095.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-78a6fe2c26e461ec047f91c0cc89d977cd3295554cc24bb03641b70c-01000000-3724764.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-79c73dac69f3adbe7a4615e0903ba456029485c30f2105e4552d2139-ffffffff-3719217.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-7c58fa2b98be3f3672ecb604c5738652ce54abc2d04c54c852aa2eb1-ffffffff-3717382.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-7d1fbb961e753df2efc066cfcdc6471cc7b0662c20cac328dc6fdac1-ffffffff-3717338.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-7e9b5e9d4194324ed6d92e696763e21b6e698f59f260bea5b7be2c58-ffffffff-3719025.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-7ea9266430cc59d01383674396d60c1f3c6c87bd90ef030d867109c7-ffffffff-3717370.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-7f78dc85210e5ed25f3559e3aaaeccd33636e5554dd93cc5c80ab626-ffffffff-3717605.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-80b78f699ffeea12fd350612736b1608d2e7ce5df7b02434546722bc-ffffffff-3718969.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-8314bf75850a690d2a150eb0e801989dbd7030334763f4cd69a43295-ffffffff-3718482.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-8369db0ca4bfa1dba23efd6adb4ee5d288acb02289cffcad4ae78f75-ffffffff-3718902.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-863521b63b64f4793ce15d8a4bab51d7e093ea4f7ecee7daec1ee6cc-ffffffff-3718078.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-893a28a2be3c64456ecec68449f7fc90ae07b643ed6811cc386b53cf-ffffffff-3717375.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-8c3e6edbbdf819afdc523a41ba211d9145927cbd11609dee168d822a-ffffffff-3719278.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-8c74c04f1674b3f2be3bb2923a2580cf38126858c1f5884eb9ad9328-ffffffff-3718375.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-8d6ed4969ccb7458b441a19ca6eccdb28d99b9e83e28f87855aec96f-ffffffff-3717377.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-8fb2c59a92e3efb4b95e646f8b32ba544349fce57d556e0fa0e46c93-01000000-3726219.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-90230b17b865976199af42f71399ac45d0c64cec34a593eb145ad37c-ffffffff-3717346.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-93c4ed2b895d1ebe638548c356ed66e33e08e4bbd0901b64856a325d-ffffffff-3718815.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-93ea294fd4531d8a2e6124ae2ada81b4d9afbed8f26ba9d77d70f1d8-ffffffff-3717362.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-9fa78c51d7203566baa32f574b8019f5eef112c2e2049d330a804cb6-ffffffff-3718785.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-a228ca89dd5df72af54d25d4bc731984e7f7175ba018c6d84c9eb45b-01000000-3729889.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-a2922a69adb955de5bd057c9c8d61a216096219f269e85e60c02965e-01000000-3724761.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-a33f2173bbe2fb930c65860efd7dea91bf60af37fb8e00d05354bd82-ffffffff-3717360.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-a3ef3de3d6ae25200a251071f2c4825809dce24c5c7facd4c21d2b91-ffffffff-3717379.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-a4bbf83d6ac8ca9e6769ee8261048e474573804b8512fb285c32766b-01000000-3726232.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-a506a16e758345aa7a00548e955e8f330705a0c32c157106f8278f20-ffffffff-3717397.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-a93d751492532986bfd6522bd5c039027ca916ce34ea2cc08aa896ec-01000000-3729894.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-a95eca8f34c2ca6eb3621dc7c92d81fba31f72515f1a8efcbe3d333a-ffffffff-3717350.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-aae1714ea0a1ca151c585b03a5289546b9cfc17dfbbcbe7a4f705b79-01000000-3725641.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-aaee2bbec8633ef0b6839c236bbc351ac4d2dd913ec005d99e68d090-ffffffff-3717399.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-abadb3fdf1ddf0a091d562fb3761ce7d3159fbf1206c4f7d6a98c47a-ffffffff-3719436.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-adc92a6f362cb15d7461ddb3945d66de07086dc92dd9784b1d3509d1-ffffffff-3717653.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-ae69872388997a6c2ea0216ec9fc899bd0d15d7fe15fbf2bfa6ecdb0-ffffffff-3717369.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-aeb0775425c9b363d516fb976964576113f0f6704775c5dd61ad5c58-ffffffff-3717390.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-b2f971b32dde34814977714e0e6a44411d88b580365556e16d6445d6-ffffffff-3719133.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-b52010faa382b204348083310747c9a6031878173989aeadd2af8f29-01000000-3724155.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-b86c2a3d8fc2264f0c69720f798a0e7fd402c81b959bb7a5fe86a31b-ffffffff-3717373.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-b928506ab6b8b20bf1bbd63cf18f8ae858eb1226dd9c9083913113f6-ffffffff-3717364.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-b93e2909e0cf47157f728c02d6a7d615b190df48ec2beb452ab61cd2-ffffffff-3718841.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-b98e8540121344c47d5918a385bb2b033bd3115f5f4c187747706de4-ffffffff-3717374.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-ba7d851cf9a97cb3a5902cfc83866c36e39a6f683a070e745dc6e837-ffffffff-3717357.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-bb2d257edd0abd20c2540643673f7e0502b7ae3b8e2b3f10c48bab1e-ffffffff-3717358.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-bb9e190c771e0e4de341c10448d918a5f7bab9a727f692601864ac61-01000000-3729393.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-be8b90eddcb68a2e4151361369f68698c504e1640f900ee9810ecbbb-ffffffff-3719437.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-bf59a980fbb1ab93a05952a9940a673b03fbae58f6776a2a0a570bb6-ffffffff-3718567.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-bfcab54762d4a26f1a28a49478e43a13fbd55afe0cd4ae74d8c20c74-ffffffff-3717351.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-c11e7f48ca76221c2aef09e2adab8e70bc041ecbfd39d76ce0a01425-ffffffff-3717652.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-c12f2c1f4e00abf732ef24c8d97d4511265aa67261c9fa72e07fd42b-ffffffff-3717343.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-c2e95a61eefebf8a1df98dfd43a5c4e9d0ce341299540ac43104f7e4-ffffffff-3718950.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-c5da95fb4f6d8214b8c3fdf13d7fb5ab4a53ca5199e557dc2433169a-01000000-3729888.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-c60fda033e9dd4445e76c8776be3d59632fabc118325f4eca2ce7d2a-ffffffff-3719381.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-c6a1a312f7c952ceb4f2fc253cb3e62d81b4a071defcb19e5e9df411-ffffffff-3718313.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-c7080f459038471cc89e6fdceb18980dd21394535456e7f7f8312682-ffffffff-3717352.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-cadaa11c854fe1c82dc445f5b94310b1806ff4360d0ef34f33192591-ffffffff-3717339.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-cb3f1a7138ae9a90f4b26dac1c7e4844f36170ba2693da09bc99deee-ffffffff-3717347.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-ccbd23df88d5893905b01119c70970dbe44bbaa8f5afd02f6ef77373-ffffffff-3718516.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-cead320a6fce2d72ba0f7a17a4b873853ec6d036d82394588433f450-ffffffff-3717393.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-d3949c9cdf2fc6a217626b869e9f8186143af62684c427638137feec-ffffffff-3718477.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-d7767aa4d62e03834e5efc4a70bd5b9b752609620085b3dd6bee2f8b-ffffffff-3717383.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-d7b9292fbc5e536a47e5561810960ef018890535a21a66fbfd792b01-01000000-3726222.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-de2f7661a440dce15563ad23867078a4306e672c3376a8d18f74f854-ffffffff-3719345.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-df0f90b2c9e0b16e5bb4ab1d6da913f2e4de065ab80defbebe40acfd-01000000-3724760.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-df2b1f31b82ec5ab76edf227670394c058c0b9cd12540fac440f99e2-ffffffff-3717490.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e320b04b34b2c2ad28216b87c712e44dc98ae6eff9da789f77739bc5-01000000-3724758.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e3936c5995e217711c299b64b43fd02d2239cb5da890cbcc7045d3cf-ffffffff-3718344.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e3b93d431dd8b5fdebdd8b6dcf429c4d2aeabd7759eaa6e7bb5e3943-ffffffff-3717363.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e4b6ac0138f91bc9e58f34e14310f0a2a870a26e1678c0c129fd97d1-01000000-3729920.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e6bed43509b3cf0c6b294366a0f2953e78442146e51296687b7f591b-ffffffff-3717387.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e6ec288296617525d5c7de6cb7aab5f612d4d0b2c6f5e95cbb3f89d4-ffffffff-3717366.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e74508f36923768393b170af63c5f3e2e73ae3f8184e507936ad0f12-ffffffff-3717960.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e7ba9b43cd15efb3c3ab0cc995cf156bfb43e3846bba4f34b4ae7f17-ffffffff-3717444.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e8783e1334325a626edc0628583b0c8b7bbd94604259a14747958a4c-ffffffff-3719170.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-e992351d3def8c2c199cd9c9a493c5591aa4893dc984adb6c8536f6d-ffffffff-3719438.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-eb51eae76f3818c287b79667063c7cbd0aaff20450f139c55d03900f-ffffffff-3717940.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-ee586b77b22e8dc1ecaab699898434e47a3a3b1fa791aac6317e5aae-ffffffff-3717368.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-f001a0fb35d78d62c884a935378e9e3ced2de86c108e8810fe423bef-ffffffff-3717353.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-f13ff2ac503325a2ca99a5917123123eedaa7360c4cfa84daf3b9ec1-ffffffff-3718698.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-f4d0d441758702e648675692d04cafafdf37dd71e928d078ea3d3dc8-01000000-3726241.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-f55422479700228ecc290fddfa46245499ece0348ff01b93dd8bd879-ffffffff-3717372.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-f96650c168a805bf10cb98f5372ea8521eeff1a9a6b58becd8f543a9-ffffffff-3717389.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-f9884cfb6769d215c31202b53e6a0caa9b95df62ca0c12551e5a2110-ffffffff-3717376.err"
+        },
+        {
+          "archive": "ray-final-logs/e2d134081a48a3aa0d50d6bb9e9de40a4bbaa513bf17d5ee8dd71fde/session_2026-10-10_16-51-57_311686_3702048.tar.gz",
+          "member": "session_2026-10-10_16-51-57_311686_3702048/logs/worker-fc265ce7a820809232e878f489c812f7724cdcdc0e1ba984f2fc73a1-ffffffff-3718085.err"
+        }
+      ]
+    }
+  ],
+  "process_exit_report": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R5-dynamic/controller-process-exit.json"
+}

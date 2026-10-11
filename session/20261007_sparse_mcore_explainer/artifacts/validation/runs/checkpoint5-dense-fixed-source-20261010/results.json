@@ -1,0 +1,55 @@
+{
+  "status": "PASS",
+  "scope": "Exact runtime source delta only, no numerical or GPU acceptance inferred",
+  "recorded_utc": "2026-10-10T23:12:24.534758+00:00",
+  "baseline_commit": "fcc943c5eab4690a4faa1892d80b9d56cb8d1564",
+  "source_patch_sha256": "c5335139319f8c49b4eea8ddfe321e192ce57b1efc37bc6b27a00a617b1eaabd",
+  "verified_source_files": 387,
+  "changed_files": [
+    {
+      "path": "nemo_rl/algorithms/x_token/loss_utils.py",
+      "sha256": "3dc38e79454a285d84ef55a1db6d25464ab4233c2ae6db6cbea237f5a1533879",
+      "baseline_present": true
+    },
+    {
+      "path": "nemo_rl/algorithms/x_token/native_same_tokenizer.py",
+      "sha256": "c4ea66ab4a8ef67e7d2247a6be7b0300c22c61f2778da4ca1fbc7f62373a576b",
+      "baseline_present": true
+    },
+    {
+      "path": "nemo_rl/algorithms/xtoken_off_policy_distillation.py",
+      "sha256": "c508ec7b728ba1a345e7ef512c0e32af25e654f41087464a929567df4de703ef",
+      "baseline_present": true
+    },
+    {
+      "path": "nemo_rl/distributed/worker_groups.py",
+      "sha256": "f61cc928ff54f296413ebdd27afa02e8cf2955605947f21e4efbb6a92cb696af",
+      "baseline_present": true
+    },
+    {
+      "path": "nemo_rl/models/policy/lm_policy.py",
+      "sha256": "332c4b1f09f8f155d958bd29ee68ee430bc8b3d2f0316b87599c4868e545d988",
+      "baseline_present": true
+    },
+    {
+      "path": "nemo_rl/models/policy/workers/dtensor_policy_worker_v2.py",
+      "sha256": "23b68268b113a9ef1d28888a81f3d51c10d37f0d0c6eb4e802fb24ec5f63b48e",
+      "baseline_present": true
+    },
+    {
+      "path": "nemo_rl/models/policy/workers/megatron_policy_worker.py",
+      "sha256": "1d6bdb1ec4af560341a422f8e23c1f5da984772d1cc5d35710b534a370ee4625",
+      "baseline_present": true
+    },
+    {
+      "path": "tests/unit/algorithms/x_token/test_legacy_dense_reusable_ipc.py",
+      "sha256": "59f2dff690582af46ea3c25bec3f746d232b35327fc694bf3473135ba2832f88",
+      "baseline_present": false
+    }
+  ],
+  "applicable_runs": [
+    "R6-dense-cross-reusable-20261010",
+    "R4-mcore-dtensor-reusable-20261010"
+  ],
+  "reverse_apply_check": "PASS (read-only git apply --check --reverse)"
+}

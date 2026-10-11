@@ -1,0 +1,1712 @@
+{
+  "format": "mcore_preclip_owned_gradients_v1",
+  "boundary": "DistributedOptimizer.prepare_grads returned; before clipping/update",
+  "stub_optimizer": false,
+  "gradient_field": "decoupled_grad",
+  "precision_aware": true,
+  "grad_reduce_in_fp32": false,
+  "average_in_collective": false,
+  "sequence_parallel": false,
+  "qk_layernorm": false,
+  "calculate_per_token_loss": true,
+  "gradient_accumulation_fusion": false,
+  "inventory": [
+    {
+      "name": "embedding.word_embeddings.weight",
+      "full_local_shape": [
+        64128,
+        2048
+      ],
+      "full_local_numel": 131334144,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.0.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.0.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.0.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.0.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.0.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.0.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.1.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.1.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.1.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.1.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.1.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.1.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.2.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.2.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.2.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.2.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.2.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.2.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.3.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.3.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.3.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.3.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.3.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.3.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.4.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.4.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.4.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.4.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.4.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.4.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.5.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.5.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.5.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.5.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.5.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.5.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.6.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.6.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.6.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.6.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.6.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.6.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.7.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.7.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.7.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.7.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.7.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.7.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.8.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.8.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.8.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.8.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.8.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.8.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.9.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.9.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.9.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.9.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.9.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.9.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.10.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.10.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.10.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.10.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.10.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.10.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.11.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.11.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.11.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.11.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.11.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.11.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.12.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.12.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.12.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.12.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.12.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.12.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.13.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.13.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.13.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.13.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.13.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.13.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.14.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.14.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.14.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.14.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.14.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.14.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.15.self_attention.linear_proj.weight",
+      "full_local_shape": [
+        2048,
+        1024
+      ],
+      "full_local_numel": 2097152,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.15.self_attention.linear_qkv.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.15.self_attention.linear_qkv.weight",
+      "full_local_shape": [
+        1536,
+        2048
+      ],
+      "full_local_numel": 3145728,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.15.mlp.linear_fc1.layer_norm_weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.15.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.layers.15.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    },
+    {
+      "name": "decoder.final_layernorm.weight",
+      "full_local_shape": [
+        2048
+      ],
+      "full_local_numel": 2048,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": false,
+      "partition_dim": -1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false
+    }
+  ],
+  "shards": [
+    {
+      "name": "decoder.layers.14.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 9829632,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.12.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 2882560,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.11.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 10878464,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.9.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 2882560,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.8.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 10878464,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.6.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 2882560,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.5.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 10878464,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.3.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 2882560,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.2.mlp.linear_fc1.weight",
+      "full_local_shape": [
+        8192,
+        2048
+      ],
+      "full_local_numel": 16777216,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 2,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 10878464,
+      "end": 16777216,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "decoder.layers.0.mlp.linear_fc2.weight",
+      "full_local_shape": [
+        2048,
+        4096
+      ],
+      "full_local_numel": 8388608,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 1,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 2882560,
+      "end": 8388608,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    },
+    {
+      "name": "embedding.word_embeddings.weight",
+      "full_local_shape": [
+        64128,
+        2048
+      ],
+      "full_local_numel": 131334144,
+      "parameter_dtype": "torch.bfloat16",
+      "tensor_model_parallel": true,
+      "partition_dim": 0,
+      "partition_stride": 1,
+      "sequence_parallel": false,
+      "average_gradients_across_tp_domain": false,
+      "qk_layernorm_name": false,
+      "start": 112164352,
+      "end": 131334144,
+      "gradient_dtype": "torch.bfloat16",
+      "gradient_field": "decoupled_grad",
+      "all_finite": true
+    }
+  ],
+  "rank": 15,
+  "world_size": 16,
+  "tp_rank": 1,
+  "tp_size": 2,
+  "cp_rank": 1,
+  "cp_size": 2,
+  "dp_rank": 3,
+  "dp_size": 4,
+  "optimizer_group_ranks": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    13,
+    15
+  ],
+  "dp_cp_group_ranks": [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+    13,
+    15
+  ],
+  "distributed_optimizer_instance_id": 0,
+  "metadata_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/optimizer-first-step/rank15-optimizer0.json",
+  "tensor_path": "/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/RL/session/20261007_sparse_mcore_explainer/artifacts/validation/runs/R2-2n-tp2cp2/optimizer-first-step/rank15-optimizer0.pt",
+  "sha256": "d8288a2120384ca13cb5a26ec19e3d5f59a40fb86f28c0f7ec122f74d182d9ff",
+  "optimizer_index": 0,
+  "found_inf": false,
+  "num_parameters": 11,
+  "num_elements": 77242624,
+  "empty_owner": false,
+  "all_finite": true
+}

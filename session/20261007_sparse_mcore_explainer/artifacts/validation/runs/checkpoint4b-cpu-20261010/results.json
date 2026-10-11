@@ -1,0 +1,50 @@
+{
+  "status": "PASS_CPU_ONLY",
+  "scope": "Checkpoint4b CPU correctness/regression only; overlapping suites are not summed",
+  "checks": {
+    "same_math": {
+      "exit_code": 0,
+      "pytest_passed": 16,
+      "cuda_deselected": 4,
+      "numerical_dispatcher_comparisons": 156,
+      "exit_status_provenance": "transport agent confirmation"
+    },
+    "same_mixed": {
+      "pytest_passed": 8,
+      "numerical_loss_gradient_comparisons": 432,
+      "log": "xtoken-same-mixed-cpu.log",
+      "exit_status_provenance": "root agent final process confirmation",
+      "exit_code": 0
+    },
+    "controller": {
+      "exit_code": 0,
+      "pytest_passed": 200,
+      "exit_status_provenance": "root agent confirmation"
+    },
+    "selector": {
+      "pytest_passed": 12,
+      "deselected": 188,
+      "log": "xtoken-controller4b-selector-tests.log",
+      "exit_code": 0,
+      "exit_status_provenance": "root agent final process confirmation"
+    },
+    "dense_contract": {
+      "exit_code": 0,
+      "pytest_passed": 9,
+      "exit_status_provenance": "normalization agent confirmation"
+    },
+    "adapter_contract": {
+      "exit_code": 0,
+      "pytest_passed": 45,
+      "exit_status_provenance": "normalization agent confirmation"
+    }
+  },
+  "gpu_execution": "NOT_RUN",
+  "excluded": [
+    "larger memory tests",
+    "staged K ladder",
+    "production-size VRAM gate"
+  ],
+  "checkpoint_commit": "fcc943c5eab4690a4faa1892d80b9d56cb8d1564",
+  "source_fingerprint_scope": "Initial8-file snapshot was captured while root mixed command was running, not before command start; all8 remained unchanged through final completion, plus2 final capability-test hashes captured. This is not claimed as a before-command-start source proof."
+}

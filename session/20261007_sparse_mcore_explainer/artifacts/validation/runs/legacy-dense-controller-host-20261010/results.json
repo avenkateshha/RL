@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "exit_code": 0,
+  "passed": 205,
+  "skipped": 0,
+  "command": "CUDA_VISIBLE_DEVICES='' PYTHONPATH='/lustre/fsw/portfolios/coreai/users/avenkateshha/nemo_rl/RL:/lustre/fs1/portfolios/coreai/projects/coreai_dlalgo_genai/users/avenkateshha/nemo_rl/experiments/xtoken-smoke/xtoken-distillation/xtoken-offset-rebased-2n100-20260928-092950/runtime/python' UV_CACHE_DIR=/tmp/xtoken-port-uv-cache uv run --no-sync --offline pytest --confcutdir=tests/unit/algorithms/x_token tests/unit/algorithms/x_token/test_xtoken_off_policy_distillation.py -q",
+  "source_sha256": {
+    "nemo_rl/algorithms/xtoken_off_policy_distillation.py": "c508ec7b728ba1a345e7ef512c0e32af25e654f41087464a929567df4de703ef",
+    "nemo_rl/models/policy/lm_policy.py": "332c4b1f09f8f155d958bd29ee68ee430bc8b3d2f0316b87599c4868e545d988",
+    "tests/unit/algorithms/x_token/test_xtoken_off_policy_distillation.py": "82801d771a65145b8ab89a0202334248c6a0da7dab13c9cd2413bc940bda4862"
+  },
+  "source_hash_timing": "After completion; files unchanged since before test invocation",
+  "quality": "Ruff check, format --check and git diff --check PASS",
+  "independent_review": "No actionable findings from normalization agent"
+}

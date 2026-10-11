@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "tests": 12,
+  "expected_tests": 12,
+  "skipped": 0,
+  "failure": 0,
+  "error": 0,
+  "backend": "dtensor",
+  "cuda_visible": true,
+  "test_file": "tests/unit/models/policy/test_dtensor_sparse_ipc.py",
+  "scope": "Exact cached actor interpreter, isolated from numerical capture and Ray driver address; every focused test must execute without skips",
+  "log": "preflight-pytest.log",
+  "junit": "preflight-junit.xml"
+}

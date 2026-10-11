@@ -1,0 +1,10 @@
+{
+  "root_head": "7e6492b1b5c192bc9949d87405a469ab018c9770",
+  "recorded_utc": "2026-10-10T20:25:25.187557+00:00",
+  "file_sha256": {
+    "nemo_rl/models/megatron/train.py": "dc0f7dd3e2d0406b1484c8ce94de4e0efbb3efda2d40f5b4cd5a0448ad089e6b",
+    "nemo_rl/models/policy/utils.py": "6aeb3eb74b405f049bd9bddb1406eac91a682ecce3981ee3d2a86df8832b82c8",
+    "tests/unit/algorithms/x_token/test_megatron_cp_normalization.py": "14de9c595bdd94c6dc87e4f37608b712cac029e78be227937bfa52db8cb5364e"
+  },
+  "scope": "Read real CUDA IPC refcounter through two fresh sequential GPU peer consumers. Diagnostic only, not memory capacity test."
+}

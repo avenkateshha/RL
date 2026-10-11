@@ -1,0 +1,9 @@
+{
+  "status": "FAIL",
+  "job_id": "19989442",
+  "worker_import_status": "FAIL",
+  "reason": "User checked-out nested MCore002255075 lacks FullyShardedDataParallelV1/V2 needed by root production worker. Exact committed dependency snapshot retry is job19989499.",
+  "model_provider_config_conversion": "PASS: all4 pinned configs TP2/CP2/PP1, no weights/forward",
+  "cpu_gloo_attempt": "FAIL: fixture broad CPU current_device patch interfered with TE import on GPU node; narrowed upstream and rerunning CUDA-hidden.",
+  "focused_worker_pytest": "COLLECTION_BLOCKED by FullyShardedDataParallelV1/V2 import"
+}

@@ -1,0 +1,19 @@
+{
+  "status": "INVALID_COUNTER_MEASUREMENT",
+  "job_id": "19990150",
+  "slurm_state": "COMPLETED",
+  "slurm_exit_code": "0:0",
+  "probe_process_exit_code": 0,
+  "counter_measurement_valid": false,
+  "reason": "Probe omitted the64-byte RefcountedMapAllocator header and read its ownership count1, not CUDA shared-memory counter. Output1\u21921\u21921 does not confirm or refute CUDA counter underflow. Corrected immutable probe required.",
+  "warning_reproduced": true,
+  "wrapper": {
+    "status": "PASS",
+    "passed": 7,
+    "deselected": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "source_validation": "Before and after source hashes PASS"
+}

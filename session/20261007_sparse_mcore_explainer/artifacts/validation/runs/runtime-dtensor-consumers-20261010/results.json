@@ -1,0 +1,35 @@
+{
+  "status": "PASS",
+  "job_id": "19990683",
+  "scope": "Cached actual DTensor-V2 worker and Automodel interpreter imports; real pinned weights atTP2CP2DP1; sparse exporter; one separate GPU consumer per producer; joined consumers before release. Repeated/fanout and mixed-student numerical acceptance remains R4.",
+  "checks": {
+    "imports": "PASS",
+    "teacher_a": {
+      "producers": 4,
+      "consumers": 4,
+      "export_shape": [
+        2,
+        12,
+        64
+      ]
+    },
+    "teacher_b": {
+      "producers": 4,
+      "consumers": 4,
+      "export_shape": [
+        2,
+        16,
+        64
+      ]
+    }
+  },
+  "source_hashes": "PASS before and after8unchangedfiles",
+  "cuda_ipc_shutdown_warnings": {},
+  "observation_sha256": {
+    "teacher-observations/151669/1.pt": "daec0c72d2ebbce193e8d73b29fbe4f0bf9ea589d8a2f74bfdc8f09d30c6f00c",
+    "teacher-observations/151669/0.pt": "1da50ede963d6a6435d05d838ca470e6f19957da0d2e3e60c08c4ed7c4e6d8a7",
+    "teacher-observations/49152/1.pt": "0feccb98f8938b8baa9f1113adcc6ff7df572c9ecb0d34e665a898181cdf6848",
+    "teacher-observations/49152/0.pt": "6b6d4408c2d1049b58e04cd3fdcc561deaf72ca0348d55240862df415fccac9c"
+  },
+  "larger_memory_tests": "EXCLUDED"
+}

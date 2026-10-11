@@ -58,6 +58,10 @@ from nemo_rl.distributed.model_utils import (
     vocab_parallel_argmax,
 )
 from nemo_rl.distributed.selected_logprobs import cp_native_global_positions
+from nemo_rl.utils.reusable_cuda_ipc import (
+    ReusableCudaIPCDescriptor,
+    open_reusable_cuda_ipc,
+)
 
 if TYPE_CHECKING:
     from nemo_automodel.components.distributed.context_parallel import (
@@ -564,12 +568,25 @@ def collect_overlapping_teacher_shards(
     return matches
 
 
+def _open_dense_teacher_ipc_storage(payload: Any, device: int) -> torch.Tensor:
+    """Map a dense slab while retaining its owner in every returned tensor view."""
+    if isinstance(payload, ReusableCudaIPCDescriptor):
+        if payload.dtype != torch.float32 or len(payload.shape) not in (2, 4):
+            raise ValueError(
+                "Reusable dense teacher IPC requires an FP32 2D or 4D slab"
+            )
+        return open_reusable_cuda_ipc(payload, device).detach()
+    # Policy utils imports loss utilities through worker modules; keep this deferred.
+    from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
+
+    return rebuild_cuda_tensor_from_ipc(payload, device).detach()
+
+
 def _rebuild_compact_teacher_ipc_storage(
     handle: Mapping[str, Any], device: int
 ) -> tuple[torch.Tensor, tuple[int, int, int, int]]:
     """Map and validate one compact producer slab without copying it."""
     from nemo_rl.models.policy.utils import (
-        rebuild_cuda_tensor_from_ipc,
         validate_compact_teacher_ipc_handle,
     )
 
@@ -579,7 +596,7 @@ def _rebuild_compact_teacher_ipc_storage(
     _token_offset, stored_seq_len, _used_tokens, _local_vocab_size = compact_geometry
     if stored_seq_len <= 0:
         raise ValueError("A zero-length compact IPC row has no storage to rebuild.")
-    src_full = rebuild_cuda_tensor_from_ipc(handle["payload_ipc"], device).detach()
+    src_full = _open_dense_teacher_ipc_storage(handle["payload_ipc"], device)
     expected_storage_shape = tuple(int(value) for value in handle["storage_shape"])
     if tuple(src_full.shape) != expected_storage_shape or src_full.ndim != 2:
         raise ValueError(
@@ -599,7 +616,6 @@ def _rebuild_compact_teacher_ipc_storage(
 def _rebuild_teacher_ipc_row(handle: Mapping[str, Any], device: int) -> torch.Tensor:
     """Return the physically stored ``[T_stored, V_local]`` row view."""
     from nemo_rl.models.policy.utils import (
-        rebuild_cuda_tensor_from_ipc,
         validate_compact_teacher_ipc_handle,
     )
 
@@ -611,7 +627,7 @@ def _rebuild_teacher_ipc_row(handle: Mapping[str, Any], device: int) -> torch.Te
         src_full, _ = _rebuild_compact_teacher_ipc_storage(handle, device)
         return src_full[token_offset : token_offset + stored_seq_len, :local_vocab_size]
 
-    src_full = rebuild_cuda_tensor_from_ipc(handle["payload_ipc"], device).detach()
+    src_full = _open_dense_teacher_ipc_storage(handle["payload_ipc"], device)
     actual_shape = handle["actual_shape"]
     if (
         not isinstance(actual_shape, (list, tuple, torch.Size))
@@ -701,8 +717,6 @@ def _try_zero_copy_teacher_logits(
     """
     if not per_sample_entries:
         return None
-    from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
-
     first_shards = per_sample_entries[0]["teacher_shards"]
     if not first_shards:
         return None
@@ -798,7 +812,7 @@ def _try_zero_copy_teacher_logits(
         ):
             return None
 
-    src_full = rebuild_cuda_tensor_from_ipc(payload, device).detach()
+    src_full = _open_dense_teacher_ipc_storage(payload, device)
     seq_lo = student_seq_start - teacher_seq_start
     seq_hi = student_seq_end - teacher_seq_start
     return src_full[buf_idx, : len(chosen), seq_lo:seq_hi, :full_vocab_size]
@@ -867,6 +881,52 @@ def rebuild_teacher_sparse_logits_from_ipc(
     """Rebuild full-sequence sparse teacher payloads from per-CP-shard IPC."""
     from nemo_rl.models.policy.utils import rebuild_cuda_tensor_from_ipc
 
+    # A rebuild is one teacher's one loss invocation. Cache whole mappings only
+    # inside this call; descriptors include owner/device/storage identity.
+    opened: dict[ReusableCudaIPCDescriptor, torch.Tensor] = {}
+
+    def read_field(shard: dict[str, Any], field: str) -> torch.Tensor:
+        handle = shard[field]
+        if not isinstance(handle, ReusableCudaIPCDescriptor):
+            return rebuild_cuda_tensor_from_ipc(handle, device).detach()
+        sample_index = shard.get("ipc_sample_index")
+        shape = tuple(shard["topk_shape"])
+        if (
+            type(sample_index) is not int
+            or sample_index < 0
+            or len(shape) != 2
+            or any(type(size) is not int or size <= 0 for size in shape)
+        ):
+            raise ValueError(
+                "Reusable legacy sparse IPC requires a valid sample index and top-k shape"
+            )
+        rank = 3 if field in ("topk_logits_ipc", "topk_indices_ipc") else 2
+        allowed_dtypes = {
+            "topk_logits_ipc": (torch.float32,),
+            "topk_indices_ipc": (torch.int32,),
+            "log_z_ipc": (torch.float32,),
+            "gt_in_topk_ipc": (torch.int32, torch.bool),
+        }
+        if handle.dtype not in allowed_dtypes[field]:
+            raise ValueError("Reusable legacy sparse IPC has an invalid field dtype")
+        if (
+            len(handle.shape) != rank
+            or sample_index >= handle.shape[0]
+            or shape[0] > handle.shape[1]
+            or (rank == 3 and shape[1] > handle.shape[2])
+        ):
+            raise ValueError(
+                "Reusable legacy sparse IPC slice exceeds its backing slab"
+            )
+        if handle not in opened:
+            opened[handle] = open_reusable_cuda_ipc(handle, device)
+        source = opened[handle]
+        return (
+            source[sample_index, : shape[0], : shape[1]]
+            if rank == 3
+            else source[sample_index, : shape[0]]
+        ).detach()
+
     if not per_sample_entries:
         raise ValueError("Sparse teacher IPC payload is empty.")
 
@@ -914,44 +974,26 @@ def rebuild_teacher_sparse_logits_from_ipc(
 
         per_sample_logits.append(
             torch.cat(
-                [
-                    rebuild_cuda_tensor_from_ipc(
-                        shard["topk_logits_ipc"], device
-                    ).detach()
-                    for shard in shards
-                ],
+                [read_field(shard, "topk_logits_ipc") for shard in shards],
                 dim=0,
             )
         )
         per_sample_indices.append(
             torch.cat(
-                [
-                    rebuild_cuda_tensor_from_ipc(
-                        shard["topk_indices_ipc"], device
-                    ).detach()
-                    for shard in shards
-                ],
+                [read_field(shard, "topk_indices_ipc") for shard in shards],
                 dim=0,
             )
         )
         per_sample_log_z.append(
             torch.cat(
-                [
-                    rebuild_cuda_tensor_from_ipc(shard["log_z_ipc"], device).detach()
-                    for shard in shards
-                ],
+                [read_field(shard, "log_z_ipc") for shard in shards],
                 dim=0,
             )
         )
         if has_gt_in_topk:
             per_sample_gt_in_topk.append(
                 torch.cat(
-                    [
-                        rebuild_cuda_tensor_from_ipc(
-                            shard["gt_in_topk_ipc"], device
-                        ).detach()
-                        for shard in shards
-                    ],
+                    [read_field(shard, "gt_in_topk_ipc") for shard in shards],
                     dim=0,
                 )
             )

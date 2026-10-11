@@ -1,0 +1,51 @@
+"""Read actual DTensor Ray decorator metadata without creating a model or actor."""
+
+import argparse
+import inspect
+import json
+import os
+from pathlib import Path
+
+import ray
+from nemo_rl.models.policy.workers import dtensor_policy_worker_v2 as worker_module
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--output", type=Path, required=True)
+args = parser.parse_args()
+actor = worker_module.DTensorPolicyWorkerV2
+metadata = actor.__ray_metadata__
+modified = metadata.modified_class
+methods = {}
+for name in ("__ray_call__", "get_topk_logits_ipc", "release_ipc_buffer"):
+    method = getattr(modified, name)
+    chain = []
+    while method is not None:
+        chain.append(
+            {
+                "qualname": getattr(method, "__qualname__", None),
+                "signature": str(inspect.signature(method, follow_wrapped=False)),
+                "source_file": inspect.getsourcefile(method),
+                "source_line": inspect.getsourcelines(method)[1],
+            }
+        )
+        method = getattr(method, "__wrapped__", None)
+    methods[name] = {
+        "wrapped_chain": chain,
+        "ray_signature": str(metadata.method_meta.signatures.get(name)),
+        "defined_on_modified_class": name in modified.__dict__,
+        "same_as_plain_implementation": getattr(modified, name)
+        is getattr(worker_module.DTensorPolicyWorkerV2Impl, name, None),
+    }
+report = {
+    "status": "PASS_METADATA_READ",
+    "ray_version": ray.__version__,
+    "ray_source": ray.__file__,
+    "worker_source": worker_module.__file__,
+    "observer_import_enabled": bool(os.environ.get("XTOKEN_NUMERICAL_CAPTURE_RUN")),
+    "modified_class_mro": [cls.__qualname__ for cls in modified.__mro__],
+    "methods": methods,
+    "scope": "Import/class metadata only; no actor creation or model execution",
+}
+args.output.write_text(json.dumps(report, indent=2) + "\n")
+print(json.dumps(report, indent=2))

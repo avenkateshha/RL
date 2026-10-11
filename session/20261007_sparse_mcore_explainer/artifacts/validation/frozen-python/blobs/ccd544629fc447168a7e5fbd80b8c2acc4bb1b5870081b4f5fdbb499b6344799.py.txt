@@ -1,0 +1,378 @@
+"""Test-only independent selected-support oracle for the pinned real corpus.
+
+The tiny dense tensors used here are detached test observations. Production
+execution never calls this module and remains under no-reconstruction guards.
+"""
+
+from pathlib import Path
+from typing import Any
+
+import torch
+
+from tests.unit.algorithms.x_token import native_sparse_fixtures as oracle
+
+
+def _stable_ids(raw: torch.Tensor, *, real_vocab_size: int, k: int) -> tuple[int, ...]:
+    # Stable descending sort preserves lower token ID on exact score ties.
+    return tuple(
+        torch.argsort(raw[:real_vocab_size], descending=True, stable=True)[:k].tolist()
+    )
+
+
+# The fixture's Python sorting is deliberately simple for V<=24. Preserve its
+# ordering definition while avoiding hundreds of thousands of Python scalar
+# conversions for every real-vocabulary token row.
+oracle.stable_natural_ids = _stable_ids
+
+
+def read_chains(path: str) -> tuple[tuple[int, ...], ...]:
+    table = torch.load(Path(path), map_location="cpu", weights_only=False)
+    rows = table["subtoks"].tolist()
+    lengths = table["lengths"].tolist()
+    return tuple(tuple(row[:length]) for row, length in zip(rows, lengths, strict=True))
+
+
+def chunks_from_ids(
+    student_ids: torch.Tensor, teacher_ids: torch.Tensor, valid: torch.Tensor
+) -> tuple[tuple[oracle.Chunk, ...], ...]:
+    """Derive spans directly from integer labels, without production helpers."""
+
+    def span(ids: torch.Tensor, chunk: int) -> tuple[int, int]:
+        positions = (ids == chunk).nonzero().flatten()
+        return (
+            (int(positions[0]), int(positions[-1]) + 1) if positions.numel() else (0, 0)
+        )
+
+    return tuple(
+        tuple(
+            oracle.Chunk(
+                f"sample{b}_chunk{j}",
+                span(student_ids[b], j),
+                span(teacher_ids[b], j),
+                bool(valid[b, j]),
+            )
+            for j in range(valid.shape[1])
+        )
+        for b in range(valid.shape[0])
+    )
+
+
+def sparse_fixture(
+    data: dict[str, torch.Tensor],
+    student_logits: torch.Tensor,
+    teacher_logits: list[torch.Tensor],
+    cfg: dict[str, Any],
+    token_denominator: float,
+    chunk_denominators: dict[int, float],
+    chains: dict[int, tuple[tuple[tuple[int, ...], ...], tuple[tuple[int, ...], ...]]],
+) -> oracle.SparseFixture:
+    teachers = []
+    for i, raw in enumerate(teacher_logits):
+        if not cfg["teacher_is_cross_tokenizer"][i]:
+            continue
+        forward, reverse = chains[i]
+        teachers.append(
+            oracle.TeacherFixture(
+                name=f"teacher_{i}",
+                logits=raw,
+                input_ids=data[f"teacher_{i}_input_ids"],
+                chunks=chunks_from_ids(
+                    data[f"alignment_{i}_student_chunk_id"],
+                    data[f"alignment_{i}_teacher_chunk_id"],
+                    data[f"alignment_{i}_pair_valid"],
+                ),
+                forward=forward,
+                reverse=reverse,
+                weight=cfg["teacher_weights"][i],
+                global_valid_chunks=chunk_denominators[i],
+                real_vocab_size=cfg["teacher_vocab_sizes"][i],
+                microbatch_size=1 if i == 0 else 2,
+            )
+        )
+    return oracle.SparseFixture(
+        student_logits=student_logits,
+        student_input_ids=data["input_ids"],
+        token_mask=data["token_mask"],
+        kd_token_mask=data["kd_token_mask"],
+        sample_mask=data["sample_mask"],
+        teachers=tuple(teachers),
+        student_vocab_size=cfg["student_vocab_size"],
+        global_valid_tokens=token_denominator,
+    )
+
+
+def same_tokenizer_kl(
+    student: torch.Tensor,
+    teacher: torch.Tensor,
+    data: dict[str, torch.Tensor],
+    cfg: dict[str, Any],
+    denominator: float,
+    *,
+    full_support: bool = False,
+    support_device: torch.device | None = None,
+) -> torch.Tensor:
+    """Independent common-K selection over this complete CP microbatch."""
+    mask = data["kd_token_mask"] * data["sample_mask"][:, None]
+    valid = torch.cat((mask[:, 1:], torch.zeros_like(mask[:, :1])), dim=1).bool()
+    vocab = cfg["student_vocab_size"]
+    assert cfg["vocab_topk"] >= 0, "Same-tokenizer vocab_topk must be nonnegative"
+    k = vocab if full_support else min(cfg["vocab_topk"], vocab)
+    if k == 0:
+        # K is the objective's common-column count, independent of the sparse
+        # transport knob. Only true averaged logits force full-vocabulary KL.
+        return student.sum(dtype=torch.float32) * 0
+    importance = (
+        teacher[..., :vocab]
+        .masked_fill(~valid[..., None], -torch.inf)
+        .flatten(0, 1)
+        .max(0)
+        .values
+    )
+    if not valid.any():
+        support = torch.arange(k)
+    else:
+        # Common-K retains torch.topk's device-specific tie choice. BF16 model
+        # observations can tie at the cutoff; CPU and CUDA may choose different
+        # columns despite identical importance values. Recompute importance
+        # independently above, then choose only this discrete support on the
+        # actual controller device. Loss and gradients remain CPU expressions.
+        selection_scores = importance.to(support_device or importance.device)
+        support = selection_scores.topk(k).indices.sort().values.cpu()
+        cutoff = importance.topk(k).values.min()
+        assert support.unique().numel() == k
+        assert importance[support].min() == cutoff
+        assert int((importance[support] > cutoff).sum()) == int(
+            (importance > cutoff).sum()
+        ), "Selected common-K support omitted a column strictly above its cutoff"
+    temperature = cfg["temperature"]
+    student_logp = (student[..., support] / temperature).log_softmax(-1)
+    teacher_logp = (teacher[..., support] / temperature).log_softmax(-1)
+    p_log, q_log = (
+        (student_logp, teacher_logp)
+        if cfg["reverse_kl"]
+        else (teacher_logp, student_logp)
+    )
+    return (
+        ((p_log.exp() * (p_log - q_log)).sum(-1) * valid).sum()
+        * temperature**2
+        / max(denominator, 1.0)
+    )
+
+
+def full_objective(
+    fixture: oracle.SparseFixture,
+    all_teacher_logits: list[torch.Tensor],
+    data: dict[str, torch.Tensor],
+    student: torch.Tensor,
+    cfg: dict[str, Any],
+    kd_token_denominator: float,
+    legacy_sparse_payloads: dict[int, tuple] | None = None,
+    legacy_loss_fn: Any = None,
+    legacy_dense_teacher_indices: tuple[int, ...] = (),
+    same_tokenizer_support_device: torch.device | None = None,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    """CE once, independent teacher terms, and one detached per-MB ratio."""
+    dense_indices = set(legacy_dense_teacher_indices)
+    assert len(dense_indices) == len(legacy_dense_teacher_indices)
+    assert dense_indices.isdisjoint(legacy_sparse_payloads or {})
+    assert all(
+        0 <= i < len(cfg["teacher_is_cross_tokenizer"])
+        and cfg["teacher_is_cross_tokenizer"][i]
+        for i in dense_indices
+    ), "Legacy dense reference indices must identify cross-tokenizer teachers"
+    if dense_indices:
+        assert cfg["teacher_topk_ipc_k"] == 0, (
+            "Dense cross-tokenizer export requires K0"
+        )
+        assert legacy_loss_fn is not None, "Legacy capture needs the retained CP1 loss"
+    mask = data["token_mask"][:, 1:] * data["sample_mask"][:, None]
+    ce_rows = torch.nn.functional.cross_entropy(
+        student[:, :-1, : cfg["student_vocab_size"]].flatten(0, 1),
+        data["input_ids"][:, 1:].flatten(),
+        reduction="none",
+    ).reshape_as(mask)
+    ce = (ce_rows * mask).sum() / max(fixture.global_valid_tokens, 1.0)
+    terms = []
+    cross_iterator = iter(fixture.teachers)
+    settings = oracle.ObjectiveSettings(
+        k=cfg["teacher_topk_ipc_k"],
+        temperature=cfg["temperature"],
+        shift=cfg["kl_chunk_shift"],
+        common_loss=cfg["prefix_bidir_v3_loss_fn"],
+        mismatch_loss=cfg.get("prefix_bidir_v3_last_pos_loss_fn")
+        or cfg["prefix_bidir_v3_loss_fn"],
+        jsd_beta=cfg["prefix_bidir_v3_jsd_beta"],
+        reverse_kl=cfg["reverse_kl"],
+        mismatch_multiplier=cfg.get("prefix_bidir_v3_mismatch_loss_beta", 1.0),
+        noise_filter_k=cfg["prefix_bidir_v3_noise_filter_topk"],
+    )
+
+    def cross_term(index: int) -> torch.Tensor:
+        teacher = next(cross_iterator)
+        payload = (legacy_sparse_payloads or {}).get(index)
+        dense = index in dense_indices
+        if payload is None and not dense:
+            assert settings.k > 0, "K0 cross-tokenizer reference needs a dense capture"
+            return oracle.teacher_sparse_oracle(
+                fixture, teacher, student, settings
+            ).loss
+        # The DTensor sparse route retains both its torch.topk support and its
+        # existing partition objective. Validate the actual export against its
+        # full forward, then run the retained CP1 implementation on those same
+        # full-sequence rows. The native term above remains independent.
+        assert legacy_loss_fn is not None, "Legacy capture needs the retained CP1 loss"
+        if payload is not None:
+            values, ids, log_z, _ = payload
+            assert values.shape[:2] == teacher.logits.shape[:2], (
+                "Legacy sparse rows must retain the full teacher sequence on every CP rank"
+            )
+            assert settings.noise_filter_k == 0, (
+                "Legacy capture oracle currently uses the agreed noise-filter-off recipe"
+            )
+            torch.testing.assert_close(
+                values, teacher.logits.gather(-1, ids.long()), rtol=1e-5, atol=1e-5
+            )
+            torch.testing.assert_close(
+                log_z,
+                (
+                    teacher.logits[..., : teacher.real_vocab_size]
+                    / settings.temperature
+                ).logsumexp(-1),
+                rtol=1e-5,
+                atol=1e-5,
+            )
+        else:
+            # The controller separately matches each actual reconstructed CP
+            # window against these observed full teacher-forward rows. Retain
+            # dense v6's objective at CP1; only CE and term aggregation are
+            # independent expressions for this preserved-route regression.
+            assert teacher.logits.shape[:2] == teacher.input_ids.shape
+            assert teacher.logits.shape[-1] >= teacher.real_vocab_size
+
+        from nemo_rl.algorithms.x_token.loss_utils import LocalizedAlignment
+
+        student_spans, teacher_spans, valid = teacher.alignment_tensors()
+        alignment = LocalizedAlignment(
+            sample_mask=fixture.sample_mask,
+            pair_valid=valid,
+            student_input_ids=fixture.student_input_ids,
+            student_token_mask=fixture.token_mask,
+            student_kd_token_mask=fixture.kd_token_mask,
+            teacher_input_ids=teacher.input_ids,
+            student_spans=student_spans,
+            teacher_spans=teacher_spans,
+            num_chunks=valid.sum(-1),
+        )
+        value, _ = legacy_loss_fn._compute_prefix_bidir_partition_kl_v3(
+            index,
+            student,
+            teacher.logits[..., : teacher.real_vocab_size] if dense else None,
+            alignment,
+            teacher_sparse_payload=payload,
+            teacher_vocab_size=teacher.real_vocab_size,
+            global_valid_chunks=student.new_tensor(teacher.global_valid_chunks),
+            tp_group=None,
+            cp_group=None,
+        )
+        return value
+
+    true_average = cfg["kd_loss_mode"] == "averaged_logits" and not any(
+        cfg["teacher_is_cross_tokenizer"]
+    )
+    if true_average:
+        averaged = sum(
+            w * raw
+            for w, raw in zip(cfg["teacher_weights"], all_teacher_logits, strict=True)
+        ) / sum(cfg["teacher_weights"])
+        kd = same_tokenizer_kl(
+            student,
+            averaged,
+            data,
+            cfg,
+            kd_token_denominator,
+            full_support=True,
+            support_device=same_tokenizer_support_device,
+        )
+        weighted_terms = [
+            kd * weight / sum(cfg["teacher_weights"])
+            for weight in cfg["teacher_weights"]
+        ]
+    else:
+        assert not cfg.get("prefix_bidir_v3_position_0_kl", False), (
+            "Real-model oracle disables the additional position-0 mismatch term explicitly."
+        )
+        for i, cross in enumerate(cfg["teacher_is_cross_tokenizer"]):
+            value = (
+                cross_term(i)
+                if cross
+                else same_tokenizer_kl(
+                    student,
+                    all_teacher_logits[i],
+                    data,
+                    cfg,
+                    kd_token_denominator,
+                    support_device=same_tokenizer_support_device,
+                )
+            )
+            terms.append(value)
+        minimum_vocab = min(cfg["teacher_vocab_sizes"])
+        vocabulary_scales = [
+            (
+                torch.log(student.new_tensor(float(vocab)))
+                / torch.log(student.new_tensor(float(minimum_vocab)))
+                if cfg.get("normalize_teacher_by_vocab", False)
+                and cfg["kd_loss_mode"] == "sum"
+                else 1.0
+            )
+            for vocab in cfg["teacher_vocab_sizes"]
+        ]
+        weighted_terms = [
+            weight * vocabulary_scale * value
+            for weight, vocabulary_scale, value in zip(
+                cfg["teacher_weights"], vocabulary_scales, terms, strict=True
+            )
+        ]
+        kd = sum(weighted_terms)
+    ratio = (
+        torch.where(
+            kd.detach().abs() > 0,
+            ce.detach().abs() / kd.detach().abs(),
+            torch.ones_like(kd),
+        )
+        if cfg["dynamic_loss_scaling"]
+        else torch.ones_like(kd)
+    )
+    loss = (
+        ce + ratio * kd
+        if cfg["dynamic_loss_scaling"]
+        else cfg["ce_loss_scale"] * ce + cfg["kl_loss_weight"] * kd
+    )
+    correct = (
+        student[:, :-1, : cfg["student_vocab_size"]]
+        .argmax(-1)
+        .eq(data["input_ids"][:, 1:])
+    )
+    return loss, {
+        "loss": loss,
+        "ce_loss": ce,
+        "kl_loss": kd,
+        "kl_loss_scale": ratio,
+        "accuracy": (correct * mask).sum() / mask.sum().clamp_min(1),
+        **{f"kl_loss_t{i}": v for i, v in enumerate(terms)},
+        **{f"teacher_{i}/weighted_kl": v for i, v in enumerate(weighted_terms)},
+    }
+
+
+def gradient_errors(actual: torch.Tensor, reference: torch.Tensor) -> dict[str, float]:
+    actual, reference = actual.detach().double(), reference.detach().double()
+    reference_norm = reference.norm()
+    absolute = (actual - reference).norm()
+    return {
+        "relative_l2": float(absolute / reference_norm.clamp_min(1e-30)),
+        "relative_norm": float(
+            (actual.norm() - reference_norm).abs() / reference_norm.clamp_min(1e-30)
+        ),
+        "absolute_l2": float(absolute),
+        "reference_norm": float(reference_norm),
+        "max_absolute": float((actual - reference).abs().max()),
+    }
