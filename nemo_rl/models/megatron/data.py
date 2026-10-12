@@ -80,12 +80,15 @@ class ProcessedMicrobatch:
         data_dict: The original BatchedDataDict containing raw batch data
         input_ids: Processed input token IDs (may be packed for sequence packing)
         input_ids_cp_sharded: Model-forward token IDs. Usually CP-sharded; models
-            that insert media before CP selection receive the full packed THD row.
-        attention_mask: Attention mask tensor (None for packed sequences)
-        position_ids: Position IDs tensor. None for packed sequences unless the
-            model runs MTP, in which case per-sample arange positions are packed
-            like input_ids (full THD row for models that CP-slice their own
-            inputs, CP-local shard otherwise)
+            that prepare unpacked CP inputs internally receive full token IDs,
+            and models that insert media before CP selection receive the full
+            packed THD row.
+        attention_mask: Attention mask tensor. None for NeMo-owned packing and
+            unpacked CP>1; model-owned packing receives a boolean padding mask.
+        position_ids: Position IDs tensor. None for model-owned unpacked CP
+            preparation, or packed sequences unless the model runs MTP, in which
+            case per-sample arange positions are packed like input_ids (full THD
+            row for models that CP-slice their own inputs, CP-local shard otherwise)
         packed_seq_params: PackedSeqParams for sequence packing (None if not packing)
         cu_seqlens_padded: Padded cumulative sequence lengths (None if not packing)
         mtp_loss_mask: Pre-computed MTP loss mask (token_mask × sample_mask).
@@ -603,7 +606,13 @@ def process_microbatch(
     prepad_packed_seq_for_hybridep: bool = False,
     mtp_enabled: bool = False,
 ) -> ProcessedInputs:
-    """Process a microbatch for Megatron model forward pass."""
+    """Process a microbatch for Megatron model forward pass.
+
+    ``delegate_pack_to_model`` also delegates unpacked CP input preparation:
+    the model receives full token IDs and prepares positions and attention.
+    MTP loss masks remain CP-local; sparse forced-label fields stay in data_dict
+    for the sparse postprocessor to select using the native CP output layout.
+    """
     prepacked = "cu_seqlens" in data_dict
     if (
         create_packed_seq_padding_mask
@@ -1110,29 +1119,26 @@ def process_microbatch(
                         input_ids,
                         data_dict["input_lengths"],
                     )
-            attention_mask, _, position_ids = get_ltor_masks_and_position_ids(
-                data=input_ids,
-                eod_token=0,  # used for loss_mask, which we don't use
-                pad_token=0,  # used for loss_mask, which we don't use
-                reset_position_ids=False,
-                reset_attention_mask=False,
-                eod_mask_loss=False,
-                pad_mask_loss=False,
-            )
             cp_size = get_context_parallel_world_size()
+            if cp_size == 1 or not delegate_pack_to_model:
+                attention_mask, _, position_ids = get_ltor_masks_and_position_ids(
+                    data=input_ids,
+                    eod_token=0,  # used for loss_mask, which we don't use
+                    pad_token=0,  # used for loss_mask, which we don't use
+                    reset_position_ids=False,
+                    reset_attention_mask=False,
+                    eod_mask_loss=False,
+                    pad_mask_loss=False,
+                )
             if cp_size > 1:
-                # Unpacked context parallelism. mcore expects each rank to be
-                # handed its load-balanced sequence shard -- chunks ``cp_rank``
-                # and ``2*cp-1-cp_rank`` of ``2*cp`` -- exactly what
-                # Megatron-LM's get_batch_on_this_cp_rank produces and what the
-                # packed path above already does per sequence. position_ids ride
-                # the same layout.
+                # Ordinary models receive load-balanced chunks ``cp_rank`` and
+                # ``2*cp-1-cp_rank`` of ``2*cp``, matching Megatron-LM's
+                # get_batch_on_this_cp_rank. Delegated wrappers perform this
+                # selection internally; auxiliary MTP masks remain CP-local.
                 #
-                # The dense [1, 1, S, S] mask built above is dropped: it is the
-                # plain causal mask (reset_position_ids / reset_attention_mask
-                # are both False), which the attention backend applies itself,
-                # and TE's context-parallel attention requires that implicit
-                # causal path rather than an arbitrary full-sequence mask.
+                # Ordinary models drop the plain dense causal mask built above:
+                # TE's context-parallel attention applies causality implicitly.
+                # Delegated wrappers avoid allocating that mask entirely.
                 if routed_experts is not None:
                     raise NotImplementedError(
                         "Router replay (routed_experts) with context parallelism "
@@ -1147,12 +1153,16 @@ def process_microbatch(
                     "tensor_model_parallel_size * context_parallel_size * 2."
                 )
                 cp_rank = get_context_parallel_rank()
-                input_ids_cp_sharded = _get_tokens_on_this_cp_rank(
-                    input_ids, cp_rank, cp_size, seq_dim=1
-                )
-                position_ids = _get_tokens_on_this_cp_rank(
-                    position_ids, cp_rank, cp_size, seq_dim=1
-                )
+                if delegate_pack_to_model:
+                    # The wrapper owns CP slicing and position/mask preparation.
+                    input_ids_cp_sharded = input_ids
+                else:
+                    input_ids_cp_sharded = _get_tokens_on_this_cp_rank(
+                        input_ids, cp_rank, cp_size, seq_dim=1
+                    )
+                    position_ids = _get_tokens_on_this_cp_rank(
+                        position_ids, cp_rank, cp_size, seq_dim=1
+                    )
                 attention_mask = None
             else:
                 input_ids_cp_sharded = input_ids

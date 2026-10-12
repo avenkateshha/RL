@@ -211,13 +211,15 @@ def _should_use_router_replay(
 
 
 def _model_self_packs_for_cp(model: Any) -> bool:
-    """Whether the model packs sequences + CP-shards inside its own forward.
+    """Whether the model owns sequence packing and CP input preparation.
 
     Such models (mbridge VLM wrappers) call ``preprocess_packed_seqs`` in their
     forward, so NeMo-RL must hand them an unpacked ``[B, S]`` batch instead of
-    pre-packing + CP-sharding itself. New wrappers advertise the capability
-    through ``model_owns_packing``. The Qwen3VL type check remains as a
-    compatibility fallback until that upstream model exposes the capability.
+    pre-packing + CP-sharding itself. For unpacked CP batches they likewise
+    receive full token IDs and prepare their own positions and attention masks.
+    New wrappers advertise the capability through ``model_owns_packing``. The
+    Qwen3VL type check remains as a compatibility fallback until that upstream
+    model exposes the capability.
     """
     from megatron.bridge.models.qwen_vl.modelling_qwen3_vl.model import Qwen3VLModel
     from megatron.core.utils import unwrap_model
@@ -872,9 +874,8 @@ class MegatronPolicyWorkerImpl(
         if self.should_disable_forward_pre_hook and self._forward_pre_hook_enabled():
             self._disable_forward_pre_hook_until_next_train_step()
 
-        # Whether the model packs sequences + CP-shards inside its own forward
-        # (mbridge VLM wrappers like Qwen3VL). If so, NeMo-RL must hand it an
-        # unpacked [B, S] batch rather than pre-packing + CP-sharding itself.
+        # Model-owned packing also owns unpacked CP input preparation. Forward
+        # receives full [B, S] token IDs and the wrapper performs CP selection.
         self.delegate_pack_to_model = _model_self_packs_for_cp(self.model)
         self.delegate_mtp_loss_mask_to_model = _model_self_packs_mtp_loss_mask(
             self.model
@@ -3547,11 +3548,12 @@ class MegatronPolicyWorkerImpl(
         before calling release_ipc_buffer. No whole-step sparse output tensors
         are retained by the MCore schedule. Each worker belongs to one teacher,
         so separate teachers retain separate storage even on the same GPU.
+        Models may own unpacked CP input preparation, but output rows must still
+        use the standard Megatron zigzag order described by the native segments.
         """
         if (
             self.cfg["sequence_packing"]["enabled"]
             or self.cfg["dynamic_batching"]["enabled"]
-            or self.delegate_pack_to_model
             or parallel_state.get_pipeline_model_parallel_world_size() != 1
         ):
             raise NotImplementedError(

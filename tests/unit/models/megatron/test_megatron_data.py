@@ -1003,6 +1003,107 @@ class TestProcessMicrobatch:
         assert torch.equal(cu_seqlens, mbridge_batch["cu_seqlens_q"])
         assert torch.equal(cu_seqlens_padded, mbridge_batch["cu_seqlens_q_padded"])
 
+    @pytest.mark.parametrize("delegate_pack_to_model", [False, True])
+    @pytest.mark.parametrize("cp_size,cp_rank", [(1, 0), (2, 0), (2, 1)])
+    def test_process_microbatch_unpacked_cp_input_ownership(
+        self, cp_size: int, cp_rank: int, delegate_pack_to_model: bool
+    ) -> None:
+        """Forward IDs, MTP masks, and forced labels have distinct CP ownership."""
+        from nemo_rl.models.megatron.data import process_microbatch
+
+        input_ids = torch.arange(16).reshape(2, 8)
+        position_ids = torch.arange(8).expand(2, -1)
+        attention_mask = torch.ones(1, 1, 8, 8, dtype=torch.bool).triu(1)
+        mtp_loss_mask = torch.tensor(
+            [[1, 0, 1, 1, 0, 1, 0, 0], [0, 1, 0, 0, 1, 0, 1, 1]]
+        )
+        forced_ids = torch.arange(32).reshape(2, 8, 2)
+        data = BatchedDataDict(
+            {
+                "input_ids": input_ids,
+                "mtp_loss_mask": mtp_loss_mask,
+                "force_include_token_ids": forced_ids,
+            }
+        )
+        expected_positions = (
+            torch.arange(8)
+            if cp_size == 1
+            else torch.tensor([0, 1, 6, 7] if cp_rank == 0 else [2, 3, 4, 5])
+        )
+        with (
+            patch(
+                "nemo_rl.models.megatron.data.get_context_parallel_world_size",
+                return_value=cp_size,
+            ),
+            patch(
+                "nemo_rl.models.megatron.data.get_context_parallel_rank",
+                return_value=cp_rank,
+            ),
+            patch(
+                "nemo_rl.models.megatron.data.get_ltor_masks_and_position_ids",
+                return_value=(attention_mask, None, position_ids),
+            ) as make_masks,
+        ):
+            result = process_microbatch(
+                data, delegate_pack_to_model=delegate_pack_to_model, mtp_enabled=True
+            )
+
+        if cp_size > 1 and delegate_pack_to_model:
+            assert result.input_ids_cp_sharded is input_ids
+            assert result.position_ids is None
+            # No full causal mask may be allocated for the wrapper to discard.
+            make_masks.assert_not_called()
+        else:
+            torch.testing.assert_close(
+                result.input_ids_cp_sharded, input_ids[:, expected_positions]
+            )
+            torch.testing.assert_close(
+                result.position_ids, position_ids[:, expected_positions]
+            )
+            make_masks.assert_called_once()
+        assert result.attention_mask is (attention_mask if cp_size == 1 else None)
+        torch.testing.assert_close(
+            result.mtp_loss_mask, mtp_loss_mask[:, expected_positions]
+        )
+        assert result.input_ids is input_ids
+        assert data["mtp_loss_mask"] is mtp_loss_mask
+        assert data["force_include_token_ids"] is forced_ids
+        assert result.packed_seq_params is None
+
+    @pytest.mark.parametrize("delegate_pack_to_model", [False, True])
+    @pytest.mark.parametrize("router_replay", [False, True])
+    def test_process_microbatch_unpacked_cp_preserves_restrictions(
+        self, delegate_pack_to_model: bool, router_replay: bool
+    ) -> None:
+        """Model-owned input preparation preserves CP divisibility/replay guards."""
+        from nemo_rl.models.megatron.data import process_microbatch
+
+        seq_length = 8 if router_replay else 6
+        data = BatchedDataDict(
+            {
+                "input_ids": torch.arange(seq_length).unsqueeze(0),
+                "input_lengths": torch.tensor([seq_length]),
+            }
+        )
+        if router_replay:
+            data["routed_experts"] = torch.zeros(1, seq_length, 1, 1, dtype=torch.long)
+        expected_error = NotImplementedError if router_replay else AssertionError
+        expected_message = (
+            "Router replay" if router_replay else "padded sequence length"
+        )
+        with (
+            patch(
+                "nemo_rl.models.megatron.data.get_context_parallel_world_size",
+                return_value=2,
+            ),
+            patch(
+                "nemo_rl.models.megatron.data.get_ltor_masks_and_position_ids",
+                return_value=(None, None, torch.arange(seq_length).unsqueeze(0)),
+            ),
+            pytest.raises(expected_error, match=expected_message),
+        ):
+            process_microbatch(data, delegate_pack_to_model=delegate_pack_to_model)
+
     def test_process_microbatch_no_packing_context_parallel_shards_sequence_data(
         self,
     ):
