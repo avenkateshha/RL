@@ -1365,9 +1365,24 @@ def validate_xtoken_sparse_setup(
     master_config: MasterConfig,
     teacher_vocab_sizes: list[int],
 ) -> None:
-    """Validate sparse transport and math only for teachers that use that route."""
+    """Validate sparse transport, objectives and every realized-only teacher route."""
     loss = master_config.loss_fn
+    if (
+        "prefix_bidir_v3_realized_only_mismatch" in loss
+        and type(loss["prefix_bidir_v3_realized_only_mismatch"]) is not bool
+    ):
+        raise ValueError("prefix_bidir_v3_realized_only_mismatch must be a boolean")
+    realized_only = loss.get("prefix_bidir_v3_realized_only_mismatch")
     k = int(loss["teacher_topk_ipc_k"])
+    if realized_only:
+        if k <= 0:
+            raise ValueError(
+                "prefix_bidir_v3_realized_only_mismatch requires teacher_topk_ipc_k > 0"
+            )
+        if not any(teacher.uses_cross_tokenizer for teacher in master_config.teachers):
+            raise ValueError(
+                "prefix_bidir_v3_realized_only_mismatch requires a cross-tokenizer teacher"
+            )
     if k <= 0:
         return
     if len(teacher_vocab_sizes) != len(master_config.teachers):
@@ -1378,6 +1393,11 @@ def validate_xtoken_sparse_setup(
         cfg = teacher.policy_config()
         dtensor = cfg["dtensor_cfg"]
         if not cfg.get("megatron_cfg", {}).get("enabled", False):
+            if realized_only:
+                raise ValueError(
+                    "prefix_bidir_v3_realized_only_mismatch requires native Megatron "
+                    f"sparse IPC for every cross-tokenizer teacher; teachers[{i}] is unsupported."
+                )
             if dtensor["enabled"] and dtensor.get("_v2", False):
                 continue
             raise ValueError(
@@ -1402,7 +1422,17 @@ def validate_xtoken_sparse_setup(
                 f"{prefix} requires 0 <= noise_filter_topk and max(K, noise_filter_topk) "
                 f"<= teacher real vocabulary {teacher_vocab_sizes[i]}; got K={k}, noise={noise_k}."
             )
-        if (
+        if realized_only:
+            if loss.get("common_indices_from_subtoks"):
+                if not teacher.aligner.pseudo_target_path:
+                    raise ValueError(
+                        f"{prefix}: common_indices_from_subtoks=true requires a forward pseudo_target_path."
+                    )
+            elif not teacher.aligner.projection_matrix_path:
+                raise ValueError(
+                    f"{prefix} requires a projection_matrix_path unless common_indices_from_subtoks=true."
+                )
+        elif (
             not teacher.aligner.pseudo_target_path
             or not teacher.aligner.reverse_pseudo_target_path
         ):
@@ -1519,9 +1549,9 @@ def setup(
                 "Sparse teacher IPC cannot be combined with "
                 "kd_loss_mode='select_teacher'; teacher selection requires full logits."
             )
-        validate_xtoken_sparse_setup(
-            master_config, [len(tok) for tok in teacher_tokenizers]
-        )
+    validate_xtoken_sparse_setup(
+        master_config, [len(tok) for tok in teacher_tokenizers]
+    )
 
     # Same-tokenizer teachers use direct KL without alignment. Reuse is safe
     # only when the complete tokenizer semantics match; equal vocabulary size

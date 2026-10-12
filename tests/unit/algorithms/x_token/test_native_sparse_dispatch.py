@@ -28,6 +28,16 @@ def _variants():
     fixture = build_sparse_fixture()
     settings = ObjectiveSettings()
     yield "fixed", fixture, settings
+    realized = replace(settings, realized_only_mismatch=True)
+    yield "realized", fixture, realized
+    yield "realized_dynamic", fixture, replace(realized, dynamic_scaling=True)
+    yield (
+        "realized_vocab_scale",
+        fixture,
+        replace(realized, normalize_teacher_by_vocab=True),
+    )
+    yield "realized_noise", fixture, replace(realized, noise_filter_k=6)
+    yield "realized_averaged_fallback", fixture, realized
     yield "dynamic", fixture, replace(settings, dynamic_scaling=True)
     yield "vocab_scale", fixture, replace(settings, normalize_teacher_by_vocab=True)
     yield "reverse_order", replace(fixture, teachers=fixture.teachers[::-1]), settings
@@ -168,7 +178,7 @@ def _run_dispatch(rank, tp_size, cp_size, rendezvous, table_root):
             table_dir = Path(table_root) / str(rank) / name
             table_dir.mkdir(parents=True)
             loss_fn = make_loss_fn(fixture, settings, table_dir)
-            if name == "averaged_fallback":
+            if name in ("averaged_fallback", "realized_averaged_fallback"):
                 loss_fn.kd_loss_mode = "averaged_logits"
                 loss_fn.cfg["kd_loss_mode"] = "averaged_logits"
             partition_results = []
@@ -214,7 +224,7 @@ def _run_dispatch(rank, tp_size, cp_size, rendezvous, table_root):
                         # Exercise the complete public adapter/caller path on
                         # ordinary alignments as well as the direct typed loss
                         # boundary used for exact collision fixture spans.
-                        if name == "fixed":
+                        if name in ("fixed", "realized"):
                             inputs, _ = prepare_loss_input(
                                 local,
                                 data,
@@ -320,6 +330,102 @@ def test_native_sparse_dispatch(tp_size, cp_size):
             nprocs=tp_size * cp_size,
             join=True,
         )
+
+
+@pytest.mark.parametrize(
+    "same_tokenizer,second_weight", [(True, 0.7), (False, 0.7), (False, 0.0)]
+)
+def test_realized_only_public_dispatch_checks_every_teacher_route(
+    tmp_path: Path, same_tokenizer: bool, second_weight: float
+) -> None:
+    # These helpers load the optional production loss stack only when executing
+    # this integration test, matching the distributed entry point above.
+    from tests.unit.algorithms.x_token.test_native_sparse_loss import (
+        make_alignment,
+        make_loss_fn,
+        make_native_student,
+        make_sparse_payload,
+    )
+
+    fixture = build_sparse_fixture()
+    second = replace(
+        fixture.teachers[0] if same_tokenizer else fixture.teachers[1],
+        name="second",
+        weight=second_weight,
+    )
+    if same_tokenizer:
+        second = replace(second, input_ids=fixture.student_input_ids)
+    fixture = replace(fixture, teachers=(fixture.teachers[0], second))
+    settings = ObjectiveSettings(realized_only_mismatch=True)
+    loss_fn = make_loss_fn(fixture, settings, tmp_path)
+    if same_tokenizer:
+        config = dict(loss_fn.cfg)
+        config.update(
+            teacher_is_cross_tokenizer=[True, False],
+            pseudo_target_paths=[config["pseudo_target_paths"][0], None],
+            reverse_pseudo_target_paths=[
+                config["reverse_pseudo_target_paths"][0],
+                None,
+            ],
+            vocab_topk=fixture.student_vocab_size,
+        )
+        loss_fn = type(loss_fn)(config)
+    logits = fixture.student_logits.clone().requires_grad_()
+    payloads = {
+        i: make_sparse_payload(teacher, settings)
+        for i, teacher in enumerate(fixture.teachers)
+    }
+    data = _batch_data(fixture, payloads)
+    kwargs = dict(
+        logits=logits,
+        student_logits_contig=logits,
+        teacher_full_logits_by_idx={1: second.logits},
+        teacher_sparse_logits_by_idx={},
+        aligns_by_idx={
+            i: make_alignment(fixture, teacher)
+            for i, teacher in enumerate(fixture.teachers)
+        },
+        native_student=make_native_student(fixture, logits),
+        native_sparse_teachers={0: payloads[0]},
+        global_valid_chunks_by_idx={
+            0: torch.tensor(fixture.teachers[0].global_valid_chunks)
+        },
+    )
+    args = (data, fixture.sample_mask.sum(), torch.tensor(fixture.global_valid_tokens))
+    if not same_tokenizer:
+        with pytest.raises(ValueError, match="realized_only_mismatch"):
+            loss_fn(*args, **kwargs)
+        return
+    loss, metrics = loss_fn(*args, **kwargs)
+    reference = fixture.student_logits.clone().requires_grad_()
+    student_lp = (
+        reference[..., : fixture.student_vocab_size] / settings.temperature
+    ).log_softmax(-1)
+    teacher_lp = (
+        second.logits[..., : fixture.student_vocab_size] / settings.temperature
+    ).log_softmax(-1)
+    per_position = (teacher_lp.exp() * (teacher_lp - student_lp)).sum(-1)
+    same_kd = (
+        (
+            per_position[:, :-1]
+            * fixture.kd_token_mask[:, 1:]
+            * fixture.sample_mask[:, None]
+        ).sum()
+        * settings.temperature**2
+        / fixture.global_valid_tokens
+    )
+    expected = sparse_objective_oracle(
+        replace(fixture, teachers=fixture.teachers[:1]), reference, settings
+    ).loss
+    expected = expected + settings.kd_weight * second_weight * same_kd
+    torch.testing.assert_close(loss, expected, rtol=2e-5, atol=2e-6)
+    torch.testing.assert_close(
+        torch.autograd.grad(loss, logits)[0],
+        torch.autograd.grad(expected, reference)[0],
+        rtol=3e-5,
+        atol=3e-6,
+    )
+    assert metrics["kl_loss_t1"] == pytest.approx(float(same_kd.detach()), rel=2e-5)
 
 
 if __name__ == "__main__":

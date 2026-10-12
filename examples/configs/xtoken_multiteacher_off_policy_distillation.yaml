@@ -70,6 +70,10 @@ loss_fn:
   # Drop chunks whose realized teacher label fell outside the teacher's true
   # top-k (0 disables the filter).
   prefix_bidir_v3_noise_filter_topk: 0
+  # Native sparse MCore only (teacher_topk_ipc_k > 0): preserve common-token
+  # distribution matching; compare each full observed mismatch chain to REST.
+  # Boolean; false (or absent) retains prefix-support alternatives.
+  prefix_bidir_v3_realized_only_mismatch: false
   # Teacher-logit IPC transport for cross-tokenizer teachers. 0 keeps the
   # exact dense full-vocab path; k > 0 sends row-wise sparse support with the
   # exact full-vocab log-normalizer and a rest bucket.

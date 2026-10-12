@@ -117,6 +117,7 @@ class ObjectiveSettings:
     mismatch_loss: Literal["kl", "jsd"] = "kl"
     jsd_beta: float = 0.3
     reverse_kl: bool = False
+    realized_only_mismatch: bool | None = None
     mismatch_multiplier: float = 1.4
     noise_filter_k: int = 0
     normalize_teacher_by_vocab: bool = False
@@ -475,6 +476,11 @@ def teacher_sparse_oracle(
                 pairs = alternatives[: settings.k - 1]
                 if common_map.get(teacher_labels[-1]) == student_labels[-1]:
                     pairs.append((student_labels[-1], teacher_labels[-1]))
+            elif settings.realized_only_mismatch:
+                # This branch deliberately does not consult either prefix table:
+                # all conditional probabilities of the observed chains are
+                # multiplied below, then compared with their complements.
+                pairs = [(student_labels[-1], teacher_labels[-1])]
             else:
                 candidates = _candidate_pairs(teacher, student_labels, teacher_labels)
                 pairs = [pair for pair in candidates if pair[1] in support]

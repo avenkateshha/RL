@@ -29,6 +29,7 @@ from __future__ import annotations
 import math
 import os
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -43,6 +44,15 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 
 import nemo_rl.algorithms.xtoken_off_policy_distillation as xt_mod
 from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLossFn
+from tests.unit.algorithms.x_token.native_sparse_fixtures import (
+    ObjectiveSettings,
+    build_sparse_fixture,
+)
+from tests.unit.algorithms.x_token.test_native_sparse_loss import (
+    _assert_case,
+    make_loss_fn,
+    realized_artifact_overrides,
+)
 from nemo_rl.algorithms.xtoken_off_policy_distillation import (
     MasterConfig,
     TeacherAlignerConfig,
@@ -964,8 +974,10 @@ def test_native_sparse_setup_rejects_second_teacher_and_unsupported_layout(failu
         {"prefix_bidir_v3_mismatch_loss_scale": -1},
     ],
 )
-def test_native_sparse_setup_rejects_unsupported_math(overrides):
+@pytest.mark.parametrize("realized_only", [False, True])
+def test_native_sparse_setup_rejects_unsupported_math(overrides, realized_only):
     cfg = _native_sparse_master()
+    cfg.loss_fn["prefix_bidir_v3_realized_only_mismatch"] = realized_only
     cfg.loss_fn.update(overrides)
     with pytest.raises(ValueError):
         xt_mod.validate_xtoken_sparse_setup(cfg, [24, 16])
@@ -977,6 +989,146 @@ def test_native_sparse_setup_accepts_explicit_zero_alpha_and_nonnegative_beta():
         prefix_bidir_v3_mismatch_pos0_alpha=0, prefix_bidir_v3_mismatch_loss_beta=0.5
     )
     xt_mod.validate_xtoken_sparse_setup(cfg, [24, 16])
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "k_zero",
+        "no_cross_teacher",
+        "student_dtensor",
+        "first_teacher_dtensor",
+        "second_teacher_dtensor",
+    ],
+)
+def test_realized_only_setup_rejects_unsupported_routes(failure: str) -> None:
+    cfg = _native_sparse_master()
+    cfg.loss_fn["prefix_bidir_v3_realized_only_mismatch"] = True
+    if failure == "k_zero":
+        cfg.loss_fn["teacher_topk_ipc_k"] = 0
+    elif failure == "no_cross_teacher":
+        for teacher in cfg.teachers:
+            teacher.is_cross_tokenizer = False
+            teacher.aligner = TeacherAlignerConfig()
+    elif failure == "student_dtensor":
+        cfg.policy["dtensor_cfg"]["enabled"] = True
+        cfg.policy["megatron_cfg"]["enabled"] = False
+    else:
+        teacher = cfg.teachers[int(failure == "second_teacher_dtensor")]
+        teacher.dtensor_cfg["enabled"] = True
+        teacher.megatron_cfg["enabled"] = False
+    message = (
+        "Megatron.*student"
+        if failure == "student_dtensor"
+        else "realized_only_mismatch"
+    )
+    with pytest.raises(ValueError, match=message):
+        _patched_setup_call(cfg)
+
+
+@pytest.mark.parametrize("same_tokenizer_second", [False, True])
+def test_realized_only_setup_accepts_native_and_same_tokenizer_teachers(
+    same_tokenizer_second: bool,
+) -> None:
+    cfg = _native_sparse_master()
+    cfg.loss_fn["prefix_bidir_v3_realized_only_mismatch"] = True
+    if same_tokenizer_second:
+        teacher = cfg.teachers[1]
+        teacher.is_cross_tokenizer = False
+        teacher.aligner = TeacherAlignerConfig()
+        teacher.dtensor_cfg["enabled"] = True
+        teacher.megatron_cfg["enabled"] = False
+    _, mocks = _patched_setup_call(cfg)
+    injected = mocks["loss"].call_args.args[0]
+    assert injected["prefix_bidir_v3_realized_only_mismatch"] is True
+    assert injected["teacher_is_cross_tokenizer"] == [True, not same_tokenizer_second]
+
+
+@pytest.mark.parametrize("common_from_subtoks", [False, True])
+def test_realized_only_artifact_omissions_reach_setup_constructor_and_native_loss(
+    tmp_path: Path, common_from_subtoks: bool
+) -> None:
+    fixture = build_sparse_fixture()
+    fixture = replace(fixture, teachers=fixture.teachers[:1])
+    settings = ObjectiveSettings(realized_only_mismatch=True)
+    artifacts = realized_artifact_overrides(
+        fixture, tmp_path / "artifacts", common_from_subtoks=common_from_subtoks
+    )
+    cfg = _native_sparse_master()
+    cfg.teachers = cfg.teachers[:1]
+    cfg.loss_fn.update(
+        make_loss_fn(
+            fixture, settings, tmp_path / "unused", loss_overrides=artifacts
+        ).cfg
+    )
+    teacher = cfg.teachers[0]
+    teacher.aligner.projection_matrix_path = artifacts["projection_matrix_paths"][0]
+    teacher.aligner.pseudo_target_path = artifacts["pseudo_target_paths"][0]
+    teacher.aligner.reverse_pseudo_target_path = None
+    _, mocks = _patched_setup_call(
+        cfg,
+        student_vocab=fixture.student_vocab_size,
+        teacher_vocab=fixture.teachers[0].real_vocab_size,
+    )
+    loss_fn = CrossTokenizerDistillationLossFn(mocks["loss"].call_args.args[0])
+    with patch.object(
+        loss_fn,
+        "_ensure_bidir_prefix_support_index",
+        side_effect=AssertionError("Prefix tables are not required"),
+    ):
+        _assert_case(fixture, settings, tmp_path, loss_fn=loss_fn)
+
+
+@pytest.mark.parametrize("common_from_subtoks", [False, True])
+def test_realized_only_still_requires_common_mapping(common_from_subtoks: bool) -> None:
+    cfg = _native_sparse_master()
+    cfg.loss_fn.update(
+        prefix_bidir_v3_realized_only_mismatch=True,
+        common_indices_from_subtoks=common_from_subtoks,
+    )
+    teacher = cfg.teachers[1]
+    teacher.aligner.projection_matrix_path = None
+    teacher.aligner.pseudo_target_path = None
+    message = "pseudo_target_path" if common_from_subtoks else "projection_matrix_path"
+    with pytest.raises(ValueError, match=message):
+        _patched_setup_call(cfg)
+
+
+@pytest.mark.parametrize("invalid", ["false", "true", 0, 1, None])
+def test_realized_only_rejects_nonboolean_setup_values(invalid: object) -> None:
+    cfg = _native_sparse_master()
+    cfg.loss_fn["prefix_bidir_v3_realized_only_mismatch"] = invalid
+    with pytest.raises(ValueError, match="realized_only_mismatch"):
+        _patched_setup_call(cfg)
+
+
+@pytest.mark.parametrize("invalid", ["false", "true", 0, 1, None])
+def test_realized_only_schema_rejects_nonboolean_values(invalid: object) -> None:
+    register_omegaconf_resolvers()
+    path = (
+        Path(__file__).resolve().parents[4]
+        / "examples/configs/xtoken_off_policy_distillation.yaml"
+    )
+    config = OmegaConf.to_container(load_config(path), resolve=True)
+    config["loss_fn"]["prefix_bidir_v3_realized_only_mismatch"] = invalid
+    with pytest.raises(ValidationError, match="prefix_bidir_v3_realized_only_mismatch"):
+        MasterConfig.model_validate(config)
+
+
+@pytest.mark.parametrize("layout", ["teacher_pp", "student_pp", "packing", "dynamic"])
+def test_realized_only_preserves_native_layout_restrictions(layout: str) -> None:
+    cfg = _native_sparse_master()
+    cfg.loss_fn["prefix_bidir_v3_realized_only_mismatch"] = True
+    if layout == "teacher_pp":
+        cfg.teachers[1].megatron_cfg["pipeline_model_parallel_size"] = 2
+    elif layout == "student_pp":
+        cfg.policy["megatron_cfg"]["pipeline_model_parallel_size"] = 2
+    elif layout == "packing":
+        cfg.teachers[1].sequence_packing["enabled"] = True
+    else:
+        cfg.teachers[1].dynamic_batching["enabled"] = True
+    with pytest.raises(ValueError, match=r"teachers\[[01]\]"):
+        xt_mod.validate_xtoken_sparse_setup(cfg, [24, 16])
 
 
 def test_setup_sets_derived_train_iters_on_megatron_teacher_and_student():

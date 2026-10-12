@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, NotRequired, Optional, TypedDict, TypeVar
 
 import numpy as np
 import torch
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 from torch.distributed.tensor import DTensor
 
 from nemo_rl.algorithms.loss.draft import (
@@ -2289,6 +2289,10 @@ class CrossTokenizerDistillationLossConfig(TypedDict):
     # student/teacher token-chain probability plus one rest bucket. Disables
     # the 1-to-1 common-vocab KL/JSD and the position-0 auxiliary term.
     prefix_bidir_v3_pure_alm: NotRequired[bool]
+    # Native sparse MCore only: keep common-token distribution matching but
+    # compare each complete observed mismatch chain against REST. Default false
+    # in exemplar YAMLs; absent preserves the existing prefix-support objective.
+    prefix_bidir_v3_realized_only_mismatch: NotRequired[StrictBool]
     # Temperature for pure-ALM BCE. When the v3 loss fn is "bce", the binary
     # target/input are p_teacher ** (1/tau) and p_student ** (1/tau).
     prefix_bidir_v3_alm_bce_tau: NotRequired[float]
@@ -2303,13 +2307,14 @@ class CrossTokenizerDistillationLossConfig(TypedDict):
     teacher_topk_ipc_keep_realized: bool
     # Per-teacher forward pseudo-target table .pt paths (keys ``subtoks`` /
     # ``lengths``: student->teacher sub-token chains), needed for each cross-tok
-    # teacher's prefix-support index unless pure_alm=True. ``None`` for
+    # teacher's prefix-support index unless pure_alm or realized-only mismatch.
+    # Still required for common_indices_from_subtoks in realized-only mode. ``None`` for
     # same-vocab teachers. Runtime-injected by
     # ``xtoken_off_policy_distillation.setup`` from
     # ``teachers[i].aligner.pseudo_target_path``.
     pseudo_target_paths: NotRequired[list[Optional[str]]]
     # Per-teacher reverse pseudo-target table .pt paths (teacher->student
-    # sub-token chains), needed unless pure_alm=True. Runtime-injected from
+    # sub-token chains), needed unless pure_alm or realized-only mismatch. Runtime-injected from
     # ``teachers[i].aligner.reverse_pseudo_target_path``.
     reverse_pseudo_target_paths: NotRequired[list[Optional[str]]]
 
@@ -2414,6 +2419,11 @@ class CrossTokenizerDistillationLossFn(LossFunction):
     input_type = LossInputType.DISTILLATION_CROSS_TOKENIZER
 
     def __init__(self, cfg: CrossTokenizerDistillationLossConfig):
+        if (
+            "prefix_bidir_v3_realized_only_mismatch" in cfg
+            and type(cfg["prefix_bidir_v3_realized_only_mismatch"]) is not bool
+        ):
+            raise ValueError("prefix_bidir_v3_realized_only_mismatch must be a boolean")
         # Dynamic teacher weighting (sum_weights_metric) and normalize_teacher_by_vocab
         # are only applied in kd_loss_mode="sum"; reject the combo instead of
         # silently ignoring them under the other modes.
@@ -2490,6 +2500,15 @@ class CrossTokenizerDistillationLossFn(LossFunction):
                 f"per-teacher lists must be equal length, got {per_teacher_lens}"
             )
         self.num_teachers = len(self.teacher_is_cross_tokenizer)
+        if cfg.get("prefix_bidir_v3_realized_only_mismatch"):
+            if int(cfg["teacher_topk_ipc_k"]) <= 0:
+                raise ValueError(
+                    "prefix_bidir_v3_realized_only_mismatch requires teacher_topk_ipc_k > 0"
+                )
+            if not any(self.teacher_is_cross_tokenizer):
+                raise ValueError(
+                    "prefix_bidir_v3_realized_only_mismatch requires a cross-tokenizer teacher"
+                )
         # ------------------------------------------------------------------
         # v6 (prefix_bidir_partition_kl_v3) state. Each cross-tokenizer teacher's
         # KD term is the prefix-bidir partition KL; same-vocab teachers keep the
@@ -2611,6 +2630,13 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         aligns_by_idx: dict[int, LocalizedAlignment],
         global_valid_chunks_by_idx: Optional[dict[int, torch.Tensor]],
     ) -> Optional[_NativeXTokenLossContext]:
+        if self.cfg.get("prefix_bidir_v3_realized_only_mismatch"):
+            for i, is_cross_tokenizer in enumerate(self.teacher_is_cross_tokenizer):
+                if is_cross_tokenizer and i not in native_sparse_teachers:
+                    raise ValueError(
+                        "prefix_bidir_v3_realized_only_mismatch requires native Megatron "
+                        f"sparse IPC for every cross-tokenizer teacher; teacher {i} uses a legacy route"
+                    )
         if native_student is None:
             if native_sparse_teachers or native_dense_teachers:
                 raise ValueError(
@@ -5159,6 +5185,11 @@ class CrossTokenizerDistillationLossFn(LossFunction):
         Returns ``(loss, metrics_dict)``.
         """
         cfg = self.cfg
+        if cfg.get("prefix_bidir_v3_realized_only_mismatch"):
+            raise ValueError(
+                "prefix_bidir_v3_realized_only_mismatch requires native Megatron sparse IPC; "
+                "legacy cross-tokenizer loss is unsupported"
+            )
         device = student_logits.device
         # ----- Native TP/CP sharded access -------------------------------
         # Both rank-3 tensors stay sequence-local. Student logits additionally

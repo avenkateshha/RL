@@ -16,9 +16,11 @@
 
 The objective follows the pinned sparse v6 implementation: common-token and
 bidirectional prefix supports retain global teacher K, a forced realized pair,
-and REST. M-to-N chunks retain the historical realized-chain objective. Only
-fixed realized student prefixes cross CP; selected final-token probabilities
-and teacher IPC row reads stay on the final student predictor's owner.
+and REST. M-to-N chunks retain the historical realized-chain objective; the
+optional realized-only mismatch mode applies that objective to every mismatch
+while preserving common-token support. Only fixed realized student prefixes
+cross CP; selected final-token probabilities and teacher IPC row reads stay on
+the final student predictor's owner.
 """
 
 from __future__ import annotations
@@ -144,6 +146,7 @@ def compute_native_sparse_teacher_loss(
     temperature = float(loss_fn.temperature)
     k = int(cfg["teacher_topk_ipc_k"])
     noise_k = int(cfg.get("prefix_bidir_v3_noise_filter_topk", 0) or 0)
+    realized_only = cfg.get("prefix_bidir_v3_realized_only_mismatch")
     common_kind = str(cfg.get("prefix_bidir_v3_loss_fn", "kl") or "kl")
     mismatch_kind = str(cfg.get("prefix_bidir_v3_last_pos_loss_fn") or common_kind)
     beta = float(cfg.get("prefix_bidir_v3_jsd_beta", 0.5))
@@ -347,7 +350,11 @@ def compute_native_sparse_teacher_loss(
         if chunk.student_positions[-1] in local_of_global
     ]
     if owners:
-        prefix_index = loss_fn._ensure_bidir_prefix_support_index(device, teacher_idx)
+        prefix_index = (
+            None
+            if realized_only
+            else loss_fn._ensure_bidir_prefix_support_index(device, teacher_idx)
+        )
         for start in range(0, len(owners), _ROW_BATCH_SIZE):
             indices = owners[start : start + _ROW_BATCH_SIZE]
             batch = [mismatches[index] for index in indices]
@@ -361,7 +368,11 @@ def compute_native_sparse_teacher_loss(
             for row, chunk in enumerate(batch):
                 m, n = len(chunk.student_labels), len(chunk.teacher_labels)
                 realized = chunk.student_labels[-1], chunk.teacher_labels[-1]
-                if m == 1 and n > 1:
+                if prefix_index is None:
+                    # Prefix sums below extend this final pair to the complete
+                    # observed chains; REST contains all other chain outcomes.
+                    s_list, t_list = [realized[0]], [realized[1]]
+                elif m == 1 and n > 1:
                     pairs = prefix_index["forward"].get(
                         (n, chunk.teacher_labels[:-1]), ()
                     )

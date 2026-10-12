@@ -284,8 +284,9 @@ always export dense logits. This transport setting is separate from
 For each native sparse MCore teacher, supply its own forward and reverse subtoken
 tables. Table-based common-vocabulary matching uses
 `common_indices_from_subtoks: true` with a null projection path. A matrix-derived
-common-token map remains supported, but the two prefix tables are still required
-for native sparse mismatch support.
+common-token map remains supported. By default, both prefix tables are required
+for native sparse mismatch support; realized-only mismatches relax this requirement
+as described below.
 
 The native sparse envelope requires:
 
@@ -311,6 +312,50 @@ Two chunks requesting the same teacher row can require different labels without
 changing each other's support. The exact full-vocabulary log-normalizer and REST
 mass remain part of the sparse objective. Producer slabs retain FP32 scores and
 int32 IDs, while bounded temporary tiles handle selection and normalization.
+
+#### Realized-only mismatches
+
+Set `loss_fn.prefix_bidir_v3_realized_only_mismatch: true` to preserve the
+common-token distribution loss while comparing only the complete observed chains
+for every mismatch. For each model, the chain probability is the product of its
+conditional token probabilities (computed by adding log probabilities). The
+mismatch compares `[p_student, 1 - p_student]` with
+`[p_teacher, 1 - p_teacher]`; REST includes all mass outside that observed chain.
+Unlike `pure_alm`, this leaves common-token matching intact.
+
+The boolean defaults to `false`; omission also preserves existing behavior.
+Enabling it requires positive `teacher_topk_ipc_k`, at least one cross-tokenizer
+teacher, and native sparse MCore transport for **every** cross-tokenizer teacher.
+Dense and legacy DTensor cross-tokenizer routes are rejected, including mixed
+lists containing an unsupported teacher. Otherwise-supported same-tokenizer
+teachers retain their normal loss. The existing static, unpacked MCore PP1
+requirements and objective restrictions above still apply.
+
+Only mismatch support changes. KL direction, KL/JSD selection, temperature and
+temperature-squared scaling, masks, natural-top-K noise filtering, mismatch
+weight, normalization, teacher aggregation and the separate CE term are retained.
+Many-to-many mismatches already use this singleton support and are unchanged.
+Teacher probabilities still use the full-vocabulary normalizer.
+
+| Common mapping source | Required with realized-only mismatches | May be omitted |
+| --- | --- | --- |
+| `common_indices_from_subtoks: true` | Forward pseudo-target table | Reverse pseudo-target table |
+| `common_indices_from_subtoks: false` | Projection matrix | Both pseudo-target tables |
+
+For example, with a supported native MCore student and cross-tokenizer teachers:
+
+```yaml
+loss_fn:
+  teacher_topk_ipc_k: 64
+  teacher_topk_ipc_keep_realized: true
+  prefix_bidir_v3_realized_only_mismatch: true
+  prefix_bidir_v3_position_0_kl: false
+  common_indices_from_subtoks: true
+```
+
+Each cross-tokenizer teacher then needs its forward `aligner.pseudo_target_path`;
+its `aligner.reverse_pseudo_target_path` may be null. False or absent retains the
+original artifact requirements.
 
 ### Text and chat batches
 

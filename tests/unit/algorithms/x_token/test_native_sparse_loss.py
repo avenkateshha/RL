@@ -2,6 +2,9 @@
 
 from dataclasses import fields, replace
 from datetime import timedelta
+from itertools import product
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -27,6 +30,7 @@ from nemo_rl.distributed.selected_logprobs import (
 from nemo_rl.distributed.sparse_topk import distributed_vocab_topk_logz_force
 from tests.unit.algorithms.x_token.native_sparse_fixtures import (
     ObjectiveSettings,
+    SparseFixture,
     build_sparse_fixture,
     forced_label_sidecar,
     teacher_sparse_oracle,
@@ -34,7 +38,7 @@ from tests.unit.algorithms.x_token.native_sparse_fixtures import (
 )
 
 
-def make_loss_fn(fixture, settings, table_dir):
+def make_loss_fn(fixture, settings, table_dir, *, loss_overrides=None):
     from nemo_rl.algorithms.loss.loss_functions import CrossTokenizerDistillationLossFn
 
     tables = [write_tables(teacher, table_dir) for teacher in fixture.teachers]
@@ -67,6 +71,16 @@ def make_loss_fn(fixture, settings, table_dir):
             "prefix_bidir_v3_mismatch_pos0_alpha": 0.0,
             "prefix_bidir_v3_mismatch_loss_beta": settings.mismatch_multiplier,
             "prefix_bidir_v3_noise_filter_topk": settings.noise_filter_k,
+            **(
+                {
+                    "prefix_bidir_v3_realized_only_mismatch": (
+                        settings.realized_only_mismatch
+                    )
+                }
+                if settings.realized_only_mismatch is not None
+                else {}
+            ),
+            **(loss_overrides or {}),
         }
     )
 
@@ -200,8 +214,10 @@ def _assert_case(
     cp_size=1,
     device=torch.device("cpu"),
     zero_count=False,
+    loss_fn=None,
 ):
-    loss_fn = make_loss_fn(fixture, settings, table_dir)
+    if loss_fn is None:
+        loss_fn = make_loss_fn(fixture, settings, table_dir)
     full = fixture.student_logits.to(device)
     positions = cp_native_global_positions(
         full.shape[1], cp_rank, cp_size, device=device
@@ -256,6 +272,7 @@ def _assert_case(
     )
     padded_start = max(0, fixture.student_vocab_size - tp_rank * width)
     assert actual_gradient[..., padded_start:].count_nonzero() == 0
+    return combined.detach(), actual_gradient
 
 
 @pytest.mark.parametrize(
@@ -268,6 +285,15 @@ def _assert_case(
         ObjectiveSettings(noise_filter_k=1),
         ObjectiveSettings(k=1),
         ObjectiveSettings(shift=False),
+        ObjectiveSettings(realized_only_mismatch=False),
+        ObjectiveSettings(realized_only_mismatch=True),
+        ObjectiveSettings(
+            realized_only_mismatch=True, common_loss="kl", reverse_kl=True
+        ),
+        ObjectiveSettings(realized_only_mismatch=True, mismatch_loss="jsd"),
+        ObjectiveSettings(realized_only_mismatch=True, noise_filter_k=6),
+        ObjectiveSettings(realized_only_mismatch=True, noise_filter_k=1),
+        ObjectiveSettings(realized_only_mismatch=True, shift=False),
     ],
 )
 def test_native_sparse_two_teachers_match_selected_support_oracle(tmp_path, settings):
@@ -277,8 +303,12 @@ def test_native_sparse_two_teachers_match_selected_support_oracle(tmp_path, sett
 @pytest.mark.parametrize(
     "case", ["masked", "empty_teacher", "zero_weight", "zero_multiplier"]
 )
-def test_native_sparse_empty_and_zero_terms_keep_correct_gradients(tmp_path, case):
-    fixture, settings = build_sparse_fixture(), ObjectiveSettings()
+@pytest.mark.parametrize("realized_only", [False, True])
+def test_native_sparse_empty_and_zero_terms_keep_correct_gradients(
+    tmp_path, case, realized_only
+):
+    fixture = build_sparse_fixture()
+    settings = ObjectiveSettings(realized_only_mismatch=realized_only)
     if case == "masked":
         fixture = replace(fixture, sample_mask=torch.zeros_like(fixture.sample_mask))
     elif case == "empty_teacher":
@@ -296,15 +326,23 @@ def test_native_sparse_empty_and_zero_terms_keep_correct_gradients(tmp_path, cas
     _assert_case(fixture, settings, tmp_path)
 
 
-def test_native_sparse_reordered_microbatches_keep_full_step_denominators(tmp_path):
-    fixture, settings = build_sparse_fixture(), ObjectiveSettings()
+@pytest.mark.parametrize("realized_only", [False, True])
+def test_native_sparse_reordered_microbatches_keep_full_step_denominators(
+    tmp_path, realized_only
+):
+    fixture = build_sparse_fixture()
+    settings = ObjectiveSettings(realized_only_mismatch=realized_only)
     for batch in (1, 0):
         _assert_case(fixture.slice_samples(batch, batch + 1), settings, tmp_path)
 
 
 @pytest.mark.parametrize("denominator", [0.0, -1.0, float("inf"), float("nan")])
-def test_native_sparse_explicit_normalizer_validation(tmp_path, denominator):
-    fixture, settings = build_sparse_fixture(), ObjectiveSettings()
+@pytest.mark.parametrize("realized_only", [False, True])
+def test_native_sparse_explicit_normalizer_validation(
+    tmp_path, denominator, realized_only
+):
+    fixture = build_sparse_fixture()
+    settings = ObjectiveSettings(realized_only_mismatch=realized_only)
     loss_fn = make_loss_fn(fixture, settings, tmp_path)
     logits = fixture.student_logits.clone().requires_grad_()
     teacher = fixture.teachers[0]
@@ -329,6 +367,217 @@ def test_native_sparse_explicit_normalizer_validation(tmp_path, denominator):
         assert torch.autograd.grad(loss, logits)[0].count_nonzero() == 0
 
 
+def _only_shape(fixture: SparseFixture, shape: str) -> SparseFixture:
+    def matches(student: tuple[int, int], teacher: tuple[int, int]) -> bool:
+        student_size, teacher_size = student[1] - student[0], teacher[1] - teacher[0]
+        return {
+            "common": student_size == teacher_size == 1,
+            "one_to_many": student_size == 1 and teacher_size > 1,
+            "many_to_one": student_size > 1 and teacher_size == 1,
+            "many_to_many": student_size > 1 and teacher_size > 1,
+        }[shape]
+
+    return replace(
+        fixture,
+        teachers=tuple(
+            replace(
+                teacher,
+                chunks=tuple(
+                    tuple(
+                        replace(
+                            chunk,
+                            valid=chunk.valid and matches(chunk.student, chunk.teacher),
+                        )
+                        for chunk in row
+                    )
+                    for row in teacher.chunks
+                ),
+            )
+            for teacher in fixture.teachers
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "shape", ["common", "one_to_many", "many_to_one", "many_to_many"]
+)
+def test_realized_only_changes_only_mismatch_alternatives(
+    tmp_path: Path, shape: str
+) -> None:
+    fixture = _only_shape(build_sparse_fixture(), shape)
+    settings = ObjectiveSettings(k=4, realized_only_mismatch=False)
+    old_oracle = teacher_sparse_oracle(
+        fixture, fixture.teachers[0], fixture.student_logits, settings
+    )
+    enabled = replace(settings, realized_only_mismatch=True)
+    new_oracle = teacher_sparse_oracle(
+        fixture, fixture.teachers[0], fixture.student_logits, enabled
+    )
+    if shape != "many_to_many":
+        assert any(len(chunk.support) > 1 for chunk in old_oracle.chunks)
+    if shape != "common":
+        assert all(len(chunk.support) == 1 for chunk in new_oracle.chunks)
+    old_loss, old_grad = _assert_case(fixture, settings, tmp_path)
+    new_loss, new_grad = _assert_case(fixture, enabled, tmp_path)
+    if shape in ("common", "many_to_many"):
+        torch.testing.assert_close(new_loss, old_loss, rtol=0, atol=0)
+        torch.testing.assert_close(new_grad, old_grad, rtol=0, atol=0)
+    else:
+        assert not torch.isclose(new_loss, old_loss)
+        assert not torch.allclose(new_grad, old_grad)
+
+
+def test_realized_only_k1_and_absent_flag_are_backward_compatible(
+    tmp_path: Path,
+) -> None:
+    fixture = build_sparse_fixture()
+    for first, second in (
+        (ObjectiveSettings(), ObjectiveSettings(realized_only_mismatch=False)),
+        (ObjectiveSettings(k=1), ObjectiveSettings(k=1, realized_only_mismatch=True)),
+    ):
+        old_loss, old_grad = _assert_case(fixture, first, tmp_path)
+        new_loss, new_grad = _assert_case(fixture, second, tmp_path)
+        torch.testing.assert_close(new_loss, old_loss, rtol=0, atol=0)
+        torch.testing.assert_close(new_grad, old_grad, rtol=0, atol=0)
+
+
+def realized_artifact_overrides(
+    fixture: SparseFixture, directory: Path, *, common_from_subtoks: bool
+) -> dict[str, object]:
+    """Create only the common-map artifacts used by realized-only mode."""
+    directory.mkdir(parents=True, exist_ok=True)
+    forward_paths, projection_paths = [], []
+    for teacher in fixture.teachers:
+        if common_from_subtoks:
+            forward, reverse = write_tables(teacher, directory)
+            reverse.unlink()
+            forward_paths.append(str(forward))
+            projection_paths.append(None)
+        else:
+            indices = torch.zeros(fixture.student_vocab_size, 1, dtype=torch.long)
+            likelihoods = torch.zeros(fixture.student_vocab_size, 1)
+            for student_id, chain in enumerate(teacher.forward):
+                if len(chain) == 1:
+                    indices[student_id, 0] = chain[0]
+                    likelihoods[student_id, 0] = 1
+            projection = directory / f"{teacher.name}_projection.pt"
+            torch.save({"indices": indices, "likelihoods": likelihoods}, projection)
+            forward_paths.append(None)
+            projection_paths.append(str(projection))
+    return {
+        "common_indices_from_subtoks": common_from_subtoks,
+        "projection_matrix_paths": projection_paths,
+        "pseudo_target_paths": forward_paths,
+        "reverse_pseudo_target_paths": [None] * len(fixture.teachers),
+    }
+
+
+@pytest.mark.parametrize("common_from_subtoks", [False, True])
+def test_realized_only_never_accesses_prefix_support_and_allows_artifact_omissions(
+    tmp_path: Path, common_from_subtoks: bool
+) -> None:
+    fixture = build_sparse_fixture()
+    settings = ObjectiveSettings(realized_only_mismatch=True)
+    artifacts = realized_artifact_overrides(
+        fixture, tmp_path / "artifacts", common_from_subtoks=common_from_subtoks
+    )
+    loss_fn = make_loss_fn(
+        fixture, settings, tmp_path / "unused", loss_overrides=artifacts
+    )
+    with patch.object(
+        loss_fn,
+        "_ensure_bidir_prefix_support_index",
+        side_effect=AssertionError("Prefix support must not be accessed"),
+    ):
+        _assert_case(fixture, settings, tmp_path, loss_fn=loss_fn)
+
+
+@pytest.mark.parametrize("transport", ["dense", "sparse"])
+def test_realized_only_rejected_at_legacy_loss_boundary(
+    tmp_path: Path, transport: str
+) -> None:
+    fixture = build_sparse_fixture()
+    settings = ObjectiveSettings(realized_only_mismatch=True)
+    loss_fn = make_loss_fn(fixture, settings, tmp_path)
+    teacher = fixture.teachers[0]
+    with pytest.raises(ValueError, match="realized_only_mismatch"):
+        loss_fn._compute_prefix_bidir_partition_kl_v3(
+            0,
+            fixture.student_logits,
+            teacher.logits if transport == "dense" else None,
+            make_alignment(fixture, teacher),
+            teacher_sparse_payload=None
+            if transport == "dense"
+            else (None, None, None, None),
+            teacher_vocab_size=teacher.real_vocab_size,
+            global_valid_chunks=torch.tensor(teacher.global_valid_chunks),
+        )
+
+
+@pytest.mark.parametrize("invalid", ["false", "true", 0, 1, None])
+def test_realized_only_constructor_rejects_nonboolean_values(
+    tmp_path: Path, invalid: object
+) -> None:
+    with pytest.raises(ValueError, match="realized_only_mismatch"):
+        make_loss_fn(
+            build_sparse_fixture(),
+            ObjectiveSettings(),
+            tmp_path,
+            loss_overrides={"prefix_bidir_v3_realized_only_mismatch": invalid},
+        )
+
+
+@pytest.mark.parametrize("unsupported", ["k_zero", "no_cross_teacher"])
+def test_realized_only_constructor_rejects_unsupported_routes(
+    tmp_path: Path, unsupported: str
+) -> None:
+    overrides = (
+        {"teacher_topk_ipc_k": 0}
+        if unsupported == "k_zero"
+        else {
+            "teacher_is_cross_tokenizer": [False, False],
+            "pseudo_target_paths": [None, None],
+            "reverse_pseudo_target_paths": [None, None],
+        }
+    )
+    with pytest.raises(ValueError, match="realized_only_mismatch"):
+        make_loss_fn(
+            build_sparse_fixture(),
+            ObjectiveSettings(realized_only_mismatch=True),
+            tmp_path,
+            loss_overrides=overrides,
+        )
+
+
+@pytest.mark.parametrize("transport", ["dense", "sparse"])
+def test_absent_and_false_preserve_legacy_loss_and_gradients(
+    tmp_path: Path, transport: str
+) -> None:
+    fixture, settings = build_sparse_fixture(), ObjectiveSettings()
+    teacher = fixture.teachers[0]
+    raw = teacher.logits[..., : teacher.real_vocab_size]
+    values, ids = raw.topk(settings.k, dim=-1)
+    payload = (values, ids.int(), (raw / settings.temperature).logsumexp(-1), None)
+    results = []
+    for flag in (None, False):
+        loss_fn = make_loss_fn(
+            fixture, replace(settings, realized_only_mismatch=flag), tmp_path
+        )
+        logits = fixture.student_logits.clone().requires_grad_()
+        loss, _ = loss_fn._compute_prefix_bidir_partition_kl_v3(
+            0,
+            logits,
+            raw if transport == "dense" else None,
+            make_alignment(fixture, teacher),
+            teacher_sparse_payload=payload if transport == "sparse" else None,
+            teacher_vocab_size=teacher.real_vocab_size,
+            global_valid_chunks=torch.tensor(teacher.global_valid_chunks),
+        )
+        results.append((loss.detach(), torch.autograd.grad(loss, logits)[0]))
+    for old, explicit_false in zip(results[0], results[1], strict=True):
+        torch.testing.assert_close(old, explicit_false, rtol=0, atol=0)
+
+
 def _grid_process(rank, tp_size, cp_size, init_path, table_dir, cuda):
     torch.set_num_threads(1)
     device = torch.device("cuda", rank) if cuda else torch.device("cpu")
@@ -345,17 +594,21 @@ def _grid_process(rank, tp_size, cp_size, init_path, table_dir, cuda):
         tp_rank, cp_rank = divmod(rank, cp_size)
         tp_group, cp_group = make_parallel_groups(tp_size, cp_size)
         fixture = build_sparse_fixture()
-        for case in (
-            "normal",
-            "masked",
-            "empty_teacher",
-            "zero_weight",
-            "filtered",
-            "bf16",
-            "prefix_only",
-            "zero_denominator",
+        for case, realized_only in product(
+            (
+                "normal",
+                "masked",
+                "empty_teacher",
+                "zero_weight",
+                "filtered",
+                "bf16",
+                "prefix_only",
+                "zero_denominator",
+            ),
+            (False, True),
         ):
-            current, settings = fixture, ObjectiveSettings()
+            current = fixture
+            settings = ObjectiveSettings(realized_only_mismatch=realized_only)
             if case == "masked":
                 current = replace(
                     fixture, sample_mask=torch.zeros_like(fixture.sample_mask)
